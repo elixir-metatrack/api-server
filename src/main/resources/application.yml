@@ -6,3 +6,6 @@ quarkus:
   hibernate-orm:
     schema-management:
       strategy: drop-and-create
+  oidc:
+    application-type: service
+    auth-server-url: http://localhost:8080/realms/metatrack
