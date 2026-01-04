@@ -1,10 +1,9 @@
-package no.metatrack.server.controllers;
+package no.metatrack.server.health;
 
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-import no.metatrack.server.Dtos.HealthStatusResponse;
 import org.jboss.logging.Logger;
 
 @Path("/")
