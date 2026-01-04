@@ -1,4 +1,6 @@
 quarkus:
+  http:
+    port: 1234
   virtual-threads:
     enabled: true
   hibernate-orm:
