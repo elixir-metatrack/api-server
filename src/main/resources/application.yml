@@ -6,6 +6,11 @@ quarkus:
   hibernate-orm:
     schema-management:
       strategy: drop-and-create
+  datasource:
+    db-kind: postgresql
+    username: postgres
+    jdbc:
+      url: jdbc:postgresql://localhost:5432/postgres
   oidc:
     application-type: service
     auth-server-url: http://localhost:8080/realms/metatrack
