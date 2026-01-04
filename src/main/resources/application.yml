@@ -1,3 +1,6 @@
 quarkus:
   virtual-threads:
     enabled: true
+  hibernate-orm:
+    schema-management:
+      strategy: drop-and-create
