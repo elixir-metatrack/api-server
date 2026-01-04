@@ -14,3 +14,9 @@ quarkus:
   oidc:
     application-type: service
     auth-server-url: http://localhost:8080/realms/metatrack
+  minio:
+    host: http://localhost
+    port: 9000
+    secure: false
+    access-key: minioadmin
+    secret-key: minioadmin
