@@ -5,7 +5,7 @@ quarkus:
     enabled: true
   hibernate-orm:
     schema-management:
-      strategy: drop-and-create
+      strategy: update
   datasource:
     db-kind: postgresql
     username: postgres
@@ -20,3 +20,4 @@ quarkus:
     secure: false
     access-key: minioadmin
     secret-key: minioadmin
+    bucket-name: metatrack
