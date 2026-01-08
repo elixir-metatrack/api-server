@@ -23,4 +23,8 @@ public class ProjectMember extends PanacheEntity {
     public static Optional<ProjectMember> findMemberInProjectOptional(UUID memberId, Long projectId) {
         return find("memberId = ?1 and project.id = ?2", memberId, projectId).firstResultOptional();
     }
+
+    public static boolean isMember(UUID memberId, Long projectId) {
+        return count("memberId = ?1 and project.id = ?2", memberId, projectId) > 0;
+    }
 }

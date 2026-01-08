@@ -8,6 +8,7 @@ import no.metatrack.server.auth.CurrentUser;
 import no.metatrack.server.auth.UserService;
 
 import java.util.List;
+import java.util.UUID;
 
 @Path("/api/projects")
 public class ProjectController {
@@ -60,6 +61,29 @@ public class ProjectController {
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
         projectService.deleteProject(projectId);
+        return Response.noContent().build();
+    }
+
+    @POST
+    @Authenticated
+    @Path("/{projectId}/member/{memberId}")
+    public Response addMember(
+            @PathParam("projectId") Long projectId, @PathParam("memberId") UUID memberId, AddMemberRequest request) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        projectService.addMember(projectId, memberId, request.role());
+        return Response.noContent().build();
+    }
+
+    @DELETE
+    @Authenticated
+    @Path("/{projectId}/member/{memberId}")
+    public Response removeMember(@PathParam("projectId") Long projectId, @PathParam("memberId") UUID memberId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        projectService.removeMember(projectId, memberId);
         return Response.noContent().build();
     }
 }

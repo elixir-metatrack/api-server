@@ -60,4 +60,33 @@ public class ProjectService {
 
         project.delete();
     }
+
+    @Transactional
+    public void addMember(Long projectId, UUID memberId, ProjectRole role) {
+        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+
+        if (ProjectMember.isMember(memberId, projectId)) {
+            throw new WebApplicationException("Member already exists", Response.Status.CONFLICT);
+        }
+
+        ProjectMember member = new ProjectMember();
+        member.memberId = memberId;
+        member.role = role;
+        member.project = project;
+
+        project.projectMembers.add(member);
+    }
+
+    @Transactional
+    public void removeMember(Long projectId, UUID memberId) {
+        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (!ProjectMember.isMember(memberId, projectId)) {
+            throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
+        }
+
+        ProjectMember member =
+                ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
+
+        project.projectMembers.remove(member);
+    }
 }
