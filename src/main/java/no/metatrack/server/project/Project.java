@@ -12,21 +12,21 @@ import java.util.UUID;
 @Entity
 public class Project extends PanacheEntity {
     @Column(unique = true, nullable = false)
-    String name;
+    public String name;
 
-    String description;
+    public String description;
 
     @Column(nullable = false)
-    UUID owner; // keycloak ID
+    public UUID owner; // keycloak ID
 
-    Instant createdOn;
-    Instant modifiedOn;
-
-    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<ProjectMember> projectMembers = new HashSet<>();
+    public Instant createdOn;
+    public Instant modifiedOn;
 
     @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<Sample> samples = new HashSet<>();
+    public Set<ProjectMember> projectMembers = new HashSet<>();
+
+    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    public Set<Sample> samples = new HashSet<>();
 
     public static boolean projectExists(Long projectId) {
         return findByIdOptional(projectId).isPresent();
