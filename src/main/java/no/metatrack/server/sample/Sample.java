@@ -64,4 +64,10 @@ public class Sample extends PanacheEntityBase {
     public static Optional<Sample> findBySampleNameInProject(String name, Long projectId) {
         return find("project.id = ?1 and name = ?2", projectId, name).firstResultOptional();
     }
+
+    public static boolean sampleExistsByName(String name, Long projectId) {
+        return find("project.id = ?1 and name = ?2", projectId, name)
+                .firstResultOptional()
+                .isPresent();
+    }
 }
