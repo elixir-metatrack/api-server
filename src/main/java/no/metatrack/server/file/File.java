@@ -3,6 +3,9 @@ package no.metatrack.server.file;
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import no.metatrack.server.sample.Sample;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +25,9 @@ public class File extends PanacheEntity {
     String objectKey;
 
     UploadStatus status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    Sample sample;
 
     public static Optional<File> findByObjectKeyOptional(String objectKey) {
         File file = File.find("objectKey", objectKey).firstResult();

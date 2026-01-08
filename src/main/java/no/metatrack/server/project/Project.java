@@ -2,6 +2,7 @@ package no.metatrack.server.project;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.*;
+import no.metatrack.server.sample.Sample;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -23,6 +24,9 @@ public class Project extends PanacheEntity {
 
     @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<ProjectMember> projectMembers = new HashSet<>();
+
+    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<Sample> samples = new HashSet<>();
 
     public static boolean projectExists(Long projectId) {
         return findByIdOptional(projectId).isPresent();
