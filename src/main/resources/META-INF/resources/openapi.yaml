@@ -1,0 +1,408 @@
+---
+openapi: 3.1.0
+components:
+  schemas:
+    AddMemberRequest:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/ProjectRole"
+    Bucket:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    HealthStatusResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    Instant:
+      type: string
+      format: date-time
+      examples:
+      - 2022-03-10T16:15:50Z
+    MinioEvent:
+      type: object
+      properties:
+        Records:
+          type: array
+          items:
+            $ref: "#/components/schemas/Record"
+    ObjectData:
+      type: object
+      properties:
+        key:
+          type: string
+        size:
+          type: integer
+          format: int64
+        eTag:
+          type: string
+    PresignDownloadRequest:
+      type: object
+      required:
+      - projectId
+      - sampleId
+      - fileName
+      properties:
+        projectId:
+          type: string
+          pattern: \S
+        sampleId:
+          type: string
+          pattern: \S
+        fileName:
+          type: string
+          pattern: \S
+    PresignResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        objectKey:
+          type: string
+        expiresIn:
+          type: integer
+          format: int32
+        expiresAt:
+          $ref: "#/components/schemas/Instant"
+    PresignUploadRequest:
+      type: object
+      required:
+      - projectId
+      - sampleId
+      - fileName
+      properties:
+        projectId:
+          type: string
+          pattern: \S
+        sampleId:
+          type: string
+          pattern: \S
+        fileName:
+          type: string
+          pattern: \S
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          $ref: "#/components/schemas/UUID"
+    ProjectRole:
+      type: string
+      enum:
+      - OWNER
+      - ADMIN
+      - EDITOR
+      - VIEWER
+    Record:
+      type: object
+      properties:
+        s3:
+          $ref: "#/components/schemas/S3"
+        eventName:
+          type: string
+    S3:
+      type: object
+      properties:
+        bucket:
+          $ref: "#/components/schemas/Bucket"
+        object:
+          $ref: "#/components/schemas/ObjectData"
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    UserResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+  securitySchemes:
+    SecurityScheme:
+      type: openIdConnect
+      openIdConnectUrl: http://localhost:8080/realms/metatrack/.well-known/openid-configuration
+      description: Authentication
+paths:
+  /api/files/presign-download:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresignDownloadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+        "400":
+          description: Bad Request
+      summary: Presign Download
+      tags:
+      - File Controller
+  /api/files/presign-upload:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresignUploadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+        "400":
+          description: Bad Request
+      summary: Presign Upload
+      tags:
+      - File Controller
+  /api/projects:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectResponse"
+      summary: Get All Projects
+      tags:
+      - Project Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Create New Project
+      tags:
+      - Project Controller
+      security:
+      - SecurityScheme: []
+  /api/projects/{projectId}:
+    patch:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Update Project
+      tags:
+      - Project Controller
+      security:
+      - SecurityScheme: []
+    delete:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Delete Project
+      tags:
+      - Project Controller
+      security:
+      - SecurityScheme: []
+  /api/projects/{projectId}/member/{memberId}:
+    delete:
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Remove Member
+      tags:
+      - Project Controller
+      security:
+      - SecurityScheme: []
+    post:
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Add Member
+      tags:
+      - Project Controller
+      security:
+      - SecurityScheme: []
+  /api/whoami:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Get User Info
+      tags:
+      - User Controller
+      security:
+      - SecurityScheme: []
+  /status:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatusResponse"
+      summary: Status
+      tags:
+      - Status Controller
+  /webhook/minio:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MinioEvent"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Bad Request
+      summary: Process Webhook
+      tags:
+      - Minio Webhook Controller
+info:
+  title: server API
+  version: 1.0-SNAPSHOT
+servers:
+- url: http://localhost:1234
+  description: Auto generated value
+- url: http://0.0.0.0:1234
+  description: Auto generated value

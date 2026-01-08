@@ -21,3 +21,5 @@ quarkus:
     access-key: minioadmin
     secret-key: minioadmin
     bucket-name: metatrack
+  smallrye-openapi:
+    store-schema-directory: src/main/resources/META-INF/resources
