@@ -25,19 +25,19 @@ public class PresignUrlService {
 
         String objectKey = projectId + "/" + sampleId + "/" + fileName;
 
-        if (FileEntity.findByObjectKeyOptional(objectKey).isPresent()) {
+        if (File.findByObjectKeyOptional(objectKey).isPresent()) {
             throw new WebApplicationException("File already exists!", 409);
         }
 
         UUID fileId = UUID.randomUUID();
 
-        FileEntity fileEntity = new FileEntity();
-        fileEntity.uuid = fileId;
-        fileEntity.fileName = fileName;
-        fileEntity.virtualPath = objectKey;
-        fileEntity.objectKey = objectKey;
-        fileEntity.status = UploadStatus.PENDING;
-        fileEntity.persist();
+        File file = new File();
+        file.uuid = fileId;
+        file.fileName = fileName;
+        file.virtualPath = objectKey;
+        file.objectKey = objectKey;
+        file.status = UploadStatus.PENDING;
+        file.persist();
 
         var args = GetPresignedObjectUrlArgs.builder()
                 .method(Method.PUT)

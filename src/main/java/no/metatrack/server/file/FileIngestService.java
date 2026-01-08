@@ -30,7 +30,7 @@ public class FileIngestService {
                     StatObjectArgs.builder().bucket(bucketName).object(key).build();
             minioClient.statObject(statObjectArgs);
 
-            FileEntity file = FileEntity.findByObjectKeyOptional(key)
+            File file = File.findByObjectKeyOptional(key)
                     .orElseThrow(() -> new WebApplicationException("File Not Found", 404));
 
             file.status = UploadStatus.UPLOADED;

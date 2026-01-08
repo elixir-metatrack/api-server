@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Entity
-public class FileEntity extends PanacheEntity {
+public class File extends PanacheEntity {
     @Column(unique = true, nullable = false)
     UUID uuid;
 
@@ -23,8 +23,8 @@ public class FileEntity extends PanacheEntity {
 
     UploadStatus status;
 
-    public static Optional<FileEntity> findByObjectKeyOptional(String objectKey) {
-        FileEntity file = FileEntity.find("objectKey", objectKey).firstResult();
+    public static Optional<File> findByObjectKeyOptional(String objectKey) {
+        File file = File.find("objectKey", objectKey).firstResult();
         if (file == null) {
             return Optional.empty();
         }
