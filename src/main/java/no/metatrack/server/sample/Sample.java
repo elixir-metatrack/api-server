@@ -7,50 +7,59 @@ import no.metatrack.server.project.Project;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"name", "project_id"}))
 public class Sample extends PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    UUID id;
+    public UUID id;
 
-    String name;
+    public String name;
 
-    String alias;
+    public String alias;
 
     @Column(nullable = false)
-    int taxId;
+    public int taxId;
 
-    int hostTaxId;
+    public int hostTaxId;
 
-    String mlst;
+    public String mlst;
 
-    String isolationSource;
+    public String isolationSource;
 
-    LocalDate collectionDate;
+    public LocalDate collectionDate;
 
-    String location; // consider using location4j here!!
+    public String location; // consider using location4j here!!
 
-    String sequencingLab;
+    public String sequencingLab;
 
-    String institution;
+    public String institution;
 
-    String hostHealthState;
+    public String hostHealthState;
 
-    Instant createdOn;
+    public Instant createdOn;
 
-    Instant modifiedOn;
+    public Instant modifiedOn;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    Project project;
+    public Project project;
 
     @OneToMany(mappedBy = "sample", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<File> files = new HashSet<>();
+    public Set<File> files = new HashSet<>();
+
+    public static boolean sampleExists(Long sampleId) {
+        return findByIdOptional(sampleId).isPresent();
+    }
+
+    public static Optional<Sample> findSampleById(UUID sampleId) {
+        return findByIdOptional(sampleId);
+    }
+
+    public static List<Sample> getAllSamplesInProject(Long projectId) {
+        return list("project.id = ?1", projectId);
+    }
 
     public static Optional<Sample> findBySampleNameInProject(String name, Long projectId) {
         return find("project.id = ?1 and name = ?2", projectId, name).firstResultOptional();
