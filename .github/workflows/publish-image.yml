@@ -42,10 +42,17 @@ jobs:
 
       - name: Build and push (Quarkus)
         run: |
+          # Docker/GHCR requires lowercase names
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          
+          # The metadata-action provides the primary version tag (e.g., 'main' or 'v1.0')
+          # as 'steps.meta.outputs.version'
           ./mvnw -B -DskipTests package \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
+            -Dquarkus.container-image.builder=jib \
             -Dquarkus.container-image.registry=ghcr.io \
-            -Dquarkus.container-image.group=${{ github.repository_owner }} \
-            -Dquarkus.container-image.name=$(basename "${{ github.repository }}") \
+            -Dquarkus.container-image.group=${OWNER_LC} \
+            -Dquarkus.container-image.name=${REPO_NAME} \
             -Dquarkus.container-image.tag=${{ steps.meta.outputs.version }}
