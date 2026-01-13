@@ -6,6 +6,8 @@ import io.minio.http.Method;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.sample.Sample;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.UUID;
@@ -21,6 +23,8 @@ public class PresignUrlService {
     @Transactional
     public String presignedUploadUrl(String projectId, String sampleName, String fileName, int expiryInSeconds)
             throws Exception {
+        Sample sample = Sample.findBySampleNameInProject(sampleName, Long.parseLong(projectId))
+                .orElseThrow(NotFoundException::new);
 
         String objectKey = projectId + "/" + sampleName + "/" + fileName;
 
@@ -43,7 +47,8 @@ public class PresignUrlService {
         file.virtualPath = objectKey;
         file.objectKey = objectKey;
         file.status = UploadStatus.PENDING;
-        file.persist();
+
+        sample.files.add(file);
 
         argsBuilder.method(Method.PUT).bucket(bucketName).object(objectKey).expiry(expiryInSeconds);
 
