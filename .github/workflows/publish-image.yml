@@ -63,4 +63,5 @@ jobs:
             -Dquarkus.container-image.registry=ghcr.io \
             -Dquarkus.container-image.group=${OWNER_LC} \
             -Dquarkus.container-image.name=${REPO_NAME} \
-            -Dquarkus.container-image.tag=${{ steps.meta.outputs.version }}
+            -Dquarkus.container-image.tag=${PRIMARY_TAG} \
+            -Djib.to.tags=${ADDITIONAL_TAGS}
