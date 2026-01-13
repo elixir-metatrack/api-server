@@ -1,6 +1,9 @@
 quarkus:
   http:
     port: 1234
+    access-log:
+      enabled: true
+      log-to-file: false
   virtual-threads:
     enabled: true
   hibernate-orm:
@@ -25,3 +28,11 @@ quarkus:
     path: /q/openapi
     always-include: true
     store-schema-directory: src/main/resources/META-INF/resources
+  log:
+    console:
+      json:
+        enable: true
+        log-format: ECS
+    category:
+      "io.quarkus.http.access-log":
+        level: INFO
