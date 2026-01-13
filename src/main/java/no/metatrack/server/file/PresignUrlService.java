@@ -6,7 +6,6 @@ import io.minio.http.Method;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.WebApplicationException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.UUID;
@@ -20,10 +19,12 @@ public class PresignUrlService {
     String bucketName;
 
     @Transactional
-    public String presignedUploadUrl(String projectId, String sampleId, String fileName, int expiryInSeconds)
+    public String presignedUploadUrl(String projectId, String sampleName, String fileName, int expiryInSeconds)
             throws Exception {
 
-        String objectKey = projectId + "/" + sampleId + "/" + fileName;
+        String objectKey = projectId + "/" + sampleName + "/" + fileName;
+
+        var argsBuilder = GetPresignedObjectUrlArgs.builder();
 
         if (File.findByObjectKeyOptional(objectKey).isPresent()) {
             File file = File.findByObjectKeyOptional(objectKey).get();
@@ -44,14 +45,9 @@ public class PresignUrlService {
         file.status = UploadStatus.PENDING;
         file.persist();
 
-        var args = GetPresignedObjectUrlArgs.builder()
-                .method(Method.PUT)
-                .bucket(bucketName)
-                .object(objectKey)
-                .expiry(expiryInSeconds)
-                .build();
+        argsBuilder.method(Method.PUT).bucket(bucketName).object(objectKey).expiry(expiryInSeconds);
 
-        return minioClient.getPresignedObjectUrl(args);
+        return minioClient.getPresignedObjectUrl(argsBuilder.build());
     }
 
     public String presignedDownloadUrl(String objectKey, int expiryInSeconds) throws Exception {

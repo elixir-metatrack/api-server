@@ -17,7 +17,7 @@ public class FileController {
         int expiry = 600;
 
         String url = presignUrlService.presignedUploadUrl(
-                request.projectId(), request.sampleId(), request.fileName(), expiry);
+                request.projectId(), request.sampleName(), request.fileName(), expiry);
 
         return new PresignResponse(
                 url, request.fileName(), expiry, Instant.now().plusSeconds(expiry));
