@@ -26,7 +26,12 @@ public class PresignUrlService {
         String objectKey = projectId + "/" + sampleId + "/" + fileName;
 
         if (File.findByObjectKeyOptional(objectKey).isPresent()) {
-            throw new WebApplicationException("File already exists!", 409);
+            File file = File.findByObjectKeyOptional(objectKey).get();
+            file.status = UploadStatus.PENDING;
+
+            argsBuilder.method(Method.PUT).bucket(bucketName).object(objectKey).expiry(expiryInSeconds);
+
+            return minioClient.getPresignedObjectUrl(argsBuilder.build());
         }
 
         UUID fileId = UUID.randomUUID();
