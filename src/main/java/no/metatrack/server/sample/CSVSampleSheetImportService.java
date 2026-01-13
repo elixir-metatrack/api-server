@@ -14,22 +14,30 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 @ApplicationScoped
 public class CSVSampleSheetImportService {
 
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("[d/M/yyyy][d/M/yy]");
+
     @Transactional
     public List<CSVUploadRowError> importNewSamples(Long projectId, File file) {
         List<CSVUploadRowError> errors = new ArrayList<>();
 
         try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            reader.mark(1);
+            if (reader.read() != 0xFEFF) {
+                reader.reset();
+            }
             Iterable<CSVRecord> records = CSVFormat.DEFAULT
                     .builder()
                     .setHeader()
                     .setSkipHeaderRecord(true)
                     .setTrim(true)
+                    .setIgnoreHeaderCase(true)
                     .get()
                     .parse(reader);
 
@@ -49,8 +57,10 @@ public class CSVSampleSheetImportService {
                 sample.alias = rec.get("alias");
                 sample.mlst = rec.get("mlst");
                 sample.isolationSource = rec.get("isolation_source");
-                sample.collectionDate =
-                        rec.get("collection_date") != null ? LocalDate.parse(rec.get("collection_date")) : null;
+                String rawDate = rec.get("collection_date");
+                if (rawDate != null && !rawDate.isBlank()) {
+                    sample.collectionDate = LocalDate.parse(rawDate, DATE_FORMATTER);
+                }
                 sample.location = rec.get("location");
                 sample.sequencingLab = rec.get("sequencing_lab");
                 sample.institution = rec.get("institution");
