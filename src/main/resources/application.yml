@@ -23,6 +23,9 @@ quarkus:
     secure: false
     access-key: minioadmin
     secret-key: minioadmin
+    secure: true
+    region: eu-west-1
+    force-path-style: true
     bucket-name: metatrack
   smallrye-openapi:
     path: /q/openapi
