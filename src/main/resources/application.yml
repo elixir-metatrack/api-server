@@ -28,14 +28,5 @@ quarkus:
     force-path-style: true
     bucket-name: metatrack
   smallrye-openapi:
-    path: /q/openapi
+    path: /openapi
     always-include: true
-    store-schema-directory: src/main/resources/META-INF/resources
-  log:
-    console:
-      json:
-        enable: true
-        log-format: ECS
-    category:
-      "io.quarkus.http.access-log":
-        level: INFO
