@@ -2,6 +2,7 @@ package no.metatrack.server.sample;
 
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -55,7 +56,7 @@ public class SampleController {
 
     @POST
     @Authenticated
-    public Sample createSample(@PathParam("projectId") Long projectId, CreateSampleRequest request) {
+    public Sample createSample(@PathParam("projectId") Long projectId, @Valid CreateSampleRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
@@ -77,7 +78,9 @@ public class SampleController {
     @Authenticated
     @Path("/{sampleId}")
     public Response updateSample(
-            @PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId, PatchSampleRequest request) {
+            @PathParam("projectId") Long projectId,
+            @PathParam("sampleId") UUID sampleId,
+            @Valid PatchSampleRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
