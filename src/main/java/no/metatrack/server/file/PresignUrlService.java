@@ -21,10 +21,9 @@ public class PresignUrlService {
     String bucketName;
 
     @Transactional
-    public String presignedUploadUrl(String projectId, String sampleName, String fileName, int expiryInSeconds)
+    public String presignedUploadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds)
             throws Exception {
-        Sample sample = Sample.findBySampleNameInProject(sampleName, Long.parseLong(projectId))
-                .orElseThrow(NotFoundException::new);
+        Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
 
         String objectKey = projectId + "/" + sampleName + "/" + fileName;
 
@@ -56,9 +55,9 @@ public class PresignUrlService {
         return minioClient.getPresignedObjectUrl(argsBuilder.build());
     }
 
-    public String presignedDownloadUrl(String projectId, String sampleName, String fileName, int expiryInSeconds)
+    public String presignedDownloadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds)
             throws Exception {
-        String objectKey = projectId + "/" + sampleName + "/" + fileName;
+        String objectKey = projectId.toString() + "/" + sampleName + "/" + fileName;
         var args = GetPresignedObjectUrlArgs.builder()
                 .method(Method.GET)
                 .bucket(bucketName)
