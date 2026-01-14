@@ -15,9 +15,13 @@ public class MinioWebhookController {
     public Response processWebhook(MinioEvent event) {
 
         if (event == null || event.Records() == null) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
+            return Response.accepted().build();
         }
-        event.Records().forEach(r -> fileIngestService.handleObjectCreated(r));
-        return Response.ok().build();
+        try {
+            event.Records().forEach(r -> fileIngestService.handleObjectCreated(r));
+        } catch (Exception e) {
+            return Response.accepted().build();
+        }
+        return Response.accepted().build();
     }
 }
