@@ -1,0 +1,10 @@
+create sequence File_SEQ start with 1 increment by 50;
+create sequence Project_SEQ start with 1 increment by 50;
+create sequence ProjectMember_SEQ start with 1 increment by 50;
+create table File (id bigint not null, sample_id uuid, uuid uuid not null unique, fileName varchar(255) not null, objectKey varchar(255) not null unique, status varchar(255) check ((status in ('PENDING','UPLOADED'))), virtualPath varchar(255) not null unique, primary key (id));
+create table Project (createdOn timestamp(6) with time zone, id bigint not null, modifiedOn timestamp(6) with time zone, owner uuid not null, description varchar(255), name varchar(255) not null unique, primary key (id));
+create table ProjectMember (id bigint not null, project_id bigint not null, memberId uuid not null, role varchar(255) not null check ((role in ('OWNER','ADMIN','EDITOR','VIEWER'))), primary key (id), unique (member_id, project_id));
+create table Sample (collectionDate date, hostTaxId integer not null, taxId integer not null, createdOn timestamp(6) with time zone, modifiedOn timestamp(6) with time zone, project_id bigint, id uuid not null, alias varchar(255), hostHealthState varchar(255), institution varchar(255), isolationSource varchar(255), location varchar(255), mlst varchar(255), name varchar(255), sequencingLab varchar(255), primary key (id), unique (name, project_id));
+alter table if exists File add constraint FKb0kro25bd7pvfu28s9dhpqam9 foreign key (sample_id) references Sample;
+alter table if exists ProjectMember add constraint FKf613i0627748imb03d8c94bo1 foreign key (project_id) references Project;
+alter table if exists Sample add constraint FKjyqy4ko8n2ry61ew3s4n4r25k foreign key (project_id) references Project;
