@@ -47,6 +47,7 @@ public class PresignUrlService {
         file.virtualPath = objectKey;
         file.objectKey = objectKey;
         file.status = UploadStatus.PENDING;
+        file.sample = sample;
 
         sample.files.add(file);
 
