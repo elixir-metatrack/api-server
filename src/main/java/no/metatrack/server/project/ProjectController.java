@@ -2,6 +2,7 @@ package no.metatrack.server.project;
 
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.auth.CurrentUser;
@@ -84,6 +85,20 @@ public class ProjectController {
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
         projectService.removeMember(projectId, memberId);
+        return Response.noContent().build();
+    }
+
+    @PUT
+    @Authenticated
+    @Path("/{projectId}/member/{memberId}")
+    public Response modifyRole(
+            @PathParam("projectId") Long projectId,
+            @PathParam("memberId") UUID memberId,
+            @Valid ModifyMemberRoleRequest request) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        projectService.updateMemberRole(projectId, memberId, request.role());
         return Response.noContent().build();
     }
 }

@@ -89,4 +89,17 @@ public class ProjectService {
 
         project.projectMembers.remove(member);
     }
+
+    @Transactional
+    public void updateMemberRole(Long projectId, UUID memberId, ProjectRole role) {
+        Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (!ProjectMember.isMember(memberId, projectId)) {
+            throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
+        }
+
+        ProjectMember member =
+                ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
+
+        member.role = role;
+    }
 }
