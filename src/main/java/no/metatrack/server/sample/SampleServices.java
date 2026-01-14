@@ -31,8 +31,8 @@ public class SampleServices {
             Long projectId,
             String name,
             String alias,
-            int taxId,
-            int hostTaxId,
+            Integer taxId,
+            Integer hostTaxId,
             String mlst,
             String location,
             String sequencingLab,
@@ -47,10 +47,9 @@ public class SampleServices {
 
         Sample sample = new Sample();
         sample.name = name;
-        sample.taxId = taxId;
-
         if (alias != null) sample.alias = alias;
-        if (hostTaxId != 0) sample.hostTaxId = hostTaxId;
+        if (taxId != null) sample.taxId = taxId;
+        if (hostTaxId != null) sample.hostTaxId = hostTaxId;
         if (mlst != null) sample.mlst = mlst;
         if (location != null) sample.location = location;
         if (sequencingLab != null) sample.sequencingLab = sequencingLab;
@@ -72,8 +71,8 @@ public class SampleServices {
             UUID sampleId,
             String name,
             String alias,
-            int taxId,
-            int hostTaxId,
+            Integer taxId,
+            Integer hostTaxId,
             String mlst,
             String location,
             String sequencingLab,
@@ -86,8 +85,8 @@ public class SampleServices {
         Sample sample = Sample.findSampleById(sampleId).orElseThrow(NotFoundException::new);
         if (name != null) sample.name = name;
         if (alias != null) sample.alias = alias;
-        if (sample.taxId != 0) sample.taxId = taxId;
-        if (hostTaxId != 0) sample.hostTaxId = hostTaxId;
+        if (taxId != null) sample.taxId = taxId;
+        if (hostTaxId != null) sample.hostTaxId = hostTaxId;
         if (mlst != null) sample.mlst = mlst;
         if (location != null) sample.location = location;
         if (sequencingLab != null) sample.sequencingLab = sequencingLab;

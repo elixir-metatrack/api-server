@@ -1,18 +1,16 @@
 package no.metatrack.server.sample;
 
-import jakarta.validation.constraints.NotBlank;
-
 import java.time.LocalDate;
 
 public record PatchSampleRequest(
-        @NotBlank String name,
-        @NotBlank String alias,
-        @NotBlank int taxId,
-        @NotBlank int hostTaxId,
-        @NotBlank String mlst,
-        @NotBlank String isolationSource,
-        @NotBlank LocalDate collectionDate,
-        @NotBlank String location,
-        @NotBlank String sequencingLab,
-        @NotBlank String institution,
-        @NotBlank String hostHealthState) {}
+        String name,
+        String alias,
+        Integer taxId,
+        Integer hostTaxId,
+        String mlst,
+        String isolationSource,
+        LocalDate collectionDate,
+        String location,
+        String sequencingLab,
+        String institution,
+        String hostHealthState) {}
