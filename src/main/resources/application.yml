@@ -7,13 +7,16 @@ quarkus:
   virtual-threads:
     enabled: true
   hibernate-orm:
-    schema-management:
-      strategy: update
+    database:
+      start-offline: true
   datasource:
     db-kind: postgresql
     username: postgres
     jdbc:
       url: jdbc:postgresql://localhost:5432/postgres
+  flyway:
+    baseline-on-migrate: true
+    migrate-at-start: true
   oidc:
     application-type: service
     auth-server-url: http://localhost:8080/realms/metatrack
