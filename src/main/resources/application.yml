@@ -9,6 +9,7 @@ quarkus:
   hibernate-orm:
     database:
       start-offline: true
+    physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
   datasource:
     db-kind: postgresql
     username: postgres
