@@ -55,7 +55,9 @@ public class PresignUrlService {
         return minioClient.getPresignedObjectUrl(argsBuilder.build());
     }
 
-    public String presignedDownloadUrl(String objectKey, int expiryInSeconds) throws Exception {
+    public String presignedDownloadUrl(String projectId, String sampleName, String fileName, int expiryInSeconds)
+            throws Exception {
+        String objectKey = projectId + "/" + sampleName + "/" + fileName;
         var args = GetPresignedObjectUrlArgs.builder()
                 .method(Method.GET)
                 .bucket(bucketName)

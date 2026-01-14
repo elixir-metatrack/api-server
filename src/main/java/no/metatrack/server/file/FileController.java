@@ -28,7 +28,8 @@ public class FileController {
     public PresignResponse presignDownload(PresignDownloadRequest request) throws Exception {
         int expiry = 600;
 
-        String url = presignUrlService.presignedDownloadUrl(request.fileName(), expiry);
+        String url = presignUrlService.presignedDownloadUrl(
+                request.projectId(), request.sampleName(), request.fileName(), expiry);
 
         return new PresignResponse(
                 url, request.fileName(), expiry, Instant.now().plusSeconds(expiry));
