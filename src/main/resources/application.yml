@@ -23,7 +23,6 @@ quarkus:
   minio:
     host: http://localhost
     port: 9000
-    secure: false
     access-key: minioadmin
     secret-key: minioadmin
     secure: true
