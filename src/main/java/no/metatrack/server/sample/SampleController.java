@@ -122,11 +122,11 @@ public class SampleController {
 
         if (file == null) throw new BadRequestException("No file uploaded");
 
-        List<CSVUploadRowError> error = csvSampleSheetImportService.importNewSamples(
+        List<CSVUploadRowError> errors = csvSampleSheetImportService.importNewSamples(
                 projectId, file.filePath().toFile());
 
-        if (!error.isEmpty()) return Response.ok(error).build();
+        if (errors.isEmpty()) return Response.ok().build();
 
-        return Response.noContent().build();
+        return Response.status(400).entity(errors).build();
     }
 }
