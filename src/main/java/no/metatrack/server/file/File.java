@@ -1,10 +1,7 @@
 package no.metatrack.server.file;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import no.metatrack.server.sample.Sample;
 
 import java.util.Optional;
@@ -24,6 +21,7 @@ public class File extends PanacheEntity {
     @Column(unique = true, nullable = false)
     String objectKey;
 
+    @Enumerated(EnumType.STRING)
     UploadStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
