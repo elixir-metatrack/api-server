@@ -28,30 +28,36 @@ public class SampleController {
 
     @GET
     @Authenticated
-    public List<Sample> getAllSamples(@PathParam("projectId") Long projectId) {
+    public List<SampleResponse> getAllSamples(@PathParam("projectId") Long projectId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
-        return sampleServices.getAllSamples(projectId);
+        List<Sample> samples = sampleServices.getAllSamples(projectId);
+
+        return samples.stream().map(SampleResponse::fromEntity).toList();
     }
 
     @GET
     @Path("/{sampleId}")
     @Authenticated
-    public Sample getSample(@PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
+    public SampleResponse getSample(@PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        return sampleServices.getSampleById(sampleId);
+        Sample sample = sampleServices.getSampleById(sampleId);
+        return SampleResponse.fromEntity(sample);
     }
 
     @GET
     @Path("/name/{sampleName}")
     @Authenticated
-    public Sample getSampleByName(@PathParam("projectId") Long projectId, @PathParam("sampleName") String sampleName) {
+    public SampleResponse getSampleByName(
+            @PathParam("projectId") Long projectId, @PathParam("sampleName") String sampleName) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        return sampleServices.getSampleByName(sampleName, projectId);
+        Sample sample = sampleServices.getSampleByName(sampleName, projectId);
+
+        return SampleResponse.fromEntity(sample);
     }
 
     @POST
