@@ -129,4 +129,17 @@ public class SampleController {
 
         return Response.status(400).entity(errors).build();
     }
+
+    @PATCH
+    @Authenticated
+    public Response batchUpdateSamples(@PathParam("projectId") Long projectId, @Valid BulkPatchSampleRequest request) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        List<String> errors = sampleServices.bulkPatchSamples(projectId, request);
+
+        if (errors.isEmpty()) return Response.ok().build();
+
+        return Response.status(400).entity(errors).build();
+    }
 }
