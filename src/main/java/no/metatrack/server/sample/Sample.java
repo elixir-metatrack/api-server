@@ -74,4 +74,8 @@ public class Sample extends PanacheEntityBase {
                 .firstResultOptional()
                 .isPresent();
     }
+
+    public static List<Sample> findSamplesInAssay(UUID assayId) {
+        return Sample.list("from Sample s join s.assays a where a.id = ?1", assayId);
+    }
 }

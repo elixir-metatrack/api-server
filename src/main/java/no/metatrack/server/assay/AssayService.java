@@ -122,4 +122,9 @@ public class AssayService {
 
         return errors;
     }
+
+    public List<Sample> getAllSamplesInAssay(UUID assayId) {
+        getAssayById(assayId);
+        return Sample.findSamplesInAssay(assayId);
+    }
 }

@@ -7,6 +7,8 @@ import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
+import no.metatrack.server.sample.Sample;
+import no.metatrack.server.sample.SampleResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -127,5 +129,19 @@ public class AssayController {
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
         return assayService.removeSamplesFromAssay(projectId, request.sampleNames(), assayId);
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{assayId}/samples")
+    public List<SampleResponse> getSamplesInAssay(
+            @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        List<Sample> samples = assayService.getAllSamplesInAssay(assayId);
+
+        return samples.stream().map(SampleResponse::fromEntity).toList();
     }
 }
