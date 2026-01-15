@@ -67,7 +67,7 @@ public class AssayService {
             String libraryLayout,
             Integer insertSize) {
         Assay assay = getAssayById(assayId);
-        assay.name = name;
+        if (name != null) assay.name = name;
         if (studyAccession != null) assay.studyAccession = studyAccession;
         if (instrumentModel != null) assay.instrumentModel = instrumentModel;
         if (libraryName != null) assay.libraryName = libraryName;
