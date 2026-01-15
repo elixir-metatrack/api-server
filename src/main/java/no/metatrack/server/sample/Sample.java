@@ -2,6 +2,7 @@ package no.metatrack.server.sample;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import no.metatrack.server.assay.Assay;
 import no.metatrack.server.file.File;
 import no.metatrack.server.project.Project;
 
@@ -48,6 +49,9 @@ public class Sample extends PanacheEntityBase {
 
     @OneToMany(mappedBy = "sample", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     public Set<File> files = new HashSet<>();
+
+    @ManyToMany(mappedBy = "samples")
+    public Set<Assay> assays = new HashSet<>();
 
     public static boolean sampleExists(Long sampleId) {
         return findByIdOptional(sampleId).isPresent();
