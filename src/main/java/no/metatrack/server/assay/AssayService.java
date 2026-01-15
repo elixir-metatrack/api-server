@@ -31,6 +31,7 @@ public class AssayService {
             String instrumentModel,
             String libraryName,
             String librarySource,
+            String libraryStrategy,
             String librarySelection,
             String libraryLayout,
             Integer insertSize) {
@@ -42,6 +43,7 @@ public class AssayService {
         assay.libraryName = libraryName;
         assay.librarySource = librarySource;
         assay.librarySelection = librarySelection;
+        assay.libraryStrategy = libraryStrategy;
         assay.libraryLayout = libraryLayout;
         assay.insertSize = insertSize;
         assay.project = project;
@@ -61,6 +63,7 @@ public class AssayService {
             String libraryName,
             String librarySource,
             String librarySelection,
+            String libraryStrategy,
             String libraryLayout,
             Integer insertSize) {
         Assay assay = getAssayById(assayId);
@@ -69,6 +72,7 @@ public class AssayService {
         if (instrumentModel != null) assay.instrumentModel = instrumentModel;
         if (libraryName != null) assay.libraryName = libraryName;
         if (librarySource != null) assay.librarySource = librarySource;
+        if (libraryStrategy != null) assay.libraryStrategy = libraryStrategy;
         if (librarySelection != null) assay.librarySelection = librarySelection;
         if (libraryLayout != null) assay.libraryLayout = libraryLayout;
         if (insertSize != null) assay.insertSize = insertSize;

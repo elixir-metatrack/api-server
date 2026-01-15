@@ -9,6 +9,7 @@ public record CreateAssayRequest(
         String instrumentModel,
         String libraryName,
         String librarySource,
+        String libraryStrategy,
         String librarySelection,
         String libraryLayout,
 

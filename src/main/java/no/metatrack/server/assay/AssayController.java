@@ -57,6 +57,7 @@ public class AssayController {
                 request.instrumentModel(),
                 request.libraryName(),
                 request.librarySource(),
+                request.libraryStrategy(),
                 request.librarySelection(),
                 request.libraryLayout(),
                 request.insertSize());
@@ -81,6 +82,7 @@ public class AssayController {
                 request.libraryName(),
                 request.librarySource(),
                 request.librarySelection(),
+                request.libraryStrategy(),
                 request.libraryLayout(),
                 request.insertSize());
 

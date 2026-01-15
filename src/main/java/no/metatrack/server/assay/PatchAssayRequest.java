@@ -8,6 +8,7 @@ public record PatchAssayRequest(
         String instrumentModel,
         String libraryName,
         String librarySource,
+        String libraryStrategy,
         String librarySelection,
         String libraryLayout,
 

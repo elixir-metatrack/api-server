@@ -38,6 +38,8 @@ public class Assay extends PanacheEntityBase {
 
     public String librarySelection;
 
+    public String libraryStrategy;
+
     public String libraryLayout;
 
     public Integer insertSize;
