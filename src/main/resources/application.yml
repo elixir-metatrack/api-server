@@ -2,7 +2,7 @@ quarkus:
   http:
     port: 1234
     access-log:
-      enabled: true
+      enabled: false
       log-to-file: false
   virtual-threads:
     enabled: true
