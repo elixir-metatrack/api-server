@@ -103,23 +103,27 @@ public class AssayController {
     @Authenticated
     @Path("/{assayId}/samples")
     public List<String> addSamplesToAssay(
-            @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId, List<String> sampleNames) {
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            AddRemoveSamplesFromAssayRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        return assayService.addSamplesToAssay(projectId, sampleNames, assayId);
+        return assayService.addSamplesToAssay(projectId, request.sampleNames(), assayId);
     }
 
     @DELETE
     @Authenticated
     @Path("/{assayId}/samples")
     public List<String> removeSamplesFromAssay(
-            @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId, List<String> sampleNames) {
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            AddRemoveSamplesFromAssayRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        return assayService.removeSamplesFromAssay(projectId, sampleNames, assayId);
+        return assayService.removeSamplesFromAssay(projectId, request.sampleNames(), assayId);
     }
 }
