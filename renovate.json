@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":separateMajorReleases",
+    ":combinePatchMinorReleases",
+    ":PRTimely"
+  ],
+  "packageRules": [
+    {
+      "description": "Group all Quarkus related updates (Core, Platform, and Quarkiverse)",
+      "matchPackagePrefixes": [
+        "io.quarkus",
+        "io.quarkiverse"
+      ],
+      "matchPackageNames": [
+        "io.quarkus.platform:quarkus-bom"
+      ],
+      "groupName": "quarkus ecosystem"
+    },
+    {
+      "description": "Group common Maven plugins to reduce noise",
+      "matchPackagePrefixes": [
+        "org.apache.maven.plugins"
+      ],
+      "matchPackageNames": [
+        "org.apache.maven.plugins:maven-compiler-plugin",
+        "org.apache.maven.plugins:maven-surefire-plugin",
+        "org.apache.maven.plugins:maven-failsafe-plugin"
+      ],
+      "groupName": "maven plugins"
+    },
+    {
+      "description": "Auto-merge patch updates for non-breaking changes",
+      "matchManagers": [
+        "maven"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "labels": [
+        "dependencies",
+        "patch"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": [
+      "security"
+    ]
+  },
+  "timezone": "Europe/Oslo"
+}
