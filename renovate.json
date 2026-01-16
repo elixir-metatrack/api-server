@@ -6,23 +6,21 @@
     ":combinePatchMinorReleases",
     ":PRTimely"
   ],
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
-      "description": "Group all Quarkus related updates (Core, Platform, and Quarkiverse)",
-      "matchPackagePrefixes": [
-        "io.quarkus",
-        "io.quarkiverse"
-      ],
+      "description": "Group all Quarkus and Quarkiverse updates",
       "matchPackageNames": [
         "io.quarkus.platform:quarkus-bom"
+      ],
+      "matchPackagePatterns": [
+        "^io\\.quarkus",
+        "^io\\.quarkiverse"
       ],
       "groupName": "quarkus ecosystem"
     },
     {
-      "description": "Group common Maven plugins to reduce noise",
-      "matchPackagePrefixes": [
-        "org.apache.maven.plugins"
-      ],
+      "description": "Group common Maven plugins",
       "matchPackageNames": [
         "org.apache.maven.plugins:maven-compiler-plugin",
         "org.apache.maven.plugins:maven-surefire-plugin",
@@ -31,7 +29,7 @@
       "groupName": "maven plugins"
     },
     {
-      "description": "Auto-merge patch updates for non-breaking changes",
+      "description": "Auto-merge patch updates",
       "matchManagers": [
         "maven"
       ],
@@ -45,11 +43,5 @@
       ]
     }
   ],
-  "vulnerabilityAlerts": {
-    "enabled": true,
-    "addLabels": [
-      "security"
-    ]
-  },
   "timezone": "Europe/Oslo"
 }
