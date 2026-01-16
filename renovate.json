@@ -3,8 +3,7 @@
   "extends": [
     "config:recommended",
     ":separateMajorReleases",
-    ":combinePatchMinorReleases",
-    ":PRTimely"
+    ":combinePatchMinorReleases"
   ],
   "osvVulnerabilityAlerts": true,
   "packageRules": [
