@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import no.metatrack.server.file.File;
+import no.metatrack.server.file.FileResponse;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
@@ -147,5 +149,17 @@ public class SampleController {
         if (errors.isEmpty()) return Response.ok().build();
 
         return Response.status(400).entity(errors).build();
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{sampleId}/files")
+    public List<FileResponse> getAllFilesInSample(
+            @PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
+
+        List<File> files = sampleServices.getAllFilesInSample(sampleId);
+        return files.stream().map(FileResponse::fromEntity).toList();
     }
 }

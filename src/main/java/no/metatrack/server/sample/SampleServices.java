@@ -7,6 +7,7 @@ import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Request;
 import jakarta.ws.rs.core.Response;
+import no.metatrack.server.file.File;
 import no.metatrack.server.project.Project;
 
 import java.time.Instant;
@@ -146,5 +147,9 @@ public class SampleServices {
         }
 
         return errors;
+    }
+
+    public List<File> getAllFilesInSample(UUID sampleId) {
+        return File.list("sample.id = ?1", sampleId);
     }
 }
