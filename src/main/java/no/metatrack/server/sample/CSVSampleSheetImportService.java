@@ -38,13 +38,15 @@ public class CSVSampleSheetImportService {
                     .setSkipHeaderRecord(true)
                     .setTrim(true)
                     .setIgnoreHeaderCase(true)
+                    .setAllowMissingColumnNames(true)
                     .get()
                     .parse(reader);
 
             for (CSVRecord rec : records) {
 
-                if (Sample.sampleExistsByName(rec.get("name"), projectId)) {
-                    errors.add(new CSVUploadRowError(rec.get("name"), "name", "Already exits"));
+                if (!rec.isMapped("name") || rec.get("name").isBlank()) {
+                    errors.add(new CSVUploadRowError(
+                            "Row " + rec.getRecordNumber(), "name", "Name column is missing or empty"));
                     continue;
                 }
 
@@ -52,20 +54,20 @@ public class CSVSampleSheetImportService {
                 sample.project = Project.findById(projectId);
 
                 // TODO: Validate input against controlled vocabularies if available
-                sample.name = rec.get("name");
-                sample.taxId = Integer.parseInt(rec.get("tax_id"));
-                sample.alias = rec.get("alias");
-                sample.mlst = rec.get("mlst");
-                sample.isolationSource = rec.get("isolation_source");
-                String rawDate = rec.get("collection_date");
+                sample.name = rec.isMapped("name") ? rec.get("name") : null;
+                sample.taxId = parseOptionalInt(rec, "tax_id");
+                sample.alias = rec.isMapped("alias") ? rec.get("alias") : null;
+                sample.mlst = rec.isMapped("mlst") ? rec.get("mlst") : null;
+                sample.isolationSource = rec.isMapped("isolation_source") ? rec.get("isolation_source") : null;
+                String rawDate = rec.isMapped("collection_date") ? rec.get("collection_date") : null;
                 if (rawDate != null && !rawDate.isBlank()) {
                     sample.collectionDate = LocalDate.parse(rawDate, DATE_FORMATTER);
                 }
-                sample.location = rec.get("location");
-                sample.sequencingLab = rec.get("sequencing_lab");
-                sample.institution = rec.get("institution");
-                sample.hostHealthState = rec.get("host_health_state");
-                sample.hostTaxId = Integer.parseInt(rec.get("host_tax_id"));
+                sample.location = rec.isMapped("location") ? rec.get("location") : null;
+                sample.sequencingLab = rec.isMapped("sequencing_lab") ? rec.get("sequencing_lab") : null;
+                sample.institution = rec.isMapped("institution") ? rec.get("institution") : null;
+                sample.hostHealthState = rec.isMapped("host_health_state") ? rec.get("host_health_state") : null;
+                sample.hostTaxId = parseOptionalInt(rec, "host_tax_id");
                 sample.createdOn = Instant.now();
                 sample.modifiedOn = Instant.now();
 
@@ -76,5 +78,16 @@ public class CSVSampleSheetImportService {
         }
 
         return errors;
+    }
+
+    private Integer parseOptionalInt(CSVRecord rec, String column) {
+        if (rec.isMapped(column) && rec.get(column) != null && !rec.get(column).isBlank()) {
+            try {
+                return Integer.parseInt(rec.get(column));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 }
