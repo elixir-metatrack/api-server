@@ -21,10 +21,9 @@ public class Sample extends PanacheEntityBase {
 
     public String alias;
 
-    @Column(nullable = false)
-    public int taxId;
+    public Integer taxId;
 
-    public int hostTaxId;
+    public Integer hostTaxId;
 
     public String mlst;
 
