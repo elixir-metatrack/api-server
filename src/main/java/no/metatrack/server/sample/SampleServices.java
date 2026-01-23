@@ -1,11 +1,9 @@
 package no.metatrack.server.sample;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Request;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.file.File;
 import no.metatrack.server.project.Project;
@@ -19,12 +17,6 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class SampleServices {
-    private final Request request;
-
-    @Inject
-    public SampleServices(Request request) {
-        this.request = request;
-    }
 
     public List<Sample> getAllSamples(Long projectId) {
         return Sample.getAllSamplesInProject(projectId);
