@@ -102,4 +102,8 @@ public class ProjectService {
 
         member.role = role;
     }
+
+    public Project getProjectById(long id) {
+        return Project.<Project>findByIdOptional(id).orElseThrow(NotFoundException::new);
+    }
 }

@@ -30,6 +30,13 @@ public class ProjectController {
                 .toList();
     }
 
+    @GET
+    @Path("/{projectId}")
+    public ProjectResponse getProjectById(@PathParam("projectId") Long projectId) {
+        Project project = projectService.getProjectById(projectId);
+        return ProjectResponse.fromEntity(project);
+    }
+
     @POST
     @Authenticated
     @Produces("application/json")
