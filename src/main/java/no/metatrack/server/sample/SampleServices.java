@@ -50,7 +50,8 @@ public class SampleServices {
             String sequencingLab,
             String institution,
             String isolationSource,
-            LocalDate collectionDate) {
+            LocalDate collectionDate,
+            String hostHealthState) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
@@ -68,6 +69,7 @@ public class SampleServices {
         if (institution != null) sample.institution = institution;
         if (isolationSource != null) sample.isolationSource = isolationSource;
         if (collectionDate != null) sample.collectionDate = collectionDate;
+        if (hostHealthState != null) sample.hostHealthState = hostHealthState;
 
         sample.createdOn = Instant.now();
         sample.modifiedOn = Instant.now();
@@ -90,7 +92,8 @@ public class SampleServices {
             String sequencingLab,
             String institution,
             String isolationSource,
-            LocalDate collectionDate) {
+            LocalDate collectionDate,
+            String hostHealthState) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
@@ -105,6 +108,7 @@ public class SampleServices {
         if (institution != null) sample.institution = institution;
         if (isolationSource != null) sample.isolationSource = isolationSource;
         if (collectionDate != null) sample.collectionDate = collectionDate;
+        if (hostHealthState != null) sample.hostHealthState = hostHealthState;
 
         sample.modifiedOn = Instant.now();
 
@@ -140,6 +144,7 @@ public class SampleServices {
             if (data.institution() != null) sample.institution = data.institution();
             if (data.isolationSource() != null) sample.isolationSource = data.isolationSource();
             if (data.collectionDate() != null) sample.collectionDate = data.collectionDate();
+            if (data.hostHealthState() != null) sample.hostHealthState = data.hostHealthState();
         }
 
         if (errors.isEmpty()) {

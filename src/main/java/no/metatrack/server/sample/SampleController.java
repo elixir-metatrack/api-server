@@ -79,7 +79,8 @@ public class SampleController {
                 request.sequencingLab(),
                 request.institution(),
                 request.isolationSource(),
-                request.collectionDate());
+                request.collectionDate(),
+                request.hostHealthState());
     }
 
     @PATCH
@@ -104,7 +105,8 @@ public class SampleController {
                 request.sequencingLab(),
                 request.institution(),
                 request.isolationSource(),
-                request.collectionDate());
+                request.collectionDate(),
+                request.hostHealthState());
 
         return Response.noContent().build();
     }
