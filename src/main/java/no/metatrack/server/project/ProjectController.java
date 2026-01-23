@@ -37,6 +37,16 @@ public class ProjectController {
         return ProjectResponse.fromEntity(project);
     }
 
+    @GET
+    @Path("/me")
+    public List<ProjectResponse> getProjectsForUser() {
+        String currentUserIdString = userService.requireCurrentUser().id();
+        UUID currentUserId = UUID.fromString(currentUserIdString);
+
+        List<Project> projects = projectService.getAllUserProjects(currentUserId);
+        return projects.stream().map(ProjectResponse::fromEntity).toList();
+    }
+
     @POST
     @Authenticated
     @Produces("application/json")

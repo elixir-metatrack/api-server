@@ -27,4 +27,5 @@ public class ProjectMember extends PanacheEntity {
     public static boolean isMember(UUID memberId, Long projectId) {
         return count("memberId = ?1 and project.id = ?2", memberId, projectId) > 0;
     }
+
 }

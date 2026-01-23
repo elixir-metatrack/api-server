@@ -7,6 +7,7 @@ import no.metatrack.server.sample.Sample;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,5 +39,10 @@ public class Project extends PanacheEntity {
 
     public static boolean projectExistsByName(String projectName) {
         return find("name", projectName).firstResultOptional().isPresent();
+    }
+
+    public static List<Project> findProjectsByMember(UUID userId) {
+        return find("select distinct pm.project from ProjectMember pm where pm.memberId = ?1", userId)
+                .list();
     }
 }

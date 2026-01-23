@@ -106,4 +106,8 @@ public class ProjectService {
     public Project getProjectById(long id) {
         return Project.<Project>findByIdOptional(id).orElseThrow(NotFoundException::new);
     }
+
+    public List<Project> getAllUserProjects(UUID currentUserId) {
+        return Project.findProjectsByMember(currentUserId);
+    }
 }
