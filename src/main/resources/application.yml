@@ -2,7 +2,7 @@ quarkus:
   http:
     cors:
       enabled: true
-      origins: *
+      origins: "*"
     port: 1234
     access-log:
       enabled: false
