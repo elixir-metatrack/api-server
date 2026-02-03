@@ -22,6 +22,9 @@ public class ProjectController {
     @Inject
     ProjectRoleCheck projectRoleCheck;
 
+    @Inject
+    JoinProjectService joinProjectService;
+
     @GET
     @Produces("application/json")
     public List<ProjectResponse> getAllProjects() {
@@ -116,6 +119,39 @@ public class ProjectController {
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
         projectService.updateMemberRole(projectId, memberId, request.role());
+        return Response.noContent().build();
+    }
+
+    @POST
+    @Authenticated
+    @Path("/{projectId}/join/{role}")
+    public Response joinProject(@PathParam("projectId") Long projectId, @PathParam("role") ProjectRole role) {
+        CurrentUser currentUser = userService.requireCurrentUser();
+        UUID currentUserId = UUID.fromString(currentUser.id());
+
+        joinProjectService.joinProject(projectId, currentUserId, role);
+        return Response.noContent().build();
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{projectId}/joinrequests/")
+    public List<JoinProjectResponse> getJoinRequests(@PathParam("projectId") Long projectId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        List<JoinProject> joinRequests = joinProjectService.getJoinRequests(projectId);
+        return joinRequests.stream().map(JoinProjectResponse::fromEntity).toList();
+    }
+
+    @DELETE
+    @Authenticated
+    @Path("/{projectId}/joingrequests/{userId}")
+    public Response deleteJoinRequest(@PathParam("projectId") Long projectId, @PathParam("userId") UUID userId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+        joinProjectService.removeJoinRequest(projectId, userId);
+
         return Response.noContent().build();
     }
 }
