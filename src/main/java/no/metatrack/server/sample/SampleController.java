@@ -147,7 +147,9 @@ public class SampleController {
         List<CSVUploadRowError> errors = csvSampleSheetImportService.importNewSamples(
                 projectId, file.filePath().toFile());
 
-        if (errors.isEmpty()) return Response.ok().build();
+        if (errors == null || errors.isEmpty()) {
+            return Response.ok().build();
+        }
 
         return Response.status(400).entity(errors).build();
     }
@@ -160,7 +162,9 @@ public class SampleController {
 
         List<String> errors = sampleServices.bulkPatchSamples(projectId, request);
 
-        if (errors.isEmpty()) return Response.ok().build();
+        if (errors == null || errors.isEmpty()) {
+            return Response.ok().build();
+        }
 
         return Response.status(400).entity(errors).build();
     }
