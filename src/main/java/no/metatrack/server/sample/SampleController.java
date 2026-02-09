@@ -65,11 +65,11 @@ public class SampleController {
 
     @POST
     @Authenticated
-    public Sample createSample(@PathParam("projectId") Long projectId, @Valid CreateSampleRequest request) {
+    public SampleResponse createSample(@PathParam("projectId") Long projectId, @Valid CreateSampleRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        return sampleServices.createSample(
+        Sample sample = sampleServices.createSample(
                 projectId,
                 request.name(),
                 request.alias(),
@@ -82,6 +82,8 @@ public class SampleController {
                 request.isolationSource(),
                 request.collectionDate(),
                 request.hostHealthState());
+
+        return SampleResponse.fromEntity(sample);
     }
 
     @PATCH

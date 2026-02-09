@@ -1,5 +1,6 @@
 package no.metatrack.server.sample;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -15,7 +16,9 @@ public record SampleResponse(
         String location,
         String sequencingLab,
         String institution,
-        String hostHealthState) {
+        String hostHealthState,
+        Instant createdOn,
+        Instant modifiedOn) {
     public static SampleResponse fromEntity(Sample sample) {
         return new SampleResponse(
                 sample.id,
@@ -29,6 +32,8 @@ public record SampleResponse(
                 sample.location,
                 sample.sequencingLab,
                 sample.institution,
-                sample.hostHealthState);
+                sample.hostHealthState,
+                sample.createdOn,
+                sample.modifiedOn);
     }
 }
