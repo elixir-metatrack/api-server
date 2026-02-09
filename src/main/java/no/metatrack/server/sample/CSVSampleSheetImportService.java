@@ -26,6 +26,7 @@ public class CSVSampleSheetImportService {
     @Transactional
     public List<CSVUploadRowError> importNewSamples(Long projectId, File file) {
         List<CSVUploadRowError> errors = new ArrayList<>();
+        Project project = Project.findById(projectId);
 
         try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
             reader.mark(1);
@@ -44,9 +45,21 @@ public class CSVSampleSheetImportService {
 
             for (CSVRecord rec : records) {
 
-                if (!rec.isMapped("name") || rec.get("name").isBlank()) {
+                String name = rec.isMapped("name") ? rec.get("name") : null;
+
+                if (name == null || name.isBlank()) {
                     errors.add(new CSVUploadRowError(
                             "Row " + rec.getRecordNumber(), "name", "Name column is missing or empty"));
+                    continue;
+                }
+
+                if (Sample.find("name = ?1 and project = ?2", name, project)
+                        .firstResultOptional()
+                        .isPresent()) {
+                    errors.add(new CSVUploadRowError(
+                            "Row " + rec.getRecordNumber(),
+                            "name",
+                            "Sample name '" + name + "' already exists in this project"));
                     continue;
                 }
 
