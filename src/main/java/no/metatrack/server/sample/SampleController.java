@@ -14,7 +14,6 @@ import no.metatrack.server.project.ProjectRoleCheck;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
 
@@ -135,13 +134,13 @@ public class SampleController {
 
         if (file == null) throw new BadRequestException("No file uploaded");
 
-        try {
-            String contentType = Files.probeContentType(file.filePath());
-            if (contentType == null || (!contentType.equals("text/csv") && !contentType.equals("text/plain"))) {
-                throw new WebApplicationException("File content does not appear to be text/csv", 400);
-            }
-        } catch (Exception e) {
-            throw new BadRequestException("Could not determine content type of uploaded file");
+        String contentType = file.contentType();
+
+        if (contentType == null
+                || (!contentType.equalsIgnoreCase("text/csv")
+                        && !contentType.equalsIgnoreCase("text/plain")
+                        && !contentType.equalsIgnoreCase("application/vnd.ms-excel"))) {
+            throw new WebApplicationException("File content does not appear to be text/csv", 400);
         }
 
         List<CSVUploadRowError> errors = csvSampleSheetImportService.importNewSamples(
