@@ -3,6 +3,7 @@ package no.metatrack.server.project;
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.*;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,4 +29,7 @@ public class ProjectMember extends PanacheEntity {
         return count("memberId = ?1 and project.id = ?2", memberId, projectId) > 0;
     }
 
+    public static List<ProjectMember> listAllMembersInProject(Long projectId) {
+        return list("project.id = ?1", projectId);
+    }
 }

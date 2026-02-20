@@ -25,6 +25,9 @@ public class ProjectController {
     @Inject
     JoinProjectService joinProjectService;
 
+    @Inject
+    ProjectMemberService projectMemberService;
+
     @GET
     @Produces("application/json")
     public List<ProjectResponse> getAllProjects() {
@@ -153,5 +156,16 @@ public class ProjectController {
         joinProjectService.removeJoinRequest(projectId, userId);
 
         return Response.noContent().build();
+    }
+
+    @GET
+    @Authenticated
+    @Path("{projectId}/members")
+    public List<ProjectMemberResponse> getAllProjectMembers(@PathParam("projectId") Long projectId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        List<ProjectMember> members = projectMemberService.listAllProjectMembers(projectId);
+        return members.stream().map(ProjectMemberResponse::fromEntity).toList();
     }
 }
