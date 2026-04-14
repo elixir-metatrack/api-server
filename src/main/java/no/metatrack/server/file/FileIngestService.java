@@ -35,8 +35,10 @@ public class FileIngestService {
 
             file.status = UploadStatus.UPLOADED;
 
+        } catch (WebApplicationException e) {
+            throw e;
         } catch (Exception e) {
-            throw new WebApplicationException("Error validating object", 500);
+            throw new WebApplicationException("Error validating object in MinIO: " + e.getMessage(), 500);
         }
     }
 
