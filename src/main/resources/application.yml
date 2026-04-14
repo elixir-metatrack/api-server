@@ -34,3 +34,8 @@ quarkus:
   smallrye-openapi:
     path: /openapi
     always-include: true
+metatrack:
+  webhook:
+    minio-secret: ${MINIO_SECRET_KEY}
+  file:
+    presign-expiry-seconds: 600

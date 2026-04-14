@@ -9,6 +9,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
 
@@ -20,6 +21,9 @@ public class FileController {
     @Inject
     ProjectRoleCheck projectRoleCheck;
 
+    @ConfigProperty(name = "metatrack.file.presign-expiry-seconds")
+    int presignExpirySeconds;
+
     @POST
     @Authenticated
     @Path("/presign-upload")
@@ -28,13 +32,11 @@ public class FileController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        int expiry = 600;
-
         String url = presignUrlService.presignedUploadUrl(
-                request.projectId(), request.sampleName(), request.fileName(), expiry);
+                request.projectId(), request.sampleName(), request.fileName(), presignExpirySeconds);
 
         return new PresignResponse(
-                url, request.fileName(), expiry, Instant.now().plusSeconds(expiry));
+                url, request.fileName(), presignExpirySeconds, Instant.now().plusSeconds(presignExpirySeconds));
     }
 
     @POST
@@ -45,12 +47,10 @@ public class FileController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        int expiry = 600;
-
         String url = presignUrlService.presignedDownloadUrl(
-                request.projectId(), request.sampleName(), request.fileName(), expiry);
+                request.projectId(), request.sampleName(), request.fileName(), presignExpirySeconds);
 
         return new PresignResponse(
-                url, request.fileName(), expiry, Instant.now().plusSeconds(expiry));
+                url, request.fileName(), presignExpirySeconds, Instant.now().plusSeconds(presignExpirySeconds));
     }
 }
