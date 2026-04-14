@@ -16,10 +16,18 @@ import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Path("/api/projects/{projectId}/samples")
 public class SampleController {
+    private static final Set<String> ALLOWED_SAMPLESHEET_TYPES = Set.of(
+            "text/csv",
+            "text/plain",
+            "text/tab-separated-values",
+            "text/tsv",
+            "application/vnd.ms-excel"
+    );
     @Inject
     SampleService sampleService;
 
@@ -139,12 +147,10 @@ public class SampleController {
         if (file == null) throw new BadRequestException("No file uploaded");
 
         String contentType = file.contentType();
+        String baseContentType = contentType != null ? contentType.split(";")[0].trim().toLowerCase() : null;
 
-        if (contentType == null
-                || (!contentType.equalsIgnoreCase("text/csv")
-                        && !contentType.equalsIgnoreCase("text/plain")
-                        && !contentType.equalsIgnoreCase("application/vnd.ms-excel"))) {
-            throw new WebApplicationException("File content does not appear to be text/csv", 400);
+        if (baseContentType == null || !ALLOWED_SAMPLESHEET_TYPES.contains(baseContentType)) {
+            throw new WebApplicationException("File must be a CSV or TSV file", 400);
         }
 
         List<CSVUploadRowError> errors = csvSampleSheetImportService.importNewSamples(
