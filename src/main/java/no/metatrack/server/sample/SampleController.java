@@ -7,6 +7,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.file.File;
+import no.metatrack.server.file.FileIngestService;
 import no.metatrack.server.file.FileResponse;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
@@ -27,6 +28,9 @@ public class SampleController {
 
     @Inject
     CSVSampleSheetImportService csvSampleSheetImportService;
+
+    @Inject
+    FileIngestService fileIngestService;
 
     @GET
     @Authenticated
@@ -178,5 +182,19 @@ public class SampleController {
 
         List<File> files = sampleService.getAllFilesInSample(sampleId);
         return files.stream().map(FileResponse::fromEntity).toList();
+    }
+
+    @DELETE
+    @Authenticated
+    @Path("/{sampleId}/files/{fileUuid}")
+    public Response deleteFile(
+            @PathParam("projectId") Long projectId,
+            @PathParam("sampleId") UUID sampleId,
+            @PathParam("fileUuid") UUID fileUuid) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        fileIngestService.deleteFile(fileUuid, sampleId);
+        return Response.noContent().build();
     }
 }
