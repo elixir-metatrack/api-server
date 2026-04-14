@@ -93,7 +93,7 @@ public class AssayService {
         for (String sampleName : sampleNames) {
             Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName, projectId);
             if (sample.isEmpty()) {
-                errors.add("Sample with name " + sampleNames + " does not exist in project " + projectId);
+                errors.add("Sample with name " + sampleName + " does not exist in project " + projectId);
                 continue;
             }
             assay.addSample(sample.get());
@@ -112,7 +112,7 @@ public class AssayService {
         for (String sampleName : sampleNames) {
             Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName, projectId);
             if (sample.isEmpty()) {
-                errors.add("Sample with name " + sampleNames + " does not exist in project " + projectId);
+                errors.add("Sample with name " + sampleName + " does not exist in project " + projectId);
                 continue;
             }
             assay.removeSample(sample.get());
