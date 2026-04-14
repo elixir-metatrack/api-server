@@ -137,6 +137,7 @@ public class SampleServices {
             if (data.isolationSource() != null) sample.isolationSource = data.isolationSource();
             if (data.collectionDate() != null) sample.collectionDate = data.collectionDate();
             if (data.hostHealthState() != null) sample.hostHealthState = data.hostHealthState();
+            sample.modifiedOn = Instant.now();
         }
 
         if (errors.isEmpty()) {
