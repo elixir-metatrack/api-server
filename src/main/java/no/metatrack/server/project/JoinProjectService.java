@@ -2,6 +2,7 @@ package no.metatrack.server.project;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.NotFoundException;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +25,9 @@ public class JoinProjectService {
     @Transactional
     public void removeJoinRequest(long projectId, UUID userId) {
         JoinProject joinProject = JoinProject.findByUserIdAndProjectId(projectId, userId);
+        if (joinProject == null) {
+            throw new NotFoundException("Join request not found");
+        }
         joinProject.delete();
     }
 }
