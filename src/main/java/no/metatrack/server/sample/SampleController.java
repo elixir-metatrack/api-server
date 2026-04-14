@@ -20,7 +20,7 @@ import java.util.UUID;
 @Path("/api/projects/{projectId}/samples")
 public class SampleController {
     @Inject
-    SampleServices sampleServices;
+    SampleService sampleService;
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
@@ -33,7 +33,7 @@ public class SampleController {
     public List<SampleResponse> getAllSamples(@PathParam("projectId") Long projectId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
-        List<Sample> samples = sampleServices.getAllSamples(projectId);
+        List<Sample> samples = sampleService.getAllSamples(projectId);
 
         return samples.stream().map(SampleResponse::fromEntity).toList();
     }
@@ -45,7 +45,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        Sample sample = sampleServices.getSampleById(sampleId);
+        Sample sample = sampleService.getSampleById(sampleId);
         return SampleResponse.fromEntity(sample);
     }
 
@@ -57,7 +57,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        Sample sample = sampleServices.getSampleByName(sampleName, projectId);
+        Sample sample = sampleService.getSampleByName(sampleName, projectId);
 
         return SampleResponse.fromEntity(sample);
     }
@@ -68,7 +68,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        Sample sample = sampleServices.createSample(
+        Sample sample = sampleService.createSample(
                 projectId,
                 request.name(),
                 request.alias(),
@@ -95,7 +95,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        sampleServices.updateSample(
+        sampleService.updateSample(
                 projectId,
                 sampleId,
                 request.name(),
@@ -120,7 +120,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        sampleServices.deleteSample(sampleId);
+        sampleService.deleteSample(sampleId);
         return Response.noContent().build();
     }
 
@@ -159,7 +159,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        List<String> errors = sampleServices.bulkPatchSamples(projectId, request);
+        List<String> errors = sampleService.bulkPatchSamples(projectId, request);
 
         if (errors == null || errors.isEmpty()) {
             return Response.ok().build();
@@ -176,7 +176,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        List<File> files = sampleServices.getAllFilesInSample(sampleId);
+        List<File> files = sampleService.getAllFilesInSample(sampleId);
         return files.stream().map(FileResponse::fromEntity).toList();
     }
 }

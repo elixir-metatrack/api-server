@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
-public class SampleServices {
+public class SampleService {
 
     public List<Sample> getAllSamples(Long projectId) {
         return Sample.getAllSamplesInProject(projectId);
