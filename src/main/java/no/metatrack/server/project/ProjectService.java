@@ -87,6 +87,14 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        if (member.role == ProjectRole.OWNER) {
+            long ownerCount = ProjectMember.count("project.id = ?1 and role = ?2", projectId, ProjectRole.OWNER);
+            if (ownerCount <= 1) {
+                throw new WebApplicationException(
+                        "Cannot remove the last owner of a project", Response.Status.BAD_REQUEST);
+            }
+        }
+
         project.projectMembers.remove(member);
     }
 
