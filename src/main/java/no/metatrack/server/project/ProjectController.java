@@ -158,6 +158,17 @@ public class ProjectController {
         return Response.noContent().build();
     }
 
+    @POST
+    @Authenticated
+    @Path("/{projectId}/joinrequests/{userId}/approve")
+    public Response approveJoinRequest(@PathParam("projectId") Long projectId, @PathParam("userId") UUID userId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        joinProjectService.approveJoinRequest(projectId, userId);
+        return Response.noContent().build();
+    }
+
     @GET
     @Authenticated
     @Path("{projectId}/members")
