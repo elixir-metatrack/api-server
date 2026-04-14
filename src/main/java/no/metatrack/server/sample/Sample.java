@@ -31,7 +31,7 @@ public class Sample extends PanacheEntityBase {
 
     public LocalDate collectionDate;
 
-    public String location; // consider using location4j here!!
+    public String location;
 
     public String sequencingLab;
 
