@@ -80,7 +80,7 @@ jobs:
           echo "image-name=${IMAGE_NAME_LC}" >> $GITHUB_OUTPUT
 
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ steps.build.outputs.image-name }}
           subject-digest: ${{ steps.build.outputs.digest }}
