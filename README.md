@@ -1,70 +1,130 @@
-# server
+# Metatrack Server
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Metatrack Server is a Quarkus-based REST API for the Metatrack platform—a comprehensive sample and assay tracking system
+for biological and genomic data. It provides robust management of projects, samples, assays, and associated files.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Tech Stack
 
-## Running the application in dev mode
+- **Language:** Java 21
+- **Framework:** [Quarkus](https://quarkus.io/) (with virtual threads enabled)
+- **Database:** PostgreSQL
+- **ORM:** Hibernate ORM with Panache (Active Record pattern)
+- **Migrations:** Flyway
+- **Authentication:** OIDC / Keycloak (Service type)
+- **Object Storage:** MinIO (for file uploads/downloads via presigned URLs)
+- **Containerization:** Jib (Docker)
+- **Build Tool:** Maven (via `./mvnw` wrapper)
 
-You can run your application in dev mode that enables live coding using:
+## Requirements
 
-```shell script
+- **Java:** JDK 21+
+- **Database:** PostgreSQL 16+ (recommended)
+- **Storage:** MinIO server access
+- **Auth:** Access to Metatrack Keycloak realm
+
+## Environment Variables
+
+The following environment variables are required for the application to function correctly:
+
+| Variable           | Description                                                     |
+|--------------------|-----------------------------------------------------------------|
+| `DB_PASSWORD`      | Password for the PostgreSQL database                            |
+| `MINIO_ACCESS_KEY` | Access key for MinIO storage                                    |
+| `MINIO_SECRET_KEY` | Secret key for MinIO storage (also used for webhook validation) |
+
+## Setup and Running
+
+### Running in Development Mode
+
+You can run the application in dev mode with live coding enabled:
+
+```shell
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+> **Note:** The server defaults to port `1234` (configured in `application.yml`). The Quarkus Dev UI is available at
+`http://localhost:1234/q/dev/`.
 
-## Packaging and running the application
+### Packaging and Running
 
-The application can be packaged using:
+To package the application into a runnable JAR:
 
-```shell script
+```shell
 ./mvnw package
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+The output `quarkus-run.jar` and its dependencies will be in `target/quarkus-app/`. Run it with:
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+```shell
+java -jar target/quarkus-app/quarkus-run.jar
+```
 
-If you want to build an _über-jar_, execute the following command:
+To build an **über-jar**:
 
-```shell script
+```shell
 ./mvnw package -Dquarkus.package.jar.type=uber-jar
+java -jar target/*-runner.jar
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+### Native Executable
 
-## Creating a native executable
+Build a native executable (requires GraalVM or Docker):
 
-You can create a native executable using:
-
-```shell script
+```shell
 ./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
+# Or using a container for the build
 ./mvnw package -Dnative -Dquarkus.native.container-build=true
 ```
 
-You can then execute your native executable with: `./target/server-1.0-SNAPSHOT-runner`
+Run the native executable: `./target/server-1.0-SNAPSHOT-runner`
 
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
+## Scripts and Commands
 
-## Related Guides
+- `./mvnw compile` - Compile the project.
+- `./mvnw test` - Run unit and integration tests.
+- `./mvnw quarkus:dev` - Start development server.
+- `./mvnw package` - Build the application.
+- `./mvnw clean` - Remove build artifacts.
 
-- REST ([guide](https://quarkus.io/guides/rest)): A Jakarta REST implementation utilizing build time processing and
-  Vert.x. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on
-  it.
-- SmallRye OpenAPI ([guide](https://quarkus.io/guides/openapi-swaggerui)): Document your REST APIs with OpenAPI - comes
-  with Swagger UI
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus
-  REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-- YAML Configuration ([guide](https://quarkus.io/guides/config-yaml)): Use YAML to configure your Quarkus application
-- OpenID Connect ([guide](https://quarkus.io/guides/security-openid-connect)): Verify Bearer access tokens and
-  authenticate users with Authorization Code Flow
-- Hibernate ORM with Panache ([guide](https://quarkus.io/guides/hibernate-orm-panache)): Simplify your persistence code
-  for Hibernate ORM via the active record or the repository pattern
-- JDBC Driver - PostgreSQL ([guide](https://quarkus.io/guides/datasource)): Connect to the PostgreSQL database via JDBC
+## Project Structure
+
+```text
+src/main/java/no/metatrack/server/
+├── auth/       # OIDC authentication and user management
+├── project/    # Project lifecycle, memberships, and roles
+├── sample/     # Sample management and CSV/TSV import
+├── assay/      # Assay grouping and sample associations
+├── file/       # File metadata and MinIO presigned URL service
+├── stats/      # Platform-wide statistics
+└── health/     # Service health status endpoints
+
+src/main/resources/
+├── application.yml    # Configuration (ports, DB, OIDC, MinIO)
+└── db/migration/      # Flyway SQL migration scripts
+```
+
+## API Documentation
+
+When the application is running, the OpenAPI UI (scalar) is available at:
+`http://localhost:1234/scalar`.
+
+## Tests
+
+Run the test suite:
+
+```shell
+./mvnw test
+```
+
+Integration tests can be run with:
+
+```shell
+./mvnw verify
+```
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+---
+*This project was generated using Quarkus.*
