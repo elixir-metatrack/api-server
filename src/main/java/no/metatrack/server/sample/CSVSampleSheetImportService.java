@@ -24,8 +24,8 @@ import java.util.Set;
 @ApplicationScoped
 public class CSVSampleSheetImportService {
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(
-            "[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
 
     @Transactional
     public List<CSVUploadRowError> importNewSamples(Long projectId, File file) {
@@ -94,8 +94,11 @@ public class CSVSampleSheetImportService {
                         try {
                             sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
                         } catch (DateTimeParseException e) {
-                            rowErrors.add(new CSVUploadRowError(name, "collection_date",
-                                    "Invalid date '" + rawDate + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
+                            rowErrors.add(new CSVUploadRowError(
+                                    name,
+                                    "collection_date",
+                                    "Invalid date '" + rawDate
+                                            + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
                         }
                     }
 
@@ -117,7 +120,7 @@ public class CSVSampleSheetImportService {
             throw new WebApplicationException(e.getMessage(), 500);
         }
 
-        samplesToSave.forEach(Sample::persist);
+        samplesToSave.forEach(sample -> sample.persist());
 
         return errors;
     }
@@ -141,7 +144,8 @@ public class CSVSampleSheetImportService {
         }
     }
 
-    private Integer parseOptionalInt(CSVRecord rec, String column, String sampleName, List<CSVUploadRowError> rowErrors) {
+    private Integer parseOptionalInt(
+            CSVRecord rec, String column, String sampleName, List<CSVUploadRowError> rowErrors) {
         if (!rec.isMapped(column)) return null;
         String value = rec.get(column);
         if (value == null || value.isBlank()) return null;
