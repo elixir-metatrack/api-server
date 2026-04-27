@@ -39,3 +39,4 @@ metatrack:
     minio-secret: ${MINIO_SECRET_KEY}
   file:
     presign-expiry-seconds: 600
+taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
