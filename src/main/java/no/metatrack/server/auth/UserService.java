@@ -22,6 +22,12 @@ public class UserService {
             throw new WebApplicationException("Unsupported principal", 401);
         }
 
-        return new CurrentUser(jwt.getSubject(), principal.getName(), identity.getRoles());
+        return new CurrentUser(
+                jwt.getSubject(),
+                principal.getName(),
+                identity.getRoles(),
+                jwt.getClaim("country"),
+                jwt.getClaim("institution"),
+                jwt.getClaim("orcid"));
     }
 }

@@ -19,6 +19,6 @@ public class UserController {
     @Produces(MediaType.APPLICATION_JSON)
     public UserResponse getUserInfo() {
         var user = userService.requireCurrentUser();
-        return new UserResponse(user.id(), user.name(), user.roles());
+        return new UserResponse(user.id(), user.name(), user.roles(), user.country(), user.institution(), user.orcid());
     }
 }
