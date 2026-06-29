@@ -99,7 +99,7 @@ public class AssayService {
             assay.addSample(sample.get());
         }
 
-        if (errors.isEmpty()) return null;
+        if (errors.isEmpty()) return List.of();
 
         return errors;
     }
@@ -118,7 +118,7 @@ public class AssayService {
             assay.removeSample(sample.get());
         }
 
-        if (errors.isEmpty()) return null;
+        if (errors.isEmpty()) return List.of();
 
         return errors;
     }
