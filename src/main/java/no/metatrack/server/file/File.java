@@ -35,6 +35,14 @@ public class File extends PanacheEntity {
         return Optional.of(file);
     }
 
+    public static Optional<File> findByVirtualPathOptional(String virtualPath) {
+        File file = File.find("virtualPath", virtualPath).firstResult();
+        if (file == null) {
+            return Optional.empty();
+        }
+        return Optional.of(file);
+    }
+
     public static Optional<File> findByUuidOptional(UUID uuid) {
         File file = File.find("uuid", uuid).firstResult();
         if (file == null) {
