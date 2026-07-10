@@ -1,41 +1,33 @@
 package no.metatrack.server.file;
 
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
-import io.minio.http.Method;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.sample.Sample;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @ApplicationScoped
 public class PresignUrlService {
     @Inject
-    MinioClient minioClient;
-
-    @ConfigProperty(name = "quarkus.minio.bucket-name")
-    String bucketName;
+    ObjectStorage objectStorage;
 
     @Transactional
-    public String presignedUploadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds)
-            throws Exception {
+    public String presignedUploadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds) {
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
 
-        String objectKey = projectId + "/" + sampleName + "/" + fileName;
+        String virtualPath = projectId + "/" + sampleName + "/" + fileName;
+        String objectKey = uploadObjectKey(virtualPath);
 
-        var argsBuilder = GetPresignedObjectUrlArgs.builder();
-
-        if (File.findByObjectKeyOptional(objectKey).isPresent()) {
-            File file = File.findByObjectKeyOptional(objectKey).get();
+        var existingFile = File.findByVirtualPathOptional(virtualPath);
+        if (existingFile.isPresent()) {
+            File file = existingFile.get();
+            file.objectKey = objectKey;
             file.status = UploadStatus.PENDING;
 
-            argsBuilder.method(Method.PUT).bucket(bucketName).object(objectKey).expiry(expiryInSeconds);
-
-            return minioClient.getPresignedObjectUrl(argsBuilder.build());
+            return objectStorage.presignUpload(objectKey, Duration.ofSeconds(expiryInSeconds));
         }
 
         UUID fileId = UUID.randomUUID();
@@ -43,28 +35,23 @@ public class PresignUrlService {
         File file = new File();
         file.uuid = fileId;
         file.fileName = fileName;
-        file.virtualPath = objectKey;
+        file.virtualPath = virtualPath;
         file.objectKey = objectKey;
         file.status = UploadStatus.PENDING;
         file.sample = sample;
 
         sample.files.add(file);
 
-        argsBuilder.method(Method.PUT).bucket(bucketName).object(objectKey).expiry(expiryInSeconds);
-
-        return minioClient.getPresignedObjectUrl(argsBuilder.build());
+        return objectStorage.presignUpload(objectKey, Duration.ofSeconds(expiryInSeconds));
     }
 
-    public String presignedDownloadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds)
-            throws Exception {
-        String objectKey = projectId.toString() + "/" + sampleName + "/" + fileName;
-        var args = GetPresignedObjectUrlArgs.builder()
-                .method(Method.GET)
-                .bucket(bucketName)
-                .object(objectKey)
-                .expiry(expiryInSeconds)
-                .build();
+    public String presignedDownloadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds) {
+        String virtualPath = projectId + "/" + sampleName + "/" + fileName;
+        File file = File.findByVirtualPathOptional(virtualPath).orElseThrow(NotFoundException::new);
+        return objectStorage.presignDownload(file.objectKey, Duration.ofSeconds(expiryInSeconds));
+    }
 
-        return minioClient.getPresignedObjectUrl(args);
+    static String uploadObjectKey(String virtualPath) {
+        return virtualPath + "/" + UUID.randomUUID();
     }
 }
