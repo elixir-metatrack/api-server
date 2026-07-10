@@ -15,20 +15,20 @@ quarkus:
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
   datasource:
     db-kind: postgresql
-    username: metatrack
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     jdbc:
-      url: jdbc:postgresql://localhost:5432/metatrack
+      url: ${JDBC_STRING}
   oidc:
     application-type: service
-    auth-server-url: https://auth.metatrack.no/realms/metatrack
+    auth-server-url: ${KEYCLOAK_URL}
   minio:
-    host: https://storage.metatrack.no
-    port:
+    host: ${S3_HOST}
+    port: ${S3_PORT}
     access-key: ${MINIO_ACCESS_KEY}
     secret-key: ${MINIO_SECRET_KEY}
-    secure: true
-    region: eu-west-1
+    secure: ${S3_SECURE}
+    region: ${S3_REGION}
     force-path-style: true
     bucket-name: metatrack
   smallrye-openapi:
