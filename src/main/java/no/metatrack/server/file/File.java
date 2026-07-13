@@ -26,6 +26,8 @@ public class File extends PanacheEntity {
     @Enumerated(EnumType.STRING)
     UploadStatus status;
 
+    UUID uploadedBy;
+
     @ManyToOne(fetch = FetchType.LAZY)
     Sample sample;
 

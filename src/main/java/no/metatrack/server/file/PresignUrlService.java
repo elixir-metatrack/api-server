@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.Assay;
+import no.metatrack.server.auth.UserService;
 import no.metatrack.server.sample.Sample;
 
 import java.time.Duration;
@@ -15,6 +16,9 @@ import java.util.UUID;
 public class PresignUrlService {
     @Inject
     ObjectStorage objectStorage;
+
+    @Inject
+    UserService userService;
 
     @Transactional
     public PresignedUrl presignedUploadUrl(
@@ -41,6 +45,7 @@ public class PresignUrlService {
         file.virtualPath = virtualPath;
         file.objectKey = objectKey;
         file.status = UploadStatus.PENDING;
+        file.uploadedBy = UUID.fromString(userService.requireCurrentUser().id());
         file.sample = sample;
         file.assay = assay;
 
