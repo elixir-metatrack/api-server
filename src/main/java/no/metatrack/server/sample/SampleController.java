@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.FileIngestService;
 import no.metatrack.server.file.FileResponse;
+import no.metatrack.server.file.FileService;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
@@ -30,6 +31,9 @@ public class SampleController {
     );
     @Inject
     SampleService sampleService;
+
+    @Inject
+    FileService fileService;
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
@@ -186,7 +190,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        List<File> files = sampleService.getAllFilesInSample(sampleId);
+        List<File> files = fileService.getAllFilesInSample(projectId, sampleId);
         return files.stream().map(FileResponse::fromEntity).toList();
     }
 

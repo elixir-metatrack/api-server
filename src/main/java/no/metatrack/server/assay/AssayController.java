@@ -5,6 +5,9 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.file.File;
+import no.metatrack.server.file.FileResponse;
+import no.metatrack.server.file.FileService;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.Sample;
@@ -17,6 +20,9 @@ import java.util.UUID;
 public class AssayController {
     @Inject
     AssayService assayService;
+
+    @Inject
+    FileService fileService;
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
@@ -143,5 +149,17 @@ public class AssayController {
         List<Sample> samples = assayService.getAllSamplesInAssay(assayId);
 
         return samples.stream().map(SampleResponse::fromEntity).toList();
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{assayId}/files")
+    public List<FileResponse> getAllFilesInAssay(
+            @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
+
+        List<File> files = fileService.getAllFilesInAssay(projectId, assayId);
+        return files.stream().map(FileResponse::fromEntity).toList();
     }
 }

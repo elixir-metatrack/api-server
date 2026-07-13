@@ -4,9 +4,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.assay.Assay;
 import no.metatrack.server.sample.Sample;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -15,19 +17,20 @@ public class PresignUrlService {
     ObjectStorage objectStorage;
 
     @Transactional
-    public String presignedUploadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds) {
+    public PresignedUrl presignedUploadUrl(
+            Long projectId, UUID assayId, String sampleName, String fileName, int expiryInSeconds) {
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
+        Assay assay = findAssayForSample(projectId, assayId, sample.id);
 
-        String virtualPath = projectId + "/" + sampleName + "/" + fileName;
-        String objectKey = uploadObjectKey(virtualPath);
-
+        String virtualPath = virtualPath(projectId, assayId, sampleName, fileName);
         var existingFile = File.findByVirtualPathOptional(virtualPath);
+        String objectKey = objectKeyForUpload(existingFile, virtualPath);
         if (existingFile.isPresent()) {
             File file = existingFile.get();
-            file.objectKey = objectKey;
-            file.status = UploadStatus.PENDING;
+            file.sample = sample;
+            file.assay = assay;
 
-            return objectStorage.presignUpload(objectKey, Duration.ofSeconds(expiryInSeconds));
+            return presignUpload(objectKey, expiryInSeconds);
         }
 
         UUID fileId = UUID.randomUUID();
@@ -39,19 +42,45 @@ public class PresignUrlService {
         file.objectKey = objectKey;
         file.status = UploadStatus.PENDING;
         file.sample = sample;
+        file.assay = assay;
 
         sample.files.add(file);
 
-        return objectStorage.presignUpload(objectKey, Duration.ofSeconds(expiryInSeconds));
+        return presignUpload(objectKey, expiryInSeconds);
     }
 
-    public String presignedDownloadUrl(Long projectId, String sampleName, String fileName, int expiryInSeconds) {
-        String virtualPath = projectId + "/" + sampleName + "/" + fileName;
+    public PresignedUrl presignedDownloadUrl(
+            Long projectId, UUID assayId, String sampleName, String fileName, int expiryInSeconds) {
+        Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
+        findAssayForSample(projectId, assayId, sample.id);
+        String virtualPath = virtualPath(projectId, assayId, sampleName, fileName);
         File file = File.findByVirtualPathOptional(virtualPath).orElseThrow(NotFoundException::new);
-        return objectStorage.presignDownload(file.objectKey, Duration.ofSeconds(expiryInSeconds));
+        String url = objectStorage.presignDownload(file.objectKey, Duration.ofSeconds(expiryInSeconds));
+        return new PresignedUrl(url, file.objectKey);
+    }
+
+    private PresignedUrl presignUpload(String objectKey, int expiryInSeconds) {
+        String url = objectStorage.presignUpload(objectKey, Duration.ofSeconds(expiryInSeconds));
+        return new PresignedUrl(url, objectKey);
+    }
+
+    static String virtualPath(Long projectId, UUID assayId, String sampleName, String fileName) {
+        return projectId + "/" + assayId + "/" + sampleName + "/" + fileName;
+    }
+
+    private Assay findAssayForSample(Long projectId, UUID assayId, UUID sampleId) {
+        return Assay.<Assay>find(
+                        "select a from Assay a join a.samples s where a.id = ?1 and a.project.id = ?2 and s.id = ?3",
+                        assayId, projectId, sampleId)
+                .firstResultOptional()
+                .orElseThrow(NotFoundException::new);
     }
 
     static String uploadObjectKey(String virtualPath) {
         return virtualPath + "/" + UUID.randomUUID();
+    }
+
+    static String objectKeyForUpload(Optional<File> existingFile, String virtualPath) {
+        return existingFile.map(file -> file.objectKey).orElseGet(() -> uploadObjectKey(virtualPath));
     }
 }
