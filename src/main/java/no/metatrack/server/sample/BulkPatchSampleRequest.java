@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public record BulkPatchSampleRequest(@Valid @NotEmpty List<SampleRequestData> sampleData) {
     public record SampleRequestData(
@@ -48,5 +49,6 @@ public record BulkPatchSampleRequest(@Valid @NotEmpty List<SampleRequestData> sa
             String hostAge,
             String county,
             String commune,
-            String hospitalHealthInstitution) {}
+            String hospitalHealthInstitution,
+            Map<String, Object> customMetadata) {}
 }

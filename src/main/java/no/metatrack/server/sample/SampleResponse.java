@@ -2,6 +2,7 @@ package no.metatrack.server.sample;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 public record SampleResponse(
@@ -47,8 +48,9 @@ public record SampleResponse(
         String commune,
         String hospitalHealthInstitution,
         Instant createdOn,
-        Instant modifiedOn) {
-    public static SampleResponse fromEntity(Sample sample) {
+        Instant modifiedOn,
+        Map<String, Object> customMetadata) {
+    public static SampleResponse fromEntity(Sample sample, Map<String, Object> customMetadata) {
         return new SampleResponse(
                 sample.id,
                 sample.name,
@@ -92,6 +94,7 @@ public record SampleResponse(
                 sample.commune,
                 sample.hospitalHealthInstitution,
                 sample.createdOn,
-                sample.modifiedOn);
+                sample.modifiedOn,
+                customMetadata);
     }
 }

@@ -12,12 +12,16 @@ import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.sample.SampleResponse;
+import no.metatrack.server.sample.metadata.SampleMetadataService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Path("/api/projects/{projectId}/assays")
 public class AssayController {
+    @Inject
+    SampleMetadataService metadataService;
     @Inject
     AssayService assayService;
 
@@ -145,10 +149,14 @@ public class AssayController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
+        if (!Assay.existsAssayByIdInProjectOptional(projectId, assayId)) throw new NotFoundException("Assay not found");
 
         List<Sample> samples = assayService.getAllSamplesInAssay(assayId);
+        Map<UUID, Map<String, Object>> metadata = metadataService.getActiveMetadata(samples);
 
-        return samples.stream().map(SampleResponse::fromEntity).toList();
+        return samples.stream()
+                .map(sample -> SampleResponse.fromEntity(sample, metadata.get(sample.id)))
+                .toList();
     }
 
     @GET

@@ -3,6 +3,7 @@ package no.metatrack.server.sample;
 import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 public record CreateSampleRequest(
         @NotBlank String name,
@@ -44,4 +45,5 @@ public record CreateSampleRequest(
         String hostAge,
         String county,
         String commune,
-        String hospitalHealthInstitution) {}
+        String hospitalHealthInstitution,
+        Map<String, Object> customMetadata) {}
