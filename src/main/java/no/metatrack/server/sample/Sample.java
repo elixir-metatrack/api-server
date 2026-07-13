@@ -27,6 +27,64 @@ public class Sample extends PanacheEntityBase {
 
     public String mlst;
 
+    public String projectTitle;
+
+    public String description;
+
+    public String isolate;
+
+    public String collectedBy;
+
+    public Double latitude;
+
+    public Double longitude;
+
+    public String environmentalSample;
+
+    public String hostAssociated;
+
+    public String hostCommonName;
+
+    public String hostSubjectId;
+
+    public String collectorName;
+
+    public String collectingInstitution;
+
+    public String hostSex;
+
+    public String influenzaTestMethod;
+
+    public String influenzaTestResult;
+
+    public String otherPathogensTested;
+
+    public String otherPathogensTestResult;
+
+    public String hostHabitat;
+
+    public String isolationSourceHostAssociated;
+
+    public String hostBehaviour;
+
+    public String isolationSourceNonHostAssociated;
+
+    public String influenzaVirusType;
+
+    public String influenzaSubType;
+
+    public String serovar;
+
+    public String strain;
+
+    public String hostAge;
+
+    public String county;
+
+    public String commune;
+
+    public String hospitalHealthInstitution;
+
     public String isolationSource;
 
     public LocalDate collectionDate;
