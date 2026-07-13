@@ -42,7 +42,36 @@ public class SampleService {
             String institution,
             String isolationSource,
             LocalDate collectionDate,
-            String hostHealthState) {
+            String hostHealthState,
+            String projectTitle,
+            String description,
+            String isolate,
+            String collectedBy,
+            Double latitude,
+            Double longitude,
+            String environmentalSample,
+            String hostAssociated,
+            String hostCommonName,
+            String hostSubjectId,
+            String collectorName,
+            String collectingInstitution,
+            String hostSex,
+            String influenzaTestMethod,
+            String influenzaTestResult,
+            String otherPathogensTested,
+            String otherPathogensTestResult,
+            String hostHabitat,
+            String isolationSourceHostAssociated,
+            String hostBehaviour,
+            String isolationSourceNonHostAssociated,
+            String influenzaVirusType,
+            String influenzaSubType,
+            String serovar,
+            String strain,
+            String hostAge,
+            String county,
+            String commune,
+            String hospitalHealthInstitution) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
@@ -61,6 +90,35 @@ public class SampleService {
         if (isolationSource != null) sample.isolationSource = isolationSource;
         if (collectionDate != null) sample.collectionDate = collectionDate;
         if (hostHealthState != null) sample.hostHealthState = hostHealthState;
+        if (projectTitle != null) sample.projectTitle = projectTitle;
+        if (description != null) sample.description = description;
+        if (isolate != null) sample.isolate = isolate;
+        if (collectedBy != null) sample.collectedBy = collectedBy;
+        if (latitude != null) sample.latitude = latitude;
+        if (longitude != null) sample.longitude = longitude;
+        if (environmentalSample != null) sample.environmentalSample = environmentalSample;
+        if (hostAssociated != null) sample.hostAssociated = hostAssociated;
+        if (hostCommonName != null) sample.hostCommonName = hostCommonName;
+        if (hostSubjectId != null) sample.hostSubjectId = hostSubjectId;
+        if (collectorName != null) sample.collectorName = collectorName;
+        if (collectingInstitution != null) sample.collectingInstitution = collectingInstitution;
+        if (hostSex != null) sample.hostSex = hostSex;
+        if (influenzaTestMethod != null) sample.influenzaTestMethod = influenzaTestMethod;
+        if (influenzaTestResult != null) sample.influenzaTestResult = influenzaTestResult;
+        if (otherPathogensTested != null) sample.otherPathogensTested = otherPathogensTested;
+        if (otherPathogensTestResult != null) sample.otherPathogensTestResult = otherPathogensTestResult;
+        if (hostHabitat != null) sample.hostHabitat = hostHabitat;
+        if (isolationSourceHostAssociated != null) sample.isolationSourceHostAssociated = isolationSourceHostAssociated;
+        if (hostBehaviour != null) sample.hostBehaviour = hostBehaviour;
+        if (isolationSourceNonHostAssociated != null) sample.isolationSourceNonHostAssociated = isolationSourceNonHostAssociated;
+        if (influenzaVirusType != null) sample.influenzaVirusType = influenzaVirusType;
+        if (influenzaSubType != null) sample.influenzaSubType = influenzaSubType;
+        if (serovar != null) sample.serovar = serovar;
+        if (strain != null) sample.strain = strain;
+        if (hostAge != null) sample.hostAge = hostAge;
+        if (county != null) sample.county = county;
+        if (commune != null) sample.commune = commune;
+        if (hospitalHealthInstitution != null) sample.hospitalHealthInstitution = hospitalHealthInstitution;
 
         sample.createdOn = Instant.now();
         sample.modifiedOn = Instant.now();
@@ -84,7 +142,36 @@ public class SampleService {
             String institution,
             String isolationSource,
             LocalDate collectionDate,
-            String hostHealthState) {
+            String hostHealthState,
+            String projectTitle,
+            String description,
+            String isolate,
+            String collectedBy,
+            Double latitude,
+            Double longitude,
+            String environmentalSample,
+            String hostAssociated,
+            String hostCommonName,
+            String hostSubjectId,
+            String collectorName,
+            String collectingInstitution,
+            String hostSex,
+            String influenzaTestMethod,
+            String influenzaTestResult,
+            String otherPathogensTested,
+            String otherPathogensTestResult,
+            String hostHabitat,
+            String isolationSourceHostAssociated,
+            String hostBehaviour,
+            String isolationSourceNonHostAssociated,
+            String influenzaVirusType,
+            String influenzaSubType,
+            String serovar,
+            String strain,
+            String hostAge,
+            String county,
+            String commune,
+            String hospitalHealthInstitution) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
@@ -100,6 +187,35 @@ public class SampleService {
         if (isolationSource != null) sample.isolationSource = isolationSource;
         if (collectionDate != null) sample.collectionDate = collectionDate;
         if (hostHealthState != null) sample.hostHealthState = hostHealthState;
+        if (projectTitle != null) sample.projectTitle = projectTitle;
+        if (description != null) sample.description = description;
+        if (isolate != null) sample.isolate = isolate;
+        if (collectedBy != null) sample.collectedBy = collectedBy;
+        if (latitude != null) sample.latitude = latitude;
+        if (longitude != null) sample.longitude = longitude;
+        if (environmentalSample != null) sample.environmentalSample = environmentalSample;
+        if (hostAssociated != null) sample.hostAssociated = hostAssociated;
+        if (hostCommonName != null) sample.hostCommonName = hostCommonName;
+        if (hostSubjectId != null) sample.hostSubjectId = hostSubjectId;
+        if (collectorName != null) sample.collectorName = collectorName;
+        if (collectingInstitution != null) sample.collectingInstitution = collectingInstitution;
+        if (hostSex != null) sample.hostSex = hostSex;
+        if (influenzaTestMethod != null) sample.influenzaTestMethod = influenzaTestMethod;
+        if (influenzaTestResult != null) sample.influenzaTestResult = influenzaTestResult;
+        if (otherPathogensTested != null) sample.otherPathogensTested = otherPathogensTested;
+        if (otherPathogensTestResult != null) sample.otherPathogensTestResult = otherPathogensTestResult;
+        if (hostHabitat != null) sample.hostHabitat = hostHabitat;
+        if (isolationSourceHostAssociated != null) sample.isolationSourceHostAssociated = isolationSourceHostAssociated;
+        if (hostBehaviour != null) sample.hostBehaviour = hostBehaviour;
+        if (isolationSourceNonHostAssociated != null) sample.isolationSourceNonHostAssociated = isolationSourceNonHostAssociated;
+        if (influenzaVirusType != null) sample.influenzaVirusType = influenzaVirusType;
+        if (influenzaSubType != null) sample.influenzaSubType = influenzaSubType;
+        if (serovar != null) sample.serovar = serovar;
+        if (strain != null) sample.strain = strain;
+        if (hostAge != null) sample.hostAge = hostAge;
+        if (county != null) sample.county = county;
+        if (commune != null) sample.commune = commune;
+        if (hospitalHealthInstitution != null) sample.hospitalHealthInstitution = hospitalHealthInstitution;
 
         sample.modifiedOn = Instant.now();
 
@@ -136,6 +252,35 @@ public class SampleService {
             if (data.isolationSource() != null) sample.isolationSource = data.isolationSource();
             if (data.collectionDate() != null) sample.collectionDate = data.collectionDate();
             if (data.hostHealthState() != null) sample.hostHealthState = data.hostHealthState();
+            if (data.projectTitle() != null) sample.projectTitle = data.projectTitle();
+            if (data.description() != null) sample.description = data.description();
+            if (data.isolate() != null) sample.isolate = data.isolate();
+            if (data.collectedBy() != null) sample.collectedBy = data.collectedBy();
+            if (data.latitude() != null) sample.latitude = data.latitude();
+            if (data.longitude() != null) sample.longitude = data.longitude();
+            if (data.environmentalSample() != null) sample.environmentalSample = data.environmentalSample();
+            if (data.hostAssociated() != null) sample.hostAssociated = data.hostAssociated();
+            if (data.hostCommonName() != null) sample.hostCommonName = data.hostCommonName();
+            if (data.hostSubjectId() != null) sample.hostSubjectId = data.hostSubjectId();
+            if (data.collectorName() != null) sample.collectorName = data.collectorName();
+            if (data.collectingInstitution() != null) sample.collectingInstitution = data.collectingInstitution();
+            if (data.hostSex() != null) sample.hostSex = data.hostSex();
+            if (data.influenzaTestMethod() != null) sample.influenzaTestMethod = data.influenzaTestMethod();
+            if (data.influenzaTestResult() != null) sample.influenzaTestResult = data.influenzaTestResult();
+            if (data.otherPathogensTested() != null) sample.otherPathogensTested = data.otherPathogensTested();
+            if (data.otherPathogensTestResult() != null) sample.otherPathogensTestResult = data.otherPathogensTestResult();
+            if (data.hostHabitat() != null) sample.hostHabitat = data.hostHabitat();
+            if (data.isolationSourceHostAssociated() != null) sample.isolationSourceHostAssociated = data.isolationSourceHostAssociated();
+            if (data.hostBehaviour() != null) sample.hostBehaviour = data.hostBehaviour();
+            if (data.isolationSourceNonHostAssociated() != null) sample.isolationSourceNonHostAssociated = data.isolationSourceNonHostAssociated();
+            if (data.influenzaVirusType() != null) sample.influenzaVirusType = data.influenzaVirusType();
+            if (data.influenzaSubType() != null) sample.influenzaSubType = data.influenzaSubType();
+            if (data.serovar() != null) sample.serovar = data.serovar();
+            if (data.strain() != null) sample.strain = data.strain();
+            if (data.hostAge() != null) sample.hostAge = data.hostAge();
+            if (data.county() != null) sample.county = data.county();
+            if (data.commune() != null) sample.commune = data.commune();
+            if (data.hospitalHealthInstitution() != null) sample.hospitalHealthInstitution = data.hospitalHealthInstitution();
             sample.modifiedOn = Instant.now();
         }
 
