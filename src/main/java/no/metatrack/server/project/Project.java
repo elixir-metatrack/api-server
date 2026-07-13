@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.*;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.sample.Sample;
+import no.metatrack.server.sample.metadata.SampleMetadataField;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -32,6 +33,9 @@ public class Project extends PanacheEntity {
 
     @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     public Set<Assay> assays = new HashSet<>();
+
+    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    public Set<SampleMetadataField> sampleMetadataFields = new HashSet<>();
 
     public static boolean projectExists(Long projectId) {
         return findByIdOptional(projectId).isPresent();

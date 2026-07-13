@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.file.File;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.sample.metadata.SampleMetadataValue;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -109,6 +110,9 @@ public class Sample extends PanacheEntityBase {
 
     @ManyToMany(mappedBy = "samples")
     public Set<Assay> assays = new HashSet<>();
+
+    @OneToMany(mappedBy = "sample", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    public Set<SampleMetadataValue> metadataValues = new HashSet<>();
 
     public static boolean sampleExists(Long sampleId) {
         return findByIdOptional(sampleId).isPresent();
