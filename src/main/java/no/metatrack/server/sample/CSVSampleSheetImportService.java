@@ -56,7 +56,7 @@ public class CSVSampleSheetImportService {
                 Set<String> namesInFile = new HashSet<>();
 
                 for (CSVRecord rec : records) {
-                    String name = rec.isMapped("name") ? rec.get("name") : null;
+                    String name = getMappedValue(rec, "name", "Sample Name");
 
                     if (name == null || name.isBlank()) {
                         errors.add(new CSVUploadRowError(
@@ -83,13 +83,14 @@ public class CSVSampleSheetImportService {
                     Sample sample = new Sample();
                     sample.project = project;
                     sample.name = name;
-                    sample.alias = rec.isMapped("alias") ? rec.get("alias") : null;
-                    sample.taxId = parseOptionalInt(rec, "tax_id", name, rowErrors);
-                    sample.hostTaxId = parseOptionalInt(rec, "host_tax_id", name, rowErrors);
-                    sample.mlst = rec.isMapped("mlst") ? rec.get("mlst") : null;
-                    sample.isolationSource = rec.isMapped("isolation_source") ? rec.get("isolation_source") : null;
+                    sample.alias = getMappedValue(rec, "alias");
+                    sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, name, rowErrors);
+                    sample.hostTaxId =
+                            parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, name, rowErrors);
+                    sample.mlst = getMappedValue(rec, "mlst", "MLST");
+                    sample.isolationSource = getMappedValue(rec, "isolation_source", "Isolation Source");
 
-                    String rawDate = rec.isMapped("collection_date") ? rec.get("collection_date") : null;
+                    String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
                     if (rawDate != null && !rawDate.isBlank()) {
                         try {
                             sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
@@ -102,10 +103,48 @@ public class CSVSampleSheetImportService {
                         }
                     }
 
-                    sample.location = rec.isMapped("location") ? rec.get("location") : null;
-                    sample.sequencingLab = rec.isMapped("sequencing_lab") ? rec.get("sequencing_lab") : null;
-                    sample.institution = rec.isMapped("institution") ? rec.get("institution") : null;
-                    sample.hostHealthState = rec.isMapped("host_health_state") ? rec.get("host_health_state") : null;
+                    sample.location = getMappedValue(rec, "location", "Geographic Location");
+                    sample.sequencingLab = getMappedValue(rec, "sequencing_lab", "Collected By");
+                    sample.institution = getMappedValue(rec, "institution", "Collecting Institution");
+                    sample.hostHealthState = getMappedValue(rec, "host_health_state", "Host Health State");
+
+                    sample.projectTitle = getMappedValue(rec, "project_title", "Project Title");
+                    sample.description = getMappedValue(rec, "description", "Description");
+                    sample.isolate = getMappedValue(rec, "isolate", "Isolate");
+                    sample.collectedBy = getMappedValue(rec, "collected_by", "Collected By");
+                    sample.latitude = parseOptionalDouble(rec, new String[] {"latitude", "Latitude"}, name, rowErrors);
+                    sample.longitude =
+                            parseOptionalDouble(rec, new String[] {"longitude", "Longitude"}, name, rowErrors);
+                    sample.environmentalSample = getMappedValue(rec, "environmental_sample", "Environmental Sample");
+                    sample.hostAssociated = getMappedValue(rec, "host_associated", "Host Associated");
+                    sample.hostCommonName = getMappedValue(rec, "host_common_name", "Host Common Name");
+                    sample.hostSubjectId = getMappedValue(rec, "host_subject_id", "Host Subject ID");
+                    sample.collectorName = getMappedValue(rec, "collector_name", "Collector Name");
+                    sample.collectingInstitution =
+                            getMappedValue(rec, "collecting_institution", "Collecting Institution");
+                    sample.hostSex = getMappedValue(rec, "host_sex", "Host Sex");
+                    sample.influenzaTestMethod = getMappedValue(rec, "influenza_test_method", "Influenza Test Method");
+                    sample.influenzaTestResult = getMappedValue(rec, "influenza_test_result", "Influenza Test Result");
+                    sample.otherPathogensTested =
+                            getMappedValue(rec, "other_pathogens_tested", "Other Pathogens Tested");
+                    sample.otherPathogensTestResult =
+                            getMappedValue(rec, "other_pathogens_test_result", "Other Pathogens Test Result");
+                    sample.hostHabitat = getMappedValue(rec, "host_habitat", "Host Habitat");
+                    sample.isolationSourceHostAssociated =
+                            getMappedValue(rec, "isolation_source_host_associated", "Isolation Source Host-Associated");
+                    sample.hostBehaviour = getMappedValue(rec, "host_behaviour", "Host Behaviour");
+                    sample.isolationSourceNonHostAssociated = getMappedValue(
+                            rec, "isolation_source_non_host_associated", "Isolation Source Non-Host-Associated");
+                    sample.influenzaVirusType = getMappedValue(rec, "influenza_virus_type", "Influenza Virus Type");
+                    sample.influenzaSubType = getMappedValue(rec, "influenza_sub_type", "Influenza Sub Type");
+                    sample.serovar = getMappedValue(rec, "serovar", "Serovar");
+                    sample.strain = getMappedValue(rec, "strain", "Strain");
+                    sample.hostAge = getMappedValue(rec, "host_age", "Host Age");
+                    sample.county = getMappedValue(rec, "county", "County");
+                    sample.commune = getMappedValue(rec, "commune", "Commune");
+                    sample.hospitalHealthInstitution =
+                            getMappedValue(rec, "hospital_health_institution", "Hospital/Health institution");
+
                     sample.createdOn = Instant.now();
                     sample.modifiedOn = Instant.now();
 
@@ -145,15 +184,35 @@ public class CSVSampleSheetImportService {
     }
 
     private Integer parseOptionalInt(
-            CSVRecord rec, String column, String sampleName, List<CSVUploadRowError> rowErrors) {
-        if (!rec.isMapped(column)) return null;
-        String value = rec.get(column);
+            CSVRecord rec, String[] columns, String sampleName, List<CSVUploadRowError> rowErrors) {
+        String value = getMappedValue(rec, columns);
         if (value == null || value.isBlank()) return null;
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            rowErrors.add(new CSVUploadRowError(sampleName, column, "Invalid integer value: '" + value + "'"));
+            rowErrors.add(new CSVUploadRowError(sampleName, String.join("/", columns), "Invalid integer value: '" + value + "'"));
             return null;
         }
+    }
+
+    private Double parseOptionalDouble(
+            CSVRecord rec, String[] columns, String sampleName, List<CSVUploadRowError> rowErrors) {
+        String value = getMappedValue(rec, columns);
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            rowErrors.add(new CSVUploadRowError(sampleName, String.join("/", columns), "Invalid decimal value: '" + value + "'"));
+            return null;
+        }
+    }
+
+    private String getMappedValue(CSVRecord rec, String... headers) {
+        for (String header : headers) {
+            if (rec.isMapped(header)) {
+                return rec.get(header);
+            }
+        }
+        return null;
     }
 }
