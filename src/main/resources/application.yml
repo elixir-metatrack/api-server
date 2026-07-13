@@ -13,6 +13,8 @@ quarkus:
     database:
       start-offline: true
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+  flyway:
+    migrate-at-start: true
   datasource:
     db-kind: postgresql
     username: ${DB_USERNAME}
