@@ -1,9 +1,13 @@
 package no.metatrack.server.sample;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.sample.metadata.SampleMetadataField;
+import no.metatrack.server.sample.metadata.SampleMetadataService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
@@ -18,11 +22,17 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @ApplicationScoped
 public class CSVSampleSheetImportService {
+
+    @Inject
+    SampleMetadataService metadataService;
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
@@ -31,7 +41,10 @@ public class CSVSampleSheetImportService {
     public List<CSVUploadRowError> importNewSamples(Long projectId, File file) {
         List<CSVUploadRowError> errors = new ArrayList<>();
         List<Sample> samplesToSave = new ArrayList<>();
+        Map<Sample, Map<String, Object>> metadataToSave = new IdentityHashMap<>();
         Project project = Project.findById(projectId);
+        List<SampleMetadataField> customFields = SampleMetadataField.list(
+                "project.id = ?1 and archivedOn is null order by key", projectId);
 
         try {
             char delimiter = detectDelimiter(file);
@@ -145,11 +158,23 @@ public class CSVSampleSheetImportService {
                     sample.hospitalHealthInstitution =
                             getMappedValue(rec, "hospital_health_institution", "Hospital/Health institution");
 
+                    Map<String, Object> customMetadata = new LinkedHashMap<>();
+                    for (SampleMetadataField field : customFields) {
+                        String rawValue = getMappedValue(rec, field.key);
+                        if (rawValue == null || rawValue.isBlank()) continue;
+                        try {
+                            customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
+                        } catch (BadRequestException e) {
+                            rowErrors.add(new CSVUploadRowError(name, field.key, e.getMessage()));
+                        }
+                    }
+
                     sample.createdOn = Instant.now();
                     sample.modifiedOn = Instant.now();
 
                     if (rowErrors.isEmpty()) {
                         samplesToSave.add(sample);
+                        metadataToSave.put(sample, customMetadata);
                     } else {
                         errors.addAll(rowErrors);
                     }
@@ -159,7 +184,10 @@ public class CSVSampleSheetImportService {
             throw new WebApplicationException(e.getMessage(), 500);
         }
 
-        samplesToSave.forEach(sample -> sample.persist());
+        samplesToSave.forEach(sample -> {
+            sample.persist();
+            metadataService.apply(projectId, sample, metadataToSave.get(sample));
+        });
 
         return errors;
     }

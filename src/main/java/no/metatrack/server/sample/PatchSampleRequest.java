@@ -1,6 +1,7 @@
 package no.metatrack.server.sample;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 public record PatchSampleRequest(
         String name,
@@ -42,4 +43,5 @@ public record PatchSampleRequest(
         String hostAge,
         String county,
         String commune,
-        String hospitalHealthInstitution) {}
+        String hospitalHealthInstitution,
+        Map<String, Object> customMetadata) {}

@@ -13,10 +13,12 @@ import no.metatrack.server.file.FileService;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
+import no.metatrack.server.sample.metadata.SampleMetadataService;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -44,14 +46,20 @@ public class SampleController {
     @Inject
     FileIngestService fileIngestService;
 
+    @Inject
+    SampleMetadataService metadataService;
+
     @GET
     @Authenticated
     public List<SampleResponse> getAllSamples(@PathParam("projectId") Long projectId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
         List<Sample> samples = sampleService.getAllSamples(projectId);
+        Map<UUID, Map<String, Object>> metadata = metadataService.getActiveMetadata(samples);
 
-        return samples.stream().map(SampleResponse::fromEntity).toList();
+        return samples.stream()
+                .map(sample -> SampleResponse.fromEntity(sample, metadata.get(sample.id)))
+                .toList();
     }
 
     @GET
@@ -61,8 +69,8 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
-        Sample sample = sampleService.getSampleById(sampleId);
-        return SampleResponse.fromEntity(sample);
+        Sample sample = sampleService.getSampleById(sampleId, projectId);
+        return SampleResponse.fromEntity(sample, metadataService.getActiveMetadata(sample));
     }
 
     @GET
@@ -75,7 +83,7 @@ public class SampleController {
 
         Sample sample = sampleService.getSampleByName(sampleName, projectId);
 
-        return SampleResponse.fromEntity(sample);
+        return SampleResponse.fromEntity(sample, metadataService.getActiveMetadata(sample));
     }
 
     @POST
@@ -125,9 +133,10 @@ public class SampleController {
                 request.hostAge(),
                 request.county(),
                 request.commune(),
-                request.hospitalHealthInstitution());
+                request.hospitalHealthInstitution(),
+                request.customMetadata());
 
-        return SampleResponse.fromEntity(sample);
+        return SampleResponse.fromEntity(sample, metadataService.getActiveMetadata(sample));
     }
 
     @PATCH
@@ -182,7 +191,8 @@ public class SampleController {
                 request.hostAge(),
                 request.county(),
                 request.commune(),
-                request.hospitalHealthInstitution());
+                request.hospitalHealthInstitution(),
+                request.customMetadata());
 
         return Response.noContent().build();
     }
@@ -194,7 +204,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        sampleService.deleteSample(sampleId);
+        sampleService.deleteSample(projectId, sampleId);
         return Response.noContent().build();
     }
 

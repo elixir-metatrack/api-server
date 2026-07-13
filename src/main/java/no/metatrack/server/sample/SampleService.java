@@ -1,28 +1,34 @@
 package no.metatrack.server.sample;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.sample.metadata.SampleMetadataService;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
 public class SampleService {
+    @Inject
+    SampleMetadataService metadataService;
 
     public List<Sample> getAllSamples(Long projectId) {
         return Sample.getAllSamplesInProject(projectId);
     }
 
-    public Sample getSampleById(UUID sampleId) {
-        return Sample.findSampleById(sampleId).orElseThrow(NotFoundException::new);
+    public Sample getSampleById(UUID sampleId, Long projectId) {
+        return Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
+                .firstResultOptional().orElseThrow(NotFoundException::new);
     }
 
     public Sample getSampleByName(String name, Long projectId) {
@@ -71,7 +77,8 @@ public class SampleService {
             String hostAge,
             String county,
             String commune,
-            String hospitalHealthInstitution) {
+            String hospitalHealthInstitution,
+            Map<String, Object> customMetadata) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
@@ -125,6 +132,8 @@ public class SampleService {
         sample.project = project;
 
         project.samples.add(sample);
+        sample.persist();
+        metadataService.apply(projectId, sample, customMetadata);
         return sample;
     }
 
@@ -171,11 +180,13 @@ public class SampleService {
             String hostAge,
             String county,
             String commune,
-            String hospitalHealthInstitution) {
+            String hospitalHealthInstitution,
+            Map<String, Object> customMetadata) {
 
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
-        Sample sample = Sample.findSampleById(sampleId).orElseThrow(NotFoundException::new);
+        Sample sample = Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
+                .firstResultOptional().orElseThrow(NotFoundException::new);
         if (name != null) sample.name = name;
         if (alias != null) sample.alias = alias;
         if (taxId != null) sample.taxId = taxId;
@@ -220,11 +231,13 @@ public class SampleService {
         sample.modifiedOn = Instant.now();
 
         sample.project = project;
+        metadataService.apply(projectId, sample, customMetadata);
     }
 
     @Transactional
-    public void deleteSample(UUID sampleId) {
-        Sample sample = Sample.findSampleById(sampleId).orElseThrow(NotFoundException::new);
+    public void deleteSample(Long projectId, UUID sampleId) {
+        Sample sample = Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
+                .firstResultOptional().orElseThrow(NotFoundException::new);
         sample.delete();
     }
 
@@ -281,6 +294,7 @@ public class SampleService {
             if (data.county() != null) sample.county = data.county();
             if (data.commune() != null) sample.commune = data.commune();
             if (data.hospitalHealthInstitution() != null) sample.hospitalHealthInstitution = data.hospitalHealthInstitution();
+            metadataService.apply(projectId, sample, data.customMetadata());
             sample.modifiedOn = Instant.now();
         }
 
