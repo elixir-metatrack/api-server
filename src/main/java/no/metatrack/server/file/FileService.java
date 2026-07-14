@@ -21,11 +21,12 @@ public class FileService {
     }
 
     public List<File> getFilesInSampleAndAssay(Long projectId, UUID assayId, UUID sampleId) {
-        boolean pairExists = Assay.count(
-                "from Assay a join a.samples s "
-                        + "where a.id = ?1 and a.project.id = ?2 and s.id = ?3 and s.project.id = ?2",
-                assayId, projectId, sampleId) > 0;
-        if (!pairExists) throw new NotFoundException();
+        Assay.find(
+                        "select a from Assay a join a.samples s "
+                                + "where a.id = ?1 and a.project.id = ?2 and s.id = ?3 and s.project.id = ?2",
+                        assayId, projectId, sampleId)
+                .firstResultOptional()
+                .orElseThrow(NotFoundException::new);
         return File.findInSampleAndAssay(projectId, sampleId, assayId);
     }
 }
