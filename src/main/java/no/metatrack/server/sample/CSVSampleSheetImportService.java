@@ -8,6 +8,9 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
+import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
@@ -34,17 +37,21 @@ public class CSVSampleSheetImportService {
     @Inject
     SampleMetadataService metadataService;
 
+    @Inject
+    SampleVocabularyService vocabularyService;
+
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
 
     @Transactional
-    public List<CSVUploadRowError> importNewSamples(Long projectId, File file) {
-        List<CSVUploadRowError> errors = new ArrayList<>();
+    public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
+        List<SampleValidationViolation> errors = new ArrayList<>();
         List<Sample> samplesToSave = new ArrayList<>();
         Map<Sample, Map<String, Object>> metadataToSave = new IdentityHashMap<>();
         Project project = Project.findById(projectId);
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", projectId);
+        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
 
         try {
             char delimiter = detectDelimiter(file);
@@ -72,26 +79,26 @@ public class CSVSampleSheetImportService {
                     String name = getMappedValue(rec, "name", "Sample Name");
 
                     if (name == null || name.isBlank()) {
-                        errors.add(new CSVUploadRowError(
-                                "Row " + rec.getRecordNumber(), "name", "Name column is missing or empty"));
+                        errors.add(new SampleValidationViolation(
+                                "Row " + rec.getRecordNumber(), "name", name, "Name column is missing or empty"));
                         continue;
                     }
 
                     if (!namesInFile.add(name)) {
-                        errors.add(new CSVUploadRowError(
-                                name, "name", "Duplicate sample name within this file: '" + name + "'"));
+                        errors.add(new SampleValidationViolation(
+                                name, "name", name, "Duplicate sample name within this file: '" + name + "'"));
                         continue;
                     }
 
                     if (Sample.find("name = ?1 and project = ?2", name, project)
                             .firstResultOptional()
                             .isPresent()) {
-                        errors.add(new CSVUploadRowError(
-                                name, "name", "Sample name '" + name + "' already exists in this project"));
+                        errors.add(new SampleValidationViolation(
+                                name, "name", name, "Sample name '" + name + "' already exists in this project"));
                         continue;
                     }
 
-                    List<CSVUploadRowError> rowErrors = new ArrayList<>();
+                    List<SampleValidationViolation> rowErrors = new ArrayList<>();
 
                     Sample sample = new Sample();
                     sample.project = project;
@@ -108,9 +115,10 @@ public class CSVSampleSheetImportService {
                         try {
                             sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
                         } catch (DateTimeParseException e) {
-                            rowErrors.add(new CSVUploadRowError(
+                            rowErrors.add(new SampleValidationViolation(
                                     name,
                                     "collection_date",
+                                    rawDate,
                                     "Invalid date '" + rawDate
                                             + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
                         }
@@ -165,9 +173,12 @@ public class CSVSampleSheetImportService {
                         try {
                             customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
                         } catch (BadRequestException e) {
-                            rowErrors.add(new CSVUploadRowError(name, field.key, e.getMessage()));
+                            rowErrors.add(new SampleValidationViolation(name, field.key, rawValue, e.getMessage()));
                         }
                     }
+
+                    rowErrors.addAll(SampleVocabularyService.validate(
+                            vocabularyRules, name, builtInValues(sample), customMetadata));
 
                     sample.createdOn = Instant.now();
                     sample.modifiedOn = Instant.now();
@@ -212,25 +223,27 @@ public class CSVSampleSheetImportService {
     }
 
     private Integer parseOptionalInt(
-            CSVRecord rec, String[] columns, String sampleName, List<CSVUploadRowError> rowErrors) {
+            CSVRecord rec, String[] columns, String sampleName, List<SampleValidationViolation> rowErrors) {
         String value = getMappedValue(rec, columns);
         if (value == null || value.isBlank()) return null;
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            rowErrors.add(new CSVUploadRowError(sampleName, String.join("/", columns), "Invalid integer value: '" + value + "'"));
+            rowErrors.add(new SampleValidationViolation(
+                    sampleName, columns[0], value, "Invalid integer value: '" + value + "'"));
             return null;
         }
     }
 
     private Double parseOptionalDouble(
-            CSVRecord rec, String[] columns, String sampleName, List<CSVUploadRowError> rowErrors) {
+            CSVRecord rec, String[] columns, String sampleName, List<SampleValidationViolation> rowErrors) {
         String value = getMappedValue(rec, columns);
         if (value == null || value.isBlank()) return null;
         try {
             return Double.parseDouble(value.trim());
         } catch (NumberFormatException e) {
-            rowErrors.add(new CSVUploadRowError(sampleName, String.join("/", columns), "Invalid decimal value: '" + value + "'"));
+            rowErrors.add(new SampleValidationViolation(
+                    sampleName, columns[0], value, "Invalid decimal value: '" + value + "'"));
             return null;
         }
     }
@@ -242,5 +255,44 @@ public class CSVSampleSheetImportService {
             }
         }
         return null;
+    }
+
+    static Map<String, String> builtInValues(Sample sample) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("alias", sample.alias);
+        values.put("mlst", sample.mlst);
+        values.put("project_title", sample.projectTitle);
+        values.put("description", sample.description);
+        values.put("isolate", sample.isolate);
+        values.put("collected_by", sample.collectedBy);
+        values.put("environmental_sample", sample.environmentalSample);
+        values.put("host_associated", sample.hostAssociated);
+        values.put("host_common_name", sample.hostCommonName);
+        values.put("host_subject_id", sample.hostSubjectId);
+        values.put("collector_name", sample.collectorName);
+        values.put("collecting_institution", sample.collectingInstitution);
+        values.put("host_sex", sample.hostSex);
+        values.put("influenza_test_method", sample.influenzaTestMethod);
+        values.put("influenza_test_result", sample.influenzaTestResult);
+        values.put("other_pathogens_tested", sample.otherPathogensTested);
+        values.put("other_pathogens_test_result", sample.otherPathogensTestResult);
+        values.put("host_habitat", sample.hostHabitat);
+        values.put("isolation_source_host_associated", sample.isolationSourceHostAssociated);
+        values.put("host_behaviour", sample.hostBehaviour);
+        values.put("isolation_source_non_host_associated", sample.isolationSourceNonHostAssociated);
+        values.put("influenza_virus_type", sample.influenzaVirusType);
+        values.put("influenza_sub_type", sample.influenzaSubType);
+        values.put("serovar", sample.serovar);
+        values.put("strain", sample.strain);
+        values.put("host_age", sample.hostAge);
+        values.put("county", sample.county);
+        values.put("commune", sample.commune);
+        values.put("hospital_health_institution", sample.hospitalHealthInstitution);
+        values.put("isolation_source", sample.isolationSource);
+        values.put("location", sample.location);
+        values.put("sequencing_lab", sample.sequencingLab);
+        values.put("institution", sample.institution);
+        values.put("host_health_state", sample.hostHealthState);
+        return values;
     }
 }

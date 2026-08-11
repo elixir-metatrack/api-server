@@ -67,7 +67,7 @@ public class SampleMetadataService {
         return switch (type) {
             case TEXT -> {
                 if (!(rawValue instanceof String text)) throw incompatible(type, rawValue);
-                yield text;
+                yield text.trim();
             }
             case NUMBER -> normalizeNumber(rawValue);
             case BOOLEAN -> {

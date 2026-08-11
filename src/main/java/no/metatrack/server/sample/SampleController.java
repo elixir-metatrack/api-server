@@ -14,6 +14,7 @@ import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
+import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
@@ -225,7 +226,7 @@ public class SampleController {
             throw new WebApplicationException("File must be a CSV or TSV file", 400);
         }
 
-        List<CSVUploadRowError> errors = csvSampleSheetImportService.importNewSamples(
+        List<SampleValidationViolation> errors = csvSampleSheetImportService.importNewSamples(
                 projectId, file.filePath().toFile());
 
         if (errors == null || errors.isEmpty()) {
@@ -241,7 +242,7 @@ public class SampleController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
 
-        List<String> errors = sampleService.bulkPatchSamples(projectId, request);
+        List<SampleValidationViolation> errors = sampleService.bulkPatchSamples(projectId, request);
 
         if (errors == null || errors.isEmpty()) {
             return Response.ok().build();
