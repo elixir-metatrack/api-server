@@ -113,6 +113,111 @@ src/main/resources/
 When the application is running, the OpenAPI UI (scalar) is available at:
 `http://localhost:1234/scalar`.
 
+## Sample Controlled Vocabularies
+
+Projects can optionally restrict values accepted by eligible sample text fields. A project vocabulary applies to one
+canonical field key and is enforced by the API for direct sample creates and updates, bulk patches, and CSV/TSV
+imports. Eligible fields without a configured vocabulary remain unrestricted.
+
+### Discovering Eligible Fields
+
+Authenticated project viewers can load all eligible built-in fields and active custom metadata fields of type `TEXT`:
+
+```http
+GET /api/projects/{projectId}/sample-vocabularies
+```
+
+```json
+[
+  {
+    "id": "0d51436d-6a5e-4ad9-8212-e4f98986f15d",
+    "fieldKey": "host_sex",
+    "label": "Host sex",
+    "custom": false,
+    "terms": ["female", "male", "unknown"],
+    "createdOn": "2026-08-11T09:00:00Z",
+    "modifiedOn": "2026-08-11T09:30:00Z"
+  },
+  {
+    "id": null,
+    "fieldKey": "sample_status",
+    "label": "Sample status",
+    "custom": true,
+    "terms": [],
+    "createdOn": null,
+    "modifiedOn": null
+  }
+]
+```
+
+Use `fieldKey` as the stable key in sample payloads and table/editor state; `label` is for display. `custom` distinguishes
+custom metadata from built-in sample attributes. A null `id` means that the field is eligible but currently
+unrestricted. The list should therefore drive client controls instead of maintaining a duplicate list of eligible
+built-in fields.
+
+A viewer can fetch one configured vocabulary with
+`GET /api/projects/{projectId}/sample-vocabularies/{fieldKey}`. This endpoint returns `404` when no vocabulary is
+configured; use the collection endpoint when the UI also needs unrestricted eligible fields.
+
+### Managing a Vocabulary
+
+Only project admins can configure vocabularies. `PUT` creates a vocabulary or atomically replaces its complete term
+set:
+
+```http
+PUT /api/projects/{projectId}/sample-vocabularies/host_sex
+Content-Type: application/json
+
+{
+  "terms": ["female", "male", "unknown"]
+}
+```
+
+At least one term is required. Terms are trimmed by the server and must be nonblank and unique after trimming. To
+remove a restriction rather than replace its values, use:
+
+```http
+DELETE /api/projects/{projectId}/sample-vocabularies/{fieldKey}
+```
+
+Deletion returns `204` and does not modify existing samples. Removing an individual term also preserves historical
+values, but that value is rejected if submitted again later. Deleting the vocabulary makes the field unrestricted.
+
+### Editor Behavior and Validation
+
+- Render a select/autocomplete control when `id` is non-null, using `terms` as the allowed values. Keep an empty option
+  when the underlying field is optional.
+- Matching is exact and case-sensitive after surrounding whitespace is trimmed. For example, `" female "` matches
+  `"female"`, while `"Female"` does not.
+- Empty and whitespace-only strings are allowed so editors can clear a controlled field.
+- Only active custom `TEXT` fields are eligible. Sample identifiers, sample names, numeric, boolean, date, timestamp,
+  and derived fields are not controlled by this feature.
+- Refresh the vocabulary list after an admin changes custom-field definitions or vocabulary configuration. Always let
+  the API remain the source of truth, because another client can change the terms between loading and saving.
+
+An out-of-vocabulary write returns HTTP `400` with a JSON array of structured violations:
+
+```json
+[
+  {
+    "sample": "sample-42",
+    "fieldKey": "host_sex",
+    "rejectedValue": "Female",
+    "message": "Value is not in the configured vocabulary"
+  }
+]
+```
+
+Map each violation by `sample` and `fieldKey` to the corresponding editor cell or form control, and display `message`
+to the user. `rejectedValue` is the original submitted value, before trimming. A direct create or update containing a
+violation does not write the offending sample data.
+
+Bulk patches and sample-sheet imports collect multiple violations in the same response. Invalid samples/rows are
+skipped, while valid samples/rows are still processed even though the overall response is HTTP `400`; clients should
+not interpret that status as a rollback of the entire bulk operation. CSV/TSV errors use canonical field keys even
+when an accepted column alias was present in the uploaded file, and `sample` contains the sample name when available
+(or row context when it is not).
+
 ## Tests
 
 Run the test suite:
