@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "900b90004b002b6a047ea4807e97186f23185dda",
+  "include-v-in-tag": false,
+  "include-component-in-tag": false,
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements"
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "test",
+      "section": "Tests"
+    },
+    {
+      "type": "build",
+      "section": "Build System"
+    },
+    {
+      "type": "ci",
+      "section": "Continuous Integration"
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous Chores"
+    }
+  ],
+  "packages": {
+    ".": {
+      "release-type": "maven",
+      "package-name": "server",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}

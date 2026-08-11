@@ -3,8 +3,13 @@ name: Build and publish container image to GHCR
 on:
   push:
     branches: [ "main" ]
-    tags: [ "v*" ]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      image-tag:
+        description: Exact image tag to publish for a release
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -36,32 +41,31 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=sha
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.image-tag }},enable=${{ inputs.image-tag != '' }}
+            type=ref,event=branch,enable=${{ inputs.image-tag == '' }}
+            type=sha,enable=${{ inputs.image-tag == '' }}
+            type=raw,value=latest,enable=${{ inputs.image-tag == '' && github.ref_name == github.event.repository.default_branch }}
 
       - name: Build and push (Quarkus)
         run: |
-          # Docker/GHCR requires lowercase names
           OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
-          
-           # 1. Get the primary tag (e.g., 'main' or 'v1.0')
           PRIMARY_TAG="${{ steps.meta.outputs.version }}"
-          
-          # 2. Check if we should also add 'latest' (only on main branch)
           ADDITIONAL_TAGS=""
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            ADDITIONAL_TAGS="latest"
-          fi
-          
+
+          while IFS= read -r image_tag; do
+            tag="${image_tag##*:}"
+            if [ -n "$tag" ] && [ "$tag" != "$PRIMARY_TAG" ]; then
+              ADDITIONAL_TAGS="${ADDITIONAL_TAGS:+${ADDITIONAL_TAGS},}${tag}"
+            fi
+          done <<< "${{ steps.meta.outputs.tags }}"
+
           ./mvnw -B -DskipTests package \
             -Dquarkus.container-image.build=true \
             -Dquarkus.container-image.push=true \
             -Dquarkus.container-image.builder=jib \
             -Dquarkus.container-image.registry=ghcr.io \
-            -Dquarkus.container-image.group=${OWNER_LC} \
-            -Dquarkus.container-image.name=${REPO_NAME} \
-            -Dquarkus.container-image.tag=${PRIMARY_TAG} \
-            -Djib.to.tags=${ADDITIONAL_TAGS}
+            -Dquarkus.container-image.group="${OWNER_LC}" \
+            -Dquarkus.container-image.name="${REPO_NAME}" \
+            -Dquarkus.container-image.tag="${PRIMARY_TAG}" \
+            -Djib.to.tags="${ADDITIONAL_TAGS}"

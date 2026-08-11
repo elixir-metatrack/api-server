@@ -127,6 +127,26 @@ Integration tests can be run with:
 ./mvnw verify
 ```
 
+## Releases
+
+Releases are automated from Conventional Commits pushed to `main`. Use these commit types to control the next version:
+
+- `fix`: patch release, for example `0.1.0` to `0.1.1`.
+- `feat`: minor release, for example `0.1.0` to `0.2.0`.
+- A `BREAKING CHANGE:` footer or `!` after the type: major release, for example `0.1.0` to `1.0.0`.
+- Other configured types, such as `docs`, `refactor`, `test`, `build`, `ci`, and `chore`, are included in the
+  changelog but do not trigger a release by themselves.
+
+Release Please maintains a release pull request that updates `pom.xml` and `CHANGELOG.md`. Merging that pull request
+creates the matching Git tag and GitHub Release, then publishes the Quarkus image to
+`ghcr.io/elixir-metatrack/api-server:<version>`. Release tags are unprefixed semantic versions, such as `0.2.0`,
+consistent with the existing `0.1.0` tag. Ordinary pushes to `main` continue to publish branch, commit SHA, and
+`latest` image tags.
+
+Repository maintainers must enable **Settings > Actions > General > Workflow permissions > Allow GitHub Actions to
+create and approve pull requests**. Branch protection for `main` must also allow the generated Release Please pull
+request to follow the repository's normal merge process.
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
