@@ -24,6 +24,19 @@ quarkus:
   oidc:
     application-type: service
     auth-server-url: ${KEYCLOAK_URL}
+  oidc-client:
+    keycloak-admin:
+      auth-server-url: ${KEYCLOAK_URL}
+      client-id: ${KEYCLOAK_ADMIN_CLIENT_ID}
+      credentials:
+        secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+      grant:
+        type: client
+  cache:
+    caffeine:
+      keycloak-usernames:
+        expire-after-write: ${KEYCLOAK_USERNAME_CACHE_TTL:10M}
+        maximum-size: ${KEYCLOAK_USERNAME_CACHE_MAX_SIZE:1000}
   smallrye-openapi:
     path: /openapi
     always-include: true
@@ -40,3 +53,6 @@ metatrack:
     reconciliation-interval: ${FILE_RECONCILIATION_INTERVAL:10s}
     reconciliation-batch-size: ${FILE_RECONCILIATION_BATCH_SIZE:100}
 taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
+keycloak-admin-api/mp-rest/url: ${KEYCLOAK_BASE_URL}
+keycloak:
+  realm: ${KEYCLOAK_REALM}
