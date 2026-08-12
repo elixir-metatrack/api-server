@@ -5,15 +5,24 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import no.metatrack.server.auth.keycloak.IdentityLookupService;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
 public class ProjectService {
-    public List<Project> getAllProjects() {
-        return Project.listAll();
+    private final IdentityLookupService identityLookupService;
+
+    public ProjectService(IdentityLookupService identityLookupService) {
+        this.identityLookupService = identityLookupService;
+    }
+
+    public List<ProjectResponse> getAllProjects() {
+        return toResponses(Project.listAll());
     }
 
     @Transactional
@@ -115,7 +124,37 @@ public class ProjectService {
         return Project.<Project>findByIdOptional(id).orElseThrow(NotFoundException::new);
     }
 
-    public List<Project> getAllUserProjects(UUID currentUserId) {
-        return Project.findProjectsByMember(currentUserId);
+    public ProjectResponse getProjectResponseById(long id) {
+        return toResponse(getProjectById(id));
+    }
+
+    public List<ProjectResponse> getAllUserProjects(UUID currentUserId) {
+        return toResponses(Project.findProjectsByMember(currentUserId));
+    }
+
+    public ProjectResponse toResponse(Project project) {
+        String ownerUsername = identityLookupService.username(project.owner).orElse(null);
+        return response(project, ownerUsername);
+    }
+
+    List<ProjectResponse> toResponses(List<Project> projects) {
+        Map<UUID, Optional<String>> usernames = identityLookupService.usernames(
+                projects.stream().map(project -> project.owner).toList()
+        );
+        return projects.stream()
+                .map(project -> response(project, usernames.get(project.owner).orElse(null)))
+                .toList();
+    }
+
+    private ProjectResponse response(Project project, String ownerUsername) {
+        return new ProjectResponse(
+                project.id,
+                project.name,
+                project.description,
+                project.owner,
+                ownerUsername,
+                project.createdOn,
+                project.modifiedOn
+        );
     }
 }

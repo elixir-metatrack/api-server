@@ -31,16 +31,13 @@ public class ProjectController {
     @GET
     @Produces("application/json")
     public List<ProjectResponse> getAllProjects() {
-        return projectService.getAllProjects().stream()
-                .map(ProjectResponse::fromEntity)
-                .toList();
+        return projectService.getAllProjects();
     }
 
     @GET
     @Path("/{projectId}")
     public ProjectResponse getProjectById(@PathParam("projectId") Long projectId) {
-        Project project = projectService.getProjectById(projectId);
-        return ProjectResponse.fromEntity(project);
+        return projectService.getProjectResponseById(projectId);
     }
 
     @GET
@@ -49,8 +46,7 @@ public class ProjectController {
         String currentUserIdString = userService.requireCurrentUser().id();
         UUID currentUserId = UUID.fromString(currentUserIdString);
 
-        List<Project> projects = projectService.getAllUserProjects(currentUserId);
-        return projects.stream().map(ProjectResponse::fromEntity).toList();
+        return projectService.getAllUserProjects(currentUserId);
     }
 
     @POST
@@ -61,7 +57,7 @@ public class ProjectController {
         String currentUserId = currentUser.id();
 
         Project project = projectService.createProject(request.name(), request.description(), currentUserId);
-        return ProjectResponse.fromEntity(project);
+        return projectService.toResponse(project);
     }
 
     @PATCH
@@ -143,8 +139,7 @@ public class ProjectController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        List<JoinProject> joinRequests = joinProjectService.getJoinRequests(projectId);
-        return joinRequests.stream().map(JoinProjectResponse::fromEntity).toList();
+        return joinProjectService.getJoinRequests(projectId);
     }
 
     @DELETE
@@ -176,7 +171,6 @@ public class ProjectController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        List<ProjectMember> members = projectMemberService.listAllProjectMembers(projectId);
-        return members.stream().map(ProjectMemberResponse::fromEntity).toList();
+        return projectMemberService.listAllProjectMembers(projectId);
     }
 }
