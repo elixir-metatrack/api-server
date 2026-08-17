@@ -32,7 +32,9 @@ public class IdentityLookupService {
                 return Optional.empty();
             }
             if (response.getStatus() != ResponseStatus.OK) {
-                throw new KeycloakIdentityException("Keycloak user lookup failed with status " + response.getStatus());
+                throw new KeycloakIdentityException(
+                        "Keycloak user lookup failed (category=upstream_http, status=" + response.getStatus() + ")"
+                );
             }
 
             KeycloakUserRepresentation user = response.getEntity();
@@ -43,8 +45,23 @@ public class IdentityLookupService {
         } catch (KeycloakIdentityException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            throw new KeycloakIdentityException("Keycloak user lookup failed", exception);
+            throw new KeycloakIdentityException(
+                    "Keycloak user lookup failed (category=" + failureCategory(exception) + ")",
+                    exception
+            );
         }
+    }
+
+    private String failureCategory(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String typeName = current.getClass().getName().toLowerCase();
+            if (typeName.contains("oidc") || typeName.contains("tokenclient")) {
+                return "token_client";
+            }
+            current = current.getCause();
+        }
+        return "transport";
     }
 
     public Map<UUID, Optional<String>> usernames(Collection<UUID> userIds) {

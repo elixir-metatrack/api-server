@@ -3,6 +3,7 @@ package no.metatrack.server.auth.keycloak;
 import org.jboss.resteasy.reactive.RestResponse;
 import org.junit.jupiter.api.Test;
 
+import java.net.ConnectException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,10 +51,16 @@ class IdentityLookupServiceTest {
     }
 
     @Test
-    void upstreamFailureIsNotTreatedAsMissingUser() {
-        IdentityLookupService service = serviceReturning(RestResponse.status(401));
+    void upstreamFailuresIncludeSafeStatusContext() {
+        for (int status : List.of(401, 403, 500, 503)) {
+            IdentityLookupService service = serviceReturning(RestResponse.status(status));
 
-        assertThrows(KeycloakIdentityException.class, () -> service.username(UUID.randomUUID()));
+            KeycloakIdentityException exception = assertThrows(
+                    KeycloakIdentityException.class,
+                    () -> service.username(UUID.randomUUID())
+            );
+            assertEquals("Keycloak user lookup failed (category=upstream_http, status=" + status + ")", exception.getMessage());
+        }
     }
 
     @Test
@@ -62,10 +69,49 @@ class IdentityLookupServiceTest {
             throw new IllegalStateException("unavailable");
         }, REALM);
 
-        assertThrows(KeycloakIdentityException.class, () -> service.username(UUID.randomUUID()));
+        KeycloakIdentityException exception = assertThrows(
+                KeycloakIdentityException.class,
+                () -> service.username(UUID.randomUUID())
+        );
+
+        assertEquals("Keycloak user lookup failed (category=transport)", exception.getMessage());
+    }
+
+    @Test
+    void tokenClientFailureIsTranslatedWithSafeCategory() {
+        IdentityLookupService service = new IdentityLookupService((realm, userId) -> {
+            throw new TokenClientFailure("secret-token-must-not-be-logged");
+        }, REALM);
+
+        KeycloakIdentityException exception = assertThrows(
+                KeycloakIdentityException.class,
+                () -> service.username(UUID.randomUUID())
+        );
+
+        assertEquals("Keycloak user lookup failed (category=token_client)", exception.getMessage());
+    }
+
+    @Test
+    void networkFailureIsTranslatedWithSafeCategory() {
+        IdentityLookupService service = new IdentityLookupService((realm, userId) -> {
+            throw new RuntimeException(new ConnectException("sensitive-hostname"));
+        }, REALM);
+
+        KeycloakIdentityException exception = assertThrows(
+                KeycloakIdentityException.class,
+                () -> service.username(UUID.randomUUID())
+        );
+
+        assertEquals("Keycloak user lookup failed (category=transport)", exception.getMessage());
     }
 
     private IdentityLookupService serviceReturning(RestResponse<KeycloakUserRepresentation> response) {
         return new IdentityLookupService((realm, userId) -> response, REALM);
+    }
+
+    private static final class TokenClientFailure extends RuntimeException {
+        private TokenClientFailure(String message) {
+            super(message);
+        }
     }
 }
