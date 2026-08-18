@@ -34,6 +34,17 @@ class SampleVocabularyManagementServiceTest {
     }
 
     @Test
+    void projectManagementRejectsBuiltInFields() {
+        SampleVocabularyManagementService service = new SampleVocabularyManagementService();
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> service.requireEligibleColumn(1L, "host_sex"));
+
+        assertEquals("Built-in sample fields use global vocabularies", exception.getMessage());
+    }
+
+    @Test
     void reconcilesTermsWithoutReplacingOverlappingEntities() {
         SampleVocabulary vocabulary = new SampleVocabulary();
         SampleVocabularyTerm retained = term(vocabulary, "female");
