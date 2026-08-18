@@ -54,4 +54,33 @@ class SampleVocabularyServiceTest {
         assertTrue(SampleVocabularyService.findViolations(
                 "sample-1", Map.of("host_sex", "historical"), Map.of()).isEmpty());
     }
+
+    @Test
+    void composesGlobalBuiltInAndActiveProjectCustomRules() {
+        SampleVocabularyRules rules = SampleVocabularyService.composeRules(
+                Set.of("status"),
+                Map.of("host_sex", Set.of("female")),
+                Map.of("status", Set.of("known"), "archived", Set.of("legacy")));
+
+        var violations = SampleVocabularyService.validate(
+                rules,
+                "sample-1",
+                Map.of("host_sex", "unknown"),
+                Map.of("status", "unknown", "archived", "anything"));
+
+        assertEquals(2, violations.size());
+        assertEquals(Set.of("host_sex", "status"), violations.stream()
+                .map(SampleValidationViolation::fieldKey)
+                .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void projectRulesCannotOverrideGlobalBuiltInRules() {
+        SampleVocabularyRules rules = SampleVocabularyService.composeRules(
+                Set.of("host_sex"),
+                Map.of("host_sex", Set.of("female")),
+                Map.of("host_sex", Set.of("project-specific")));
+
+        assertEquals(Set.of("female"), rules.allowedTerms().get("host_sex"));
+    }
 }
