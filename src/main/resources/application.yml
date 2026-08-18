@@ -24,6 +24,8 @@ quarkus:
   oidc:
     application-type: service
     auth-server-url: ${KEYCLOAK_URL}
+    roles:
+      role-claim-path: realm_access/roles
   oidc-client:
     keycloak-admin:
       auth-server-url: ${KEYCLOAK_URL}
