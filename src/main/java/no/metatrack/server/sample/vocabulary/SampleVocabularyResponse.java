@@ -31,4 +31,19 @@ public record SampleVocabularyResponse(
                 vocabulary.createdOn,
                 vocabulary.modifiedOn);
     }
+
+    static SampleVocabularyResponse configured(SampleVocabularyColumn column, GlobalSampleVocabulary vocabulary) {
+        List<String> values = vocabulary.terms.stream()
+                .map(term -> term.value)
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        return new SampleVocabularyResponse(
+                vocabulary.id,
+                column.key(),
+                column.label(),
+                column.custom(),
+                values,
+                vocabulary.createdOn,
+                vocabulary.modifiedOn);
+    }
 }

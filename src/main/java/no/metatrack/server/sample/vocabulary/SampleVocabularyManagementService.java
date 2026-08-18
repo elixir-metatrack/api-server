@@ -50,26 +50,26 @@ public class SampleVocabularyManagementService {
     @Transactional
     public void delete(Long projectId, String fieldKey) {
         requireProject(projectId);
-        findVocabulary(projectId, normalizeFieldKey(fieldKey)).delete();
+        SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
+        findVocabulary(projectId, column.key()).delete();
     }
 
     List<SampleVocabularyColumn> eligibleColumns(Long projectId) {
-        List<SampleVocabularyColumn> columns = new ArrayList<>(SampleVocabularyBuiltInCatalog.columns());
-        SampleMetadataField.<SampleMetadataField>list(
+        return SampleMetadataField.<SampleMetadataField>list(
                         "project.id = ?1 and archivedOn is null and type = ?2 order by key",
                         projectId,
                         SampleMetadataFieldType.TEXT)
                 .stream()
                 .map(field -> new SampleVocabularyColumn(field.key, field.label, true))
-                .forEach(columns::add);
-        return List.copyOf(columns);
+                .toList();
     }
 
     SampleVocabularyColumn requireEligibleColumn(Long projectId, String fieldKey) {
         if (fieldKey == null || fieldKey.isBlank()) throw new BadRequestException("Sample field key is required");
         String key = fieldKey.trim();
-        Optional<SampleVocabularyColumn> builtIn = SampleVocabularyBuiltInCatalog.find(key);
-        if (builtIn.isPresent()) return builtIn.get();
+        if (SampleVocabularyBuiltInCatalog.find(key).isPresent()) {
+            throw new BadRequestException("Built-in sample fields use global vocabularies");
+        }
 
         return SampleMetadataField.<SampleMetadataField>find(
                         "project.id = ?1 and key = ?2 and archivedOn is null and type = ?3",
@@ -124,10 +124,6 @@ public class SampleVocabularyManagementService {
                 .orElseThrow(() -> new NotFoundException("Sample vocabulary not found"));
     }
 
-    private String normalizeFieldKey(String fieldKey) {
-        if (fieldKey == null || fieldKey.isBlank()) throw new BadRequestException("Sample field key is required");
-        return fieldKey.trim();
-    }
 
     private Project requireProject(Long projectId) {
         return Project.<Project>findByIdOptional(projectId).orElseThrow(() -> new NotFoundException("Project not found"));

@@ -24,11 +24,30 @@ public class SampleVocabularyService {
                         SampleMetadataFieldType.TEXT)
                 .stream()
                 .map(field -> field.key)
+                .filter(key -> SampleVocabularyBuiltInCatalog.find(key).isEmpty())
                 .collect(Collectors.toSet());
-        Map<String, Set<String>> allowedTerms = SampleVocabulary.<SampleVocabulary>list("project.id", projectId).stream()
+        Map<String, Set<String>> globalTerms = GlobalSampleVocabulary.<GlobalSampleVocabulary>listAll().stream()
                 .collect(Collectors.toMap(
                         vocabulary -> vocabulary.fieldKey,
                         vocabulary -> vocabulary.terms.stream().map(term -> term.value).collect(Collectors.toSet())));
+        Map<String, Set<String>> projectTerms = SampleVocabulary.<SampleVocabulary>list("project.id", projectId).stream()
+                .filter(vocabulary -> activeTextKeys.contains(vocabulary.fieldKey))
+                .collect(Collectors.toMap(
+                        vocabulary -> vocabulary.fieldKey,
+                        vocabulary -> vocabulary.terms.stream().map(term -> term.value).collect(Collectors.toSet())));
+        return composeRules(activeTextKeys, globalTerms, projectTerms);
+    }
+
+    static SampleVocabularyRules composeRules(
+            Set<String> activeTextKeys,
+            Map<String, Set<String>> globalTerms,
+            Map<String, Set<String>> projectTerms) {
+        Map<String, Set<String>> allowedTerms = new LinkedHashMap<>(globalTerms);
+        projectTerms.forEach((fieldKey, terms) -> {
+            if (activeTextKeys.contains(fieldKey) && SampleVocabularyBuiltInCatalog.find(fieldKey).isEmpty()) {
+                allowedTerms.put(fieldKey, terms);
+            }
+        });
         return new SampleVocabularyRules(activeTextKeys, allowedTerms);
     }
 
