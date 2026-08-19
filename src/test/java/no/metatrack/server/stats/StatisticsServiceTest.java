@@ -2,8 +2,12 @@ package no.metatrack.server.stats;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import no.metatrack.server.file.File;
+import no.metatrack.server.file.ObjectStorage;
+import no.metatrack.server.file.StorageObjectMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.sql.Date;
 import java.time.LocalDate;
@@ -17,6 +21,7 @@ class StatisticsServiceTest {
     private EntityManager entityManager;
     private Query countQuery;
     private Query dataQuery;
+    private ObjectStorage objectStorage;
     private StatisticsService service;
 
     @BeforeEach
@@ -24,8 +29,10 @@ class StatisticsServiceTest {
         entityManager = mock(EntityManager.class);
         countQuery = mock(Query.class);
         dataQuery = mock(Query.class);
+        objectStorage = mock(ObjectStorage.class);
         service = new StatisticsService();
         service.entityManager = entityManager;
+        service.objectStorage = objectStorage;
 
         when(entityManager.createNativeQuery(contains("COUNT(DISTINCT"))).thenReturn(countQuery);
         when(entityManager.createNativeQuery(contains("GROUP BY creation_date"))).thenReturn(dataQuery);
@@ -98,5 +105,40 @@ class StatisticsServiceTest {
 
         assertEquals(List.of(), result.items());
         verify(entityManager, never()).createNativeQuery(contains("GROUP BY creation_date"));
+    }
+
+    @Test
+    void aggregatesOnlyTrackedUploadedObjects() {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(File::findUploadedObjectKeys).thenReturn(List.of("tracked", "missing"));
+            when(objectStorage.listObjects(null)).thenReturn(List.of(
+                    new StorageObjectMetadata("tracked", 12L),
+                    new StorageObjectMetadata("untracked", 99L)));
+
+            assertEquals(new StorageStatistics(1L, 12L), service.getStorageStatistics());
+        }
+    }
+
+    @Test
+    void scopesProjectListingAndPreventsDuplicateCounts() {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(() -> File.findUploadedObjectKeysInProject(42L))
+                    .thenReturn(List.of("42/tracked", "42/tracked"));
+            when(objectStorage.listObjects("42/")).thenReturn(List.of(
+                    new StorageObjectMetadata("42/tracked", 15L),
+                    new StorageObjectMetadata("42/tracked", 15L)));
+
+            assertEquals(new StorageStatistics(1L, 15L), service.getProjectStorageStatistics(42L));
+        }
+    }
+
+    @Test
+    void returnsZeroStorageStatisticsForEmptyScope() {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(File::findUploadedObjectKeys).thenReturn(List.of());
+            when(objectStorage.listObjects(null)).thenReturn(List.of());
+
+            assertEquals(new StorageStatistics(0L, 0L), service.getStorageStatistics());
+        }
     }
 }

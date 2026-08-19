@@ -2,6 +2,7 @@ package no.metatrack.server.stats;
 
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.DefaultValue;
+import io.quarkus.security.Authenticated;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -90,5 +91,18 @@ class StatisticsControllerTest {
         controller.getSamplesByDate(0, StatisticsController.MAX_PAGE_SIZE);
 
         verify(service).getDailySampleCounts(0, StatisticsController.MAX_PAGE_SIZE);
+    }
+
+    @Test
+    void delegatesPublicStorageStatistics() throws NoSuchMethodException {
+        var expected = new StorageStatistics(4L, 1024L);
+        when(service.getStorageStatistics()).thenReturn(expected);
+
+        assertSame(expected, controller.getStorageStatistics());
+        assertEquals(4L, expected.fileCount());
+        assertEquals(1024L, expected.totalBytes());
+        assertEquals(null, StatisticsController.class.getMethod("getStorageStatistics")
+                .getAnnotation(Authenticated.class));
+        verify(service).getStorageStatistics();
     }
 }
