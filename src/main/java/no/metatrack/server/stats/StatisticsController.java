@@ -20,6 +20,12 @@ public class StatisticsController {
     }
 
     @GET
+    @Path("/storage")
+    public StorageStatistics getStorageStatistics() {
+        return statisticsService.getStorageStatistics();
+    }
+
+    @GET
     @Path("/samples-by-date")
     public DailySampleCountPage getSamplesByDate(
             @QueryParam("page") @DefaultValue("0") int page,
