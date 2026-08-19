@@ -6,6 +6,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -15,6 +16,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 @ApplicationScoped
 public class S3ObjectStorage implements ObjectStorage {
@@ -56,6 +59,21 @@ public class S3ObjectStorage implements ObjectStorage {
             if (e.statusCode() == 404) return false;
             throw e;
         }
+    }
+
+    @Override
+    public List<StorageObjectMetadata> listObjects(String prefix) {
+        var request = ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .prefix(prefix)
+                .build();
+        var objects = new ArrayList<StorageObjectMetadata>();
+        for (var page : s3Client.listObjectsV2Paginator(request)) {
+            for (var object : page.contents()) {
+                objects.add(new StorageObjectMetadata(object.key(), object.size()));
+            }
+        }
+        return List.copyOf(objects);
     }
 
     @Override

@@ -47,6 +47,20 @@ public class File extends PanacheEntity {
                 sampleId, assayId, projectId);
     }
 
+    public static List<String> findUploadedObjectKeys() {
+        return find("select distinct f.objectKey from File f where f.status = ?1", UploadStatus.UPLOADED)
+                .project(String.class)
+                .list();
+    }
+
+    public static List<String> findUploadedObjectKeysInProject(Long projectId) {
+        return find("select distinct f.objectKey from File f where f.status = ?1 " +
+                        "and (f.sample.project.id = ?2 or f.assay.project.id = ?2)",
+                UploadStatus.UPLOADED, projectId)
+                .project(String.class)
+                .list();
+    }
+
     public static Optional<File> findByObjectKeyOptional(String objectKey) {
         File file = File.find("objectKey", objectKey).firstResult();
         if (file == null) {

@@ -5,13 +5,17 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import no.metatrack.server.assay.Assay;
+import no.metatrack.server.file.File;
+import no.metatrack.server.file.ObjectStorage;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 
 import java.sql.Date;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class StatisticsService {
@@ -30,6 +34,9 @@ public class StatisticsService {
 
     @Inject
     EntityManager entityManager;
+
+    @Inject
+    ObjectStorage objectStorage;
 
     public MetatrackStatistics getStatistics() {
         long projectCount = Project.count();
@@ -66,6 +73,26 @@ public class StatisticsService {
                 .toList();
 
         return new DailySampleCountPage(items, page, size, totalElements, totalPages);
+    }
+
+    public StorageStatistics getStorageStatistics() {
+        return aggregateStorage(File.findUploadedObjectKeys(), null);
+    }
+
+    public StorageStatistics getProjectStorageStatistics(Long projectId) {
+        return aggregateStorage(File.findUploadedObjectKeysInProject(projectId), projectId + "/");
+    }
+
+    private StorageStatistics aggregateStorage(List<String> trackedObjectKeys, String prefix) {
+        Set<String> trackedKeys = new HashSet<>(trackedObjectKeys);
+        Set<String> countedKeys = new HashSet<>();
+        long totalBytes = 0;
+        for (var object : objectStorage.listObjects(prefix)) {
+            if (trackedKeys.contains(object.objectKey()) && countedKeys.add(object.objectKey())) {
+                totalBytes += object.size();
+            }
+        }
+        return new StorageStatistics(countedKeys.size(), totalBytes);
     }
 
     private LocalDate toLocalDate(Object value) {
