@@ -170,4 +170,19 @@ public class AssayController {
         List<File> files = fileService.getAllFilesInAssay(projectId, assayId);
         return files.stream().map(FileResponse::fromEntity).toList();
     }
+
+    @GET
+    @Authenticated
+    @Path("/{assayId}/samples/{sampleId}/files")
+    public List<FileResponse> getFilesInSampleAndAssay(
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            @PathParam("sampleId") UUID sampleId) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
+
+        return fileService.getFilesInSampleAndAssay(projectId, assayId, sampleId).stream()
+                .map(FileResponse::fromEntity)
+                .toList();
+    }
 }

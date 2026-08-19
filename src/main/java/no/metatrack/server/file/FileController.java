@@ -5,22 +5,16 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
-import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 
 @Path("/api")
 public class FileController {
     @Inject
     PresignUrlService presignUrlService;
-
-    @Inject
-    FileService fileService;
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
@@ -60,18 +54,4 @@ public class FileController {
                 Instant.now().plusSeconds(presignExpirySeconds));
     }
 
-    @GET
-    @Authenticated
-    @Path("/projects/{projectId}/assays/{assayId}/samples/{sampleId}/files")
-    public List<FileResponse> getFilesInSampleAndAssay(
-            @PathParam("projectId") Long projectId,
-            @PathParam("assayId") UUID assayId,
-            @PathParam("sampleId") UUID sampleId) {
-        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
-        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
-
-        return fileService.getFilesInSampleAndAssay(projectId, assayId, sampleId).stream()
-                .map(FileResponse::fromEntity)
-                .toList();
-    }
 }
