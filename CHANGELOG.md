@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.3.0](https://github.com/elixir-metatrack/api-server/compare/0.2.0...0.3.0) (2026-08-19)
+
+
+### Features
+
+* add global sample vocabulary management with CRUD operations ([991c9e5](https://github.com/elixir-metatrack/api-server/commit/991c9e53309c7d98542394b08b4e5f8596a5c176))
+* add Keycloak admin client configuration ([3689b6c](https://github.com/elixir-metatrack/api-server/commit/3689b6ce4830dee57a92323e9be2042d54cae28f))
+* add Keycloak user lookup service ([5652e7f](https://github.com/elixir-metatrack/api-server/commit/5652e7fdae6c8d590425dd9925fc2f9b24886ca2))
+* add role-claim-path configuration for Keycloak roles mapping ([70b3013](https://github.com/elixir-metatrack/api-server/commit/70b3013173af0c3cdb0f93fea4e9412f9ff6f723))
+* enhance error handling for Keycloak user lookup service ([56fe287](https://github.com/elixir-metatrack/api-server/commit/56fe287706321b3dc4000f958cda9a9f9d83e3bc))
+* enhance KeycloakIdentityException logging with detailed cause chain tracing ([d9bba52](https://github.com/elixir-metatrack/api-server/commit/d9bba520231eda463429c5effd4334a1aeebc709))
+* extend support for global and project sample vocabularies ([d9a49d5](https://github.com/elixir-metatrack/api-server/commit/d9a49d534e041d75346aa2e4f65d26684d8a9c5a))
+* integrate username resolution in project services ([b160df1](https://github.com/elixir-metatrack/api-server/commit/b160df157119972466f5c227a94eda409cad8112))
+
+
+### Bug Fixes
+
+* **deps:** update aws-java-sdk-v2 monorepo to v2.53.3 ([03ba061](https://github.com/elixir-metatrack/api-server/commit/03ba06110cbf9da3337247472b4b98c719884c9c))
+* **deps:** update quarkus ecosystem to v3.38.2 ([d289081](https://github.com/elixir-metatrack/api-server/commit/d289081357bd05ef08255ee72dcad6c80f1105ad))
+
+
+### Tests
+
+* add test coverage for keycloak admin client integration ([2696cee](https://github.com/elixir-metatrack/api-server/commit/2696cee153e246e55362825376333d6bdc408156))
+* add unit tests for built-in field rejection and vocabulary rule composition ([f555f1f](https://github.com/elixir-metatrack/api-server/commit/f555f1f5c44c104b1dfbf2620c248209718c38be))
+* add unit tests for global sample vocabulary management and migration ([e28ab71](https://github.com/elixir-metatrack/api-server/commit/e28ab715fc3832a5efa866b555a4890f68a82e2a))
+
+
+### Miscellaneous Chores
+
+* **main:** release 0.2.1-SNAPSHOT ([2cb474e](https://github.com/elixir-metatrack/api-server/commit/2cb474ecde981cb0d48ce2dc1d975f5787e1d648))
+* update .env.example with extended Keycloak configuration options ([e546069](https://github.com/elixir-metatrack/api-server/commit/e546069a6171cf67a5707c504a0ec78f28861acb))
+
 ## [0.2.0](https://github.com/elixir-metatrack/api-server/compare/0.1.0...0.2.0) (2026-08-11)
 
 
