@@ -12,11 +12,16 @@ import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.CSVPrinter;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -62,16 +67,7 @@ public class CSVSampleSheetImportService {
                     reader.reset();
                 }
 
-                Iterable<CSVRecord> records = CSVFormat.DEFAULT
-                        .builder()
-                        .setDelimiter(delimiter)
-                        .setHeader()
-                        .setSkipHeaderRecord(true)
-                        .setTrim(true)
-                        .setIgnoreHeaderCase(true)
-                        .setAllowMissingColumnNames(true)
-                        .get()
-                        .parse(reader);
+                List<CSVRecord> records = prepareRecords(reader, delimiter);
 
                 Set<String> namesInFile = new HashSet<>();
 
@@ -201,6 +197,76 @@ public class CSVSampleSheetImportService {
         });
 
         return errors;
+    }
+
+    List<CSVRecord> prepareRecords(Reader reader, char delimiter) throws IOException {
+        CSVFormat inputFormat = CSVFormat.DEFAULT.builder()
+                .setDelimiter(delimiter)
+                .setTrim(true)
+                .get();
+
+        List<CSVRecord> allRecords;
+        try (CSVParser parser = inputFormat.parse(reader)) {
+            allRecords = parser.getRecords();
+        }
+
+        int markerIndex = -1;
+        for (int i = 0; i < allRecords.size(); i++) {
+            CSVRecord record = allRecords.get(i);
+            if (record.size() > 0 && "METADATA FIELDS:".equalsIgnoreCase(record.get(0).trim())) {
+                markerIndex = i;
+                break;
+            }
+        }
+
+        if (markerIndex < 0) {
+            if (allRecords.isEmpty()) {
+                throw new BadRequestException("CSV file has no header record");
+            }
+            return parseMappedRecords(
+                    allRecords.get(0).toList(), allRecords.subList(1, allRecords.size()), delimiter, false);
+        }
+
+        CSVRecord marker = allRecords.get(markerIndex);
+        List<String> headers = withoutFirstField(marker);
+        if (headers.stream().allMatch(String::isBlank)) {
+            throw new BadRequestException("METADATA FIELDS: record has no usable headers");
+        }
+
+        return parseMappedRecords(headers, allRecords.subList(markerIndex + 1, allRecords.size()), delimiter);
+    }
+
+    private List<CSVRecord> parseMappedRecords(
+            List<String> headers, List<CSVRecord> dataRecords, char delimiter) throws IOException {
+        return parseMappedRecords(headers, dataRecords, delimiter, true);
+    }
+
+    private List<CSVRecord> parseMappedRecords(
+            List<String> headers, List<CSVRecord> dataRecords, char delimiter, boolean removeFirstField)
+            throws IOException {
+        StringWriter content = new StringWriter();
+        try (CSVPrinter printer = new CSVPrinter(content, CSVFormat.DEFAULT.builder().setDelimiter(delimiter).get())) {
+            printer.printRecord(headers);
+            for (CSVRecord dataRecord : dataRecords) {
+                printer.printRecord(removeFirstField ? withoutFirstField(dataRecord) : dataRecord.toList());
+            }
+        }
+
+        CSVFormat mappedFormat = CSVFormat.DEFAULT.builder()
+                .setDelimiter(delimiter)
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .setTrim(true)
+                .setIgnoreHeaderCase(true)
+                .setAllowMissingColumnNames(true)
+                .get();
+        try (CSVParser parser = mappedFormat.parse(new StringReader(content.toString()))) {
+            return parser.getRecords();
+        }
+    }
+
+    private List<String> withoutFirstField(CSVRecord record) {
+        return record.size() <= 1 ? List.of() : record.toList().subList(1, record.size());
     }
 
     private char detectDelimiter(File file) throws IOException {
