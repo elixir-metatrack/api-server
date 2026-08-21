@@ -153,6 +153,7 @@ public class ProjectService {
                 project.description,
                 project.owner,
                 ownerUsername,
+                project.samples.size(),
                 project.createdOn,
                 project.modifiedOn
         );

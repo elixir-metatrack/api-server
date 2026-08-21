@@ -9,6 +9,7 @@ public record ProjectResponse(
         String description,
         UUID owner,
         String ownerUsername,
+        long sampleCount,
         Instant createdOn,
         Instant modifiedOn
 ) {
