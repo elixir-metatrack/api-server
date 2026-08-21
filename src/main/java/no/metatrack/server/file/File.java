@@ -17,6 +17,10 @@ public class File extends PanacheEntity {
     @Column(nullable = false)
     String fileName;
 
+    String md5;
+
+    String unencryptedMd5;
+
     @Column(unique = true, nullable = false)
     String virtualPath;
 
@@ -83,5 +87,45 @@ public class File extends PanacheEntity {
             return Optional.empty();
         }
         return Optional.of(file);
+    }
+
+    public static Optional<String> validateImportPending(
+            Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
+            String unencryptedMd5) {
+        String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
+        Optional<File> existing = findByVirtualPathOptional(virtualPath);
+        if (existing.isPresent()) {
+            File file = existing.get();
+            if (file.status != UploadStatus.PENDING || file.sample != sample || file.assay != assay
+                    || !java.util.Objects.equals(file.md5, md5)
+                    || !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5)) {
+                return Optional.of("Conflicting file metadata for '" + fileName + "'");
+            }
+        }
+        return Optional.empty();
+    }
+
+    public static Optional<String> importPending(
+            Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
+            String unencryptedMd5) {
+        Optional<String> validationError = validateImportPending(
+                projectId, assayId, sample, assay, fileName, md5, unencryptedMd5);
+        if (validationError.isPresent()) return validationError;
+
+        String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
+        if (findByVirtualPathOptional(virtualPath).isPresent()) return Optional.empty();
+
+        File file = new File();
+        file.uuid = UUID.randomUUID();
+        file.fileName = fileName;
+        file.md5 = md5;
+        file.unencryptedMd5 = unencryptedMd5;
+        file.virtualPath = virtualPath;
+        file.objectKey = PresignUrlService.uploadObjectKey(virtualPath);
+        file.status = UploadStatus.PENDING;
+        file.sample = sample;
+        file.assay = assay;
+        sample.files.add(file);
+        return Optional.empty();
     }
 }

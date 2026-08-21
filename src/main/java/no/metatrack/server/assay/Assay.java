@@ -32,6 +32,10 @@ public class Assay extends PanacheEntityBase {
 
     public String instrumentModel;
 
+    public String sequencingPlatform;
+
+    public String sequencingLaboratory;
+
     public String libraryName;
 
     public String librarySource;
