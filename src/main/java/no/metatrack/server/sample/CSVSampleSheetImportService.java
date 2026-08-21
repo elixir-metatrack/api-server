@@ -15,6 +15,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.DuplicateHeaderMode;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -33,11 +34,28 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 @ApplicationScoped
 public class CSVSampleSheetImportService {
+
+    private static final Set<String> BUILT_IN_HEADERS = Set.of(
+            "name", "sample name", "alias", "mlst", "tax_id", "tax id", "host_tax_id", "host tax id",
+            "isolation_source", "isolation source", "collection_date", "collection date", "location",
+            "geographic location", "sequencing_lab", "collected by", "institution", "collecting institution",
+            "host_health_state", "host health state", "project_title", "project title", "description", "isolate",
+            "collected_by", "latitude", "longitude", "environmental_sample", "environmental sample",
+            "host_associated", "host associated", "host_common_name", "host common name", "host_subject_id",
+            "host subject id", "collector_name", "collector name", "host_sex", "host sex", "influenza_test_method",
+            "influenza test method", "influenza_test_result", "influenza test result", "other_pathogens_tested",
+            "other pathogens tested", "other_pathogens_test_result", "other pathogens test result", "host_habitat",
+            "host habitat", "isolation_source_host_associated", "isolation source host-associated", "host_behaviour",
+            "host behaviour", "isolation_source_non_host_associated", "isolation source non-host-associated",
+            "influenza_virus_type", "influenza virus type", "influenza_sub_type", "influenza sub type", "serovar",
+            "strain", "host_age", "host age", "county", "commune", "hospital_health_institution",
+            "hospital/health institution");
 
     @Inject
     SampleMetadataService metadataService;
@@ -164,7 +182,7 @@ public class CSVSampleSheetImportService {
 
                     Map<String, Object> customMetadata = new LinkedHashMap<>();
                     for (SampleMetadataField field : customFields) {
-                        String rawValue = getMappedValue(rec, field.key);
+                        String rawValue = getCustomMetadataValue(rec, field, customFields);
                         if (rawValue == null || rawValue.isBlank()) continue;
                         try {
                             customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
@@ -259,9 +277,12 @@ public class CSVSampleSheetImportService {
                 .setTrim(true)
                 .setIgnoreHeaderCase(true)
                 .setAllowMissingColumnNames(true)
+                .setDuplicateHeaderMode(DuplicateHeaderMode.DISALLOW)
                 .get();
         try (CSVParser parser = mappedFormat.parse(new StringReader(content.toString()))) {
             return parser.getRecords();
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("CSV file contains duplicate headers", e);
         }
     }
 
@@ -321,6 +342,53 @@ public class CSVSampleSheetImportService {
             }
         }
         return null;
+    }
+
+    String getCustomMetadataValue(CSVRecord rec, SampleMetadataField field) {
+        return getCustomMetadataValue(rec, field, List.of(field));
+    }
+
+    String getCustomMetadataValue(
+            CSVRecord rec, SampleMetadataField field, List<SampleMetadataField> customFields) {
+        Integer keyIndex = findHeaderIndex(rec, field.key);
+        if (keyIndex != null) return valueAt(rec, keyIndex);
+
+        if (isAmbiguousLabel(field, customFields)) return null;
+        Integer labelIndex = findHeaderIndex(rec, field.label);
+        return labelIndex == null ? null : valueAt(rec, labelIndex);
+    }
+
+    private boolean isAmbiguousLabel(SampleMetadataField field, List<SampleMetadataField> customFields) {
+        String normalizedLabel = normalizeHeader(field.label);
+        if (BUILT_IN_HEADERS.contains(normalizedLabel)) return true;
+
+        return customFields.stream()
+                .filter(other -> other != field)
+                .anyMatch(other -> normalizeHeader(other.key).equals(normalizedLabel)
+                        || normalizeHeader(other.label).equals(normalizedLabel));
+    }
+
+    private Integer findHeaderIndex(CSVRecord rec, String expectedHeader) {
+        String normalizedExpectedHeader = normalizeHeader(expectedHeader);
+        Integer match = null;
+        List<String> headers = rec.getParser().getHeaderNames();
+        for (int i = 0; i < headers.size(); i++) {
+            if (normalizeHeader(headers.get(i)).equals(normalizedExpectedHeader)) {
+                if (match != null) {
+                    throw new BadRequestException("Duplicate metadata column '" + expectedHeader + "'");
+                }
+                match = i;
+            }
+        }
+        return match;
+    }
+
+    private String valueAt(CSVRecord rec, int index) {
+        return index < rec.size() ? rec.get(index) : null;
+    }
+
+    private String normalizeHeader(String header) {
+        return header == null ? "" : header.trim().toLowerCase(Locale.ROOT);
     }
 
     static Map<String, String> builtInValues(Sample sample) {

@@ -1,6 +1,8 @@
 package no.metatrack.server.sample;
 
 import jakarta.ws.rs.BadRequestException;
+import no.metatrack.server.sample.metadata.SampleMetadataField;
+import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import org.apache.commons.csv.CSVRecord;
@@ -61,6 +63,66 @@ class CSVSampleSheetImportServiceTest {
     }
 
     @Test
+    void preservesAppendedTemplateColumnsAndUnevenRows() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+
+        List<CSVRecord> records = service.prepareRecords(new StringReader(
+                "REQUIREMENTS:;Mandatory;Optional;Optional\n"
+                        + "METADATA FIELDS:;Sample Name;custom_status;Unknown\n"
+                        + "alignment;sample-1;known;ignored\n"
+                        + "alignment;sample-2\n"), ';');
+
+        assertEquals("known", records.get(0).get("custom_status"));
+        assertEquals("ignored", records.get(0).get("Unknown"));
+        assertEquals(null, service.getCustomMetadataValue(records.get(1), metadataField("custom_status", "Status")));
+    }
+
+    @Test
+    void resolvesCustomMetadataByKeyAndLabelWithKeyPrecedence() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        SampleMetadataField field = metadataField("custom_status", "Status");
+
+        CSVRecord keyRecord = service.prepareRecords(
+                new StringReader("  CUSTOM_STATUS  ,Status\nkey-value,label-value\n"), ',').get(0);
+        CSVRecord labelRecord = service.prepareRecords(
+                new StringReader("Status\nlabel-value\n"), ',').get(0);
+
+        assertEquals("key-value", service.getCustomMetadataValue(keyRecord, field));
+        assertEquals("label-value", service.getCustomMetadataValue(labelRecord, field));
+    }
+
+    @Test
+    void ignoresAmbiguousCustomMetadataLabels() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        SampleMetadataField builtInCollision = metadataField("custom_status", "Sample Name");
+        SampleMetadataField keyCollision = metadataField("sample_name", "Status");
+        SampleMetadataField otherField = metadataField("status", "Other Status");
+        CSVRecord record = service.prepareRecords(
+                new StringReader("Sample Name,Status\nsample-1,status-value\n"), ',').get(0);
+
+        assertEquals(null, service.getCustomMetadataValue(record, builtInCollision));
+        assertEquals(null, service.getCustomMetadataValue(record, keyCollision, List.of(keyCollision, otherField)));
+    }
+
+    @Test
+    void keyMatchRemainsAuthoritativeWhenLabelIsAmbiguous() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        SampleMetadataField field = metadataField("custom_status", "Sample Name");
+        CSVRecord record = service.prepareRecords(
+                new StringReader("custom_status,Sample Name\nkey-value,label-value\n"), ',').get(0);
+
+        assertEquals("key-value", service.getCustomMetadataValue(record, field));
+    }
+
+    @Test
+    void rejectsDuplicateCustomHeaders() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+
+        assertThrows(BadRequestException.class, () -> service.prepareRecords(
+                new StringReader("custom_status,custom_status\nkey-value,other-value\n"), ','));
+    }
+
+    @Test
     void preservesHeaderFirstCsvAndTsv() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
 
@@ -109,5 +171,13 @@ class CSVSampleSheetImportServiceTest {
         assertEquals(2, SampleVocabularyService.validate(
                         rules, "sample-2", Map.of("host_sex", "male"), Map.of("custom_status", "unknown"))
                 .size());
+    }
+
+    private SampleMetadataField metadataField(String key, String label) {
+        SampleMetadataField field = new SampleMetadataField();
+        field.key = key;
+        field.label = label;
+        field.type = SampleMetadataFieldType.TEXT;
+        return field;
     }
 }
