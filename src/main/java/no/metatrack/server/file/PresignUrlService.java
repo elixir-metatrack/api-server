@@ -69,7 +69,7 @@ public class PresignUrlService {
         return new PresignedUrl(url, objectKey);
     }
 
-    static String virtualPath(Long projectId, UUID assayId, String sampleName, String fileName) {
+    public static String virtualPath(Long projectId, UUID assayId, String sampleName, String fileName) {
         return projectId + "/" + assayId + "/" + sampleName + "/" + fileName;
     }
 

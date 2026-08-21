@@ -4,6 +4,7 @@ import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.MediaType;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.FileResponse;
@@ -13,13 +14,18 @@ import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.sample.SampleResponse;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 
 @Path("/api/projects/{projectId}/assays")
 public class AssayController {
+    private static final Set<String> ALLOWED_EXPERIMENT_TYPES = Set.of(
+            "text/csv", "text/plain", "text/tab-separated-values", "text/tsv", "application/vnd.ms-excel");
     @Inject
     SampleMetadataService metadataService;
     @Inject
@@ -30,6 +36,9 @@ public class AssayController {
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
+
+    @Inject
+    CSVExperimentImportService csvExperimentImportService;
 
     @GET
     @Authenticated
@@ -99,6 +108,29 @@ public class AssayController {
                 request.insertSize());
 
         return Response.noContent().build();
+    }
+
+    @POST
+    @Authenticated
+    @Path("/{assayId}/experiments")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response importExperiments(
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            @RestForm("file") FileUpload file) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+        if (file == null) throw new BadRequestException("No file uploaded");
+
+        String contentType = file.contentType();
+        String baseContentType = contentType == null ? null : contentType.split(";")[0].trim().toLowerCase();
+        if (baseContentType == null || !ALLOWED_EXPERIMENT_TYPES.contains(baseContentType)) {
+            throw new WebApplicationException("File must be a CSV or TSV file", 400);
+        }
+
+        List<CSVExperimentRowError> errors = csvExperimentImportService.importIntoAssay(
+                projectId, assayId, file.filePath().toFile());
+        return errors.isEmpty() ? Response.ok().build() : Response.status(400).entity(errors).build();
     }
 
     @DELETE
