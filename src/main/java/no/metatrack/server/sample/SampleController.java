@@ -276,4 +276,26 @@ public class SampleController {
         fileIngestService.deleteFile(fileUuid, sampleId);
         return Response.noContent().build();
     }
+
+    @PUT
+    @Authenticated
+    @Path("/link")
+    public Response linkSamples(@PathParam("projectId") Long projectId, @Valid LinkSamplesRequest request) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        sampleService.linkSamples(projectId, request.sampleIds());
+        return Response.noContent().build();
+    }
+
+    @DELETE
+    @Authenticated
+    @Path("/link")
+    public Response unlinkSamples(@PathParam("projectId") Long projectId, @Valid LinkSamplesRequest request) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        sampleService.unlinkSamples(projectId, request.sampleIds());
+        return Response.noContent().build();
+    }
 }

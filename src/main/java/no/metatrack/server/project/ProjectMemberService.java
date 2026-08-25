@@ -2,6 +2,7 @@ package no.metatrack.server.project;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
+import no.metatrack.server.auth.keycloak.KeycloakIdentity;
 
 import java.util.List;
 import java.util.Map;
@@ -21,15 +22,19 @@ public class ProjectMemberService {
     }
 
     List<ProjectMemberResponse> toResponses(List<ProjectMember> members) {
-        Map<UUID, Optional<String>> usernames = identityLookupService.usernames(
+        Map<UUID, Optional<KeycloakIdentity>> identities = identityLookupService.identities(
                 members.stream().map(member -> member.memberId).toList()
         );
         return members.stream()
-                .map(member -> new ProjectMemberResponse(
-                        member.memberId,
-                        usernames.get(member.memberId).orElse(null),
-                        member.role
-                ))
+                .map(member -> {
+                    KeycloakIdentity identity = identities.get(member.memberId).orElse(null);
+                    return new ProjectMemberResponse(
+                            member.memberId,
+                            identity != null ? identity.username() : null,
+                            identity != null ? identity.email() : null,
+                            member.role
+                    );
+                })
                 .toList();
     }
 }

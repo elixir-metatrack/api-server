@@ -39,6 +39,9 @@ quarkus:
       keycloak-usernames:
         expire-after-write: ${KEYCLOAK_USERNAME_CACHE_TTL:10M}
         maximum-size: ${KEYCLOAK_USERNAME_CACHE_MAX_SIZE:1000}
+      keycloak-identities:
+        expire-after-write: ${KEYCLOAK_USERNAME_CACHE_TTL:10M}
+        maximum-size: ${KEYCLOAK_USERNAME_CACHE_MAX_SIZE:1000}
   smallrye-openapi:
     path: /openapi
     always-include: true

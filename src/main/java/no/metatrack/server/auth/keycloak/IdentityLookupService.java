@@ -52,6 +52,41 @@ public class IdentityLookupService {
         }
     }
 
+    @CacheResult(cacheName = "keycloak-identities")
+    public Optional<KeycloakIdentity> identity(UUID userId) {
+        try (RestResponse<KeycloakUserRepresentation> response = keycloakAdminClient.getUser(realm, userId.toString())) {
+            if (response.getStatus() == ResponseStatus.NOT_FOUND) {
+                return Optional.empty();
+            }
+            if (response.getStatus() != ResponseStatus.OK) {
+                throw new KeycloakIdentityException(
+                        "Keycloak user lookup failed (category=upstream_http, status=" + response.getStatus() + ")"
+                );
+            }
+
+            KeycloakUserRepresentation user = response.getEntity();
+            if (user == null) {
+                throw new KeycloakIdentityException("Keycloak user lookup returned an empty response");
+            }
+            return Optional.of(new KeycloakIdentity(user.username(), user.email()));
+        } catch (KeycloakIdentityException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new KeycloakIdentityException(
+                    "Keycloak user lookup failed (category=" + failureCategory(exception) + ")",
+                    exception
+            );
+        }
+    }
+
+    public Map<UUID, Optional<KeycloakIdentity>> identities(Collection<UUID> userIds) {
+        Map<UUID, Optional<KeycloakIdentity>> identities = new LinkedHashMap<>();
+        for (UUID userId : userIds) {
+            identities.computeIfAbsent(userId, this::identity);
+        }
+        return identities;
+    }
+
     private String failureCategory(Throwable failure) {
         Throwable current = failure;
         while (current != null) {

@@ -35,7 +35,11 @@ public class AssayService {
             String librarySelection,
             String libraryLayout,
             Integer insertSize) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        // Same rule as samples: an assay created from within a sub-project belongs to the
+        // root project. It becomes visible in the sub-project once a linked sample is attached.
+        Project owningProject = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
+
         Assay assay = new Assay();
         assay.name = name;
         assay.studyAccession = studyAccession;
@@ -46,11 +50,11 @@ public class AssayService {
         assay.libraryStrategy = libraryStrategy;
         assay.libraryLayout = libraryLayout;
         assay.insertSize = insertSize;
-        assay.project = project;
+        assay.project = owningProject;
         assay.createdOn = Instant.now();
         assay.modifiedOn = Instant.now();
 
-        project.assays.add(assay);
+        owningProject.assays.add(assay);
         return assay;
     }
 

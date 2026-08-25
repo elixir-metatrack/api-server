@@ -6,6 +6,7 @@ import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
+import no.metatrack.server.sample.Sample;
 
 import java.time.Instant;
 import java.util.List;
@@ -66,6 +67,12 @@ public class ProjectService {
     @Transactional
     public void deleteProject(Long projectId) {
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+
+        if (!project.subProjects.isEmpty()) {
+            throw new WebApplicationException(
+                    "Cannot delete a project that has sub-projects - delete them first",
+                    Response.Status.CONFLICT);
+        }
 
         project.delete();
     }
@@ -147,15 +154,68 @@ public class ProjectService {
     }
 
     private ProjectResponse response(Project project, String ownerUsername) {
+        // Sub-projects don't own samples directly (Project.samples) - their samples
+        // are the curated subset linked in via Project.linkedSamples.
+        long sampleCount = project.isSubProject() ? project.linkedSamples.size() : project.samples.size();
+
         return new ProjectResponse(
                 project.id,
                 project.name,
                 project.description,
                 project.owner,
                 ownerUsername,
-                project.samples.size(),
+                sampleCount,
                 project.createdOn,
-                project.modifiedOn
+                project.modifiedOn,
+                project.parentProject != null ? project.parentProject.id : null
         );
+    }
+
+    @Transactional
+    public Project createSubProject(
+            Long parentProjectId, String name, String description, List<UUID> sampleIds, String currentUserId) {
+        Project parent = (Project) Project.findByIdOptional(parentProjectId).orElseThrow(NotFoundException::new);
+        if (parent.isSubProject()) {
+            throw new WebApplicationException(
+                    "Cannot create a sub-project of a sub-project", Response.Status.BAD_REQUEST);
+        }
+        if (Project.projectExistsByName(name)) {
+            throw new WebApplicationException("Project already exists", Response.Status.CONFLICT);
+        }
+
+        Project subProject = new Project();
+        subProject.name = name;
+        subProject.description = description;
+        subProject.owner = UUID.fromString(currentUserId);
+        subProject.parentProject = parent;
+        subProject.createdOn = Instant.now();
+        subProject.modifiedOn = Instant.now();
+
+        ProjectMember member = new ProjectMember();
+        member.role = ProjectRole.OWNER;
+        member.memberId = UUID.fromString(currentUserId);
+        member.project = subProject;
+        subProject.projectMembers.add(member);
+
+        if (sampleIds != null) {
+            for (UUID sampleId : sampleIds) {
+                Sample sample = Sample.<Sample>findByIdOptional(sampleId)
+                        .orElseThrow(() -> new WebApplicationException(
+                                "Sample " + sampleId + " not found", Response.Status.BAD_REQUEST));
+                if (sample.project == null || !sample.project.id.equals(parent.id)) {
+                    throw new WebApplicationException(
+                            "Sample " + sampleId + " does not belong to project " + parentProjectId,
+                            Response.Status.BAD_REQUEST);
+                }
+                subProject.linkedSamples.add(sample);
+            }
+        }
+
+        subProject.persist();
+        return subProject;
+    }
+
+    public List<ProjectResponse> getSubProjects(Long parentProjectId) {
+        return toResponses(Project.findSubProjects(parentProjectId));
     }
 }
