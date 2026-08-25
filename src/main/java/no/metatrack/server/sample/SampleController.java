@@ -288,11 +288,32 @@ public class SampleController {
     @Path("/{sampleId}/assays")
     public List<AssayResponse> getAllAssaysInSample(
             @PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
-
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
         List<Assay> assays = assayService.getAllAssaysInSample(projectId, sampleId);
         return assays.stream().map(AssayResponse::fromEntity).toList();
+    }
+
+    @PUT
+    @Authenticated
+    @Path("/link")
+    public Response linkSamples(@PathParam("projectId") Long projectId, @Valid LinkSamplesRequest request) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        sampleService.linkSamples(projectId, request.sampleIds());
+        return Response.noContent().build();
+    }
+
+    @DELETE
+    @Authenticated
+    @Path("/link")
+    public Response unlinkSamples(@PathParam("projectId") Long projectId, @Valid LinkSamplesRequest request) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+
+        sampleService.unlinkSamples(projectId, request.sampleIds());
+        return Response.noContent().build();
     }
 }

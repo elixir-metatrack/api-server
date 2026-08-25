@@ -2,6 +2,7 @@ package no.metatrack.server.assay;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 
@@ -56,7 +57,14 @@ public class Assay extends PanacheEntityBase {
     public Project project;
 
     public static boolean existsAssayByIdInProjectOptional(Long projectId, UUID assayId) {
-        return count("id = ?1 and project.id = ?2", assayId, projectId) > 0;
+        Project project = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (!project.isSubProject()) {
+            return count("id = ?1 and project.id = ?2", assayId, projectId) > 0;
+        }
+        return find("select distinct a from Assay a join a.samples s join s.linkedInSubProjects lp "
+                        + "where a.id = ?1 and lp.id = ?2", assayId, projectId)
+                .firstResultOptional()
+                .isPresent();
     }
 
     public void addSample(Sample sample) {
@@ -69,7 +77,17 @@ public class Assay extends PanacheEntityBase {
         sample.assays.remove(this);
     }
 
+    /**
+     * All assays visible in a project. For a root project this is the assays it owns;
+     * for a sub-project, an assay is visible if it has at least one sample linked into
+     * that sub-project (assays follow their samples, there's no separate assay link).
+     */
     public static List<Assay> findAssaysInProject(Long projectId) {
-        return list("project.id = ?1", projectId);
+        Project project = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (!project.isSubProject()) {
+            return list("project.id = ?1", projectId);
+        }
+        return list("select distinct a from Assay a join a.samples s join s.linkedInSubProjects lp where lp.id = ?1",
+                projectId);
     }
 }
