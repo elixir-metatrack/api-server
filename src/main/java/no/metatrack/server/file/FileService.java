@@ -11,22 +11,24 @@ import java.util.UUID;
 @ApplicationScoped
 public class FileService {
     public List<File> getAllFilesInSample(Long projectId, UUID sampleId) {
-        if (Sample.count("id = ?1 and project.id = ?2", sampleId, projectId) == 0) throw new NotFoundException();
-        return File.findInSample(projectId, sampleId);
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        return File.findInSample(sample.project.id, sampleId);
     }
 
     public List<File> getAllFilesInAssay(Long projectId, UUID assayId) {
         if (!Assay.existsAssayByIdInProjectOptional(projectId, assayId)) throw new NotFoundException();
-        return File.findInAssay(projectId, assayId);
+        // Files are indexed by the assay's actual (root) project, which may differ from
+        // the sub-project id the request came in through.
+        Assay assay = (Assay) Assay.findByIdOptional(assayId).orElseThrow(NotFoundException::new);
+        return File.findInAssay(assay.project.id, assayId);
     }
 
     public List<File> getFilesInSampleAndAssay(Long projectId, UUID assayId, UUID sampleId) {
-        Assay.find(
-                        "select a from Assay a join a.samples s "
-                                + "where a.id = ?1 and a.project.id = ?2 and s.id = ?3 and s.project.id = ?2",
-                        assayId, projectId, sampleId)
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        if (!Assay.existsAssayByIdInProjectOptional(projectId, assayId)) throw new NotFoundException();
+        Assay.find("select a from Assay a join a.samples s where a.id = ?1 and s.id = ?2", assayId, sampleId)
                 .firstResultOptional()
                 .orElseThrow(NotFoundException::new);
-        return File.findInSampleAndAssay(projectId, sampleId, assayId);
+        return File.findInSampleAndAssay(sample.project.id, sampleId, assayId);
     }
 }

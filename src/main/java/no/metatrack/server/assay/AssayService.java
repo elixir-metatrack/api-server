@@ -45,6 +45,7 @@ public class AssayService {
             String libraryLayout,
             Integer insertSize) {
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project owningProject = project.isSubProject() ? project.parentProject : project;
         validate(name, studyAccession, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout);
         Assay assay = new Assay();
@@ -57,11 +58,11 @@ public class AssayService {
         assay.libraryStrategy = libraryStrategy;
         assay.libraryLayout = libraryLayout;
         assay.insertSize = insertSize;
-        assay.project = project;
+        assay.project = owningProject;
         assay.createdOn = Instant.now();
         assay.modifiedOn = Instant.now();
 
-        project.assays.add(assay);
+        owningProject.assays.add(assay);
         return assay;
     }
 

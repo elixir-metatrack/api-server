@@ -173,4 +173,30 @@ public class ProjectController {
 
         return projectMemberService.listAllProjectMembers(projectId);
     }
+
+    @POST
+    @Authenticated
+    @Path("/{projectId}/subprojects")
+    @Produces("application/json")
+    public ProjectResponse createSubProject(
+            @PathParam("projectId") Long projectId, @Valid CreateSubProjectRequest request) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        CurrentUser currentUser = userService.requireCurrentUser();
+        Project subProject = projectService.createSubProject(
+                projectId, request.name(), request.description(), request.sampleIds(), currentUser.id());
+        return projectService.toResponse(subProject);
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{projectId}/subprojects")
+    @Produces("application/json")
+    public List<ProjectResponse> getSubProjects(@PathParam("projectId") Long projectId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
+            throw new WebApplicationException(Response.Status.FORBIDDEN);
+
+        return projectService.getSubProjects(projectId);
+    }
 }

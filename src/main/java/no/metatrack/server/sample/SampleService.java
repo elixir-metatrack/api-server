@@ -34,8 +34,38 @@ public class SampleService {
     }
 
     public Sample getSampleById(UUID sampleId, Long projectId) {
-        return Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
-                .firstResultOptional().orElseThrow(NotFoundException::new);
+        return Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+    }
+
+    @Transactional
+    public void linkSamples(Long subProjectId, List<UUID> sampleIds) {
+        Project subProject = (Project) Project.findByIdOptional(subProjectId).orElseThrow(NotFoundException::new);
+        if (!subProject.isSubProject()) {
+            throw new WebApplicationException(
+                    "Project " + subProjectId + " is not a sub-project", Response.Status.BAD_REQUEST);
+        }
+
+        for (UUID sampleId : sampleIds) {
+            Sample sample = Sample.<Sample>findByIdOptional(sampleId).orElseThrow(() -> new WebApplicationException(
+                    "Sample " + sampleId + " not found", Response.Status.BAD_REQUEST));
+            if (sample.project == null || !sample.project.id.equals(subProject.parentProject.id)) {
+                throw new WebApplicationException(
+                        "Sample " + sampleId + " does not belong to project " + subProject.parentProject.id,
+                        Response.Status.BAD_REQUEST);
+            }
+            subProject.linkedSamples.add(sample);
+        }
+    }
+
+    @Transactional
+    public void unlinkSamples(Long subProjectId, List<UUID> sampleIds) {
+        Project subProject = (Project) Project.findByIdOptional(subProjectId).orElseThrow(NotFoundException::new);
+        if (!subProject.isSubProject()) {
+            throw new WebApplicationException(
+                    "Project " + subProjectId + " is not a sub-project", Response.Status.BAD_REQUEST);
+        }
+
+        subProject.linkedSamples.removeIf(sample -> sampleIds.contains(sample.id));
     }
 
     public Sample getSampleByName(String name, Long projectId) {
@@ -87,12 +117,16 @@ public class SampleService {
             String hospitalHealthInstitution,
             Map<String, Object> customMetadata) {
 
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        // Samples always physically belong to their root project - a sub-project only ever
+        // links to a subset of it. A sample created from within a sub-project therefore lands
+        // in the root project and is auto-linked into the creating sub-project below.
+        Project owningProject = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
 
-        if (Sample.sampleExistsByName(name, projectId))
+        if (Sample.sampleExistsByName(name, owningProject.id))
             throw new WebApplicationException("Sample with name " + name + " already exists", Response.Status.CONFLICT);
 
-        validate(projectId, name, builtInValues(
+        validate(owningProject.id, name, builtInValues(
                 alias, mlst, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
                 description, isolate, collectedBy, environmentalSample, hostAssociated, hostCommonName, hostSubjectId,
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
@@ -144,11 +178,14 @@ public class SampleService {
 
         sample.createdOn = Instant.now();
         sample.modifiedOn = Instant.now();
-        sample.project = project;
+        sample.project = owningProject;
 
-        project.samples.add(sample);
+        owningProject.samples.add(sample);
         sample.persist();
-        metadataService.apply(projectId, sample, customMetadata);
+        if (targetProject.isSubProject()) {
+            targetProject.linkedSamples.add(sample);
+        }
+        metadataService.apply(owningProject.id, sample, customMetadata);
         return sample;
     }
 
@@ -198,11 +235,8 @@ public class SampleService {
             String hospitalHealthInstitution,
             Map<String, Object> customMetadata) {
 
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
-
-        Sample sample = Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
-                .firstResultOptional().orElseThrow(NotFoundException::new);
-        validate(projectId, sample.name, builtInValues(
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        validate(sample.project.id, sample.name, builtInValues(
                 alias, mlst, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
                 description, isolate, collectedBy, environmentalSample, hostAssociated, hostCommonName, hostSubjectId,
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
@@ -252,14 +286,12 @@ public class SampleService {
 
         sample.modifiedOn = Instant.now();
 
-        sample.project = project;
-        metadataService.apply(projectId, sample, customMetadata);
+        metadataService.apply(sample.project.id, sample, customMetadata);
     }
 
     @Transactional
     public void deleteSample(Long projectId, UUID sampleId) {
-        Sample sample = Sample.<Sample>find("id = ?1 and project.id = ?2", sampleId, projectId)
-                .firstResultOptional().orElseThrow(NotFoundException::new);
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
         sample.delete();
     }
 
