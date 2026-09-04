@@ -286,13 +286,13 @@ public class SampleController {
     @GET
     @Authenticated
     @Path("/{sampleId}/assays")
-    public Response getAllAssaysInSample(
+    public List<AssayResponse> getAllAssaysInSample(
             @PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
 
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
 
         List<Assay> assays = assayService.getAllAssaysInSample(projectId, sampleId);
-        return Response.ok(assays.stream().map(AssayResponse::fromEntity).toList()).build();
+        return assays.stream().map(AssayResponse::fromEntity).toList();
     }
 }
