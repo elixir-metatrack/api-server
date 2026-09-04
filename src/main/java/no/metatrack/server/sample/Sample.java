@@ -114,8 +114,8 @@ public class Sample extends PanacheEntityBase {
     @OneToMany(mappedBy = "sample", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     public Set<SampleMetadataValue> metadataValues = new HashSet<>();
 
-    public static boolean sampleExists(Long sampleId) {
-        return findByIdOptional(sampleId).isPresent();
+    public static boolean sampleExistsInProject(UUID sampleId, Long projectId) {
+        return count("id = ?1 and project.id = ?2", sampleId, projectId) > 0;
     }
 
     public static Optional<Sample> findSampleById(UUID sampleId) {
@@ -138,5 +138,9 @@ public class Sample extends PanacheEntityBase {
 
     public static List<Sample> findSamplesInAssay(UUID assayId) {
         return Sample.list("select s from Sample s join s.assays a where a.id = ?1", assayId);
+    }
+
+    public static List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {
+        return list("select a from Assay a join a.samples s where s.id = ?1 and a.project.id = ?2", sampleId, projectId);
     }
 }
