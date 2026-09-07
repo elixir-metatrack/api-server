@@ -168,7 +168,14 @@ public class Sample extends PanacheEntityBase {
         return Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
     }
 
-    public static List<Sample> findSamplesInAssay(UUID assayId) {
-        return Sample.list("select s from Sample s join s.assays a where a.id = ?1", assayId);
+    public static List<Sample> findSamplesInAssayInProjectScope(Long projectId, UUID assayId) {
+        Project project = resolveProject(projectId);
+        if (!project.isSubProject()) {
+            return list("select s from Sample s join s.assays a "
+                    + "where a.id = ?1 and a.project.id = ?2 and s.project.id = ?2", assayId, projectId);
+        }
+        return list("select s from Sample s join s.assays a join s.linkedInSubProjects lp "
+                        + "where a.id = ?1 and lp.id = ?2 and a.project.id = ?3 and s.project.id = ?3",
+                assayId, projectId, project.parentProject.id);
     }
 }

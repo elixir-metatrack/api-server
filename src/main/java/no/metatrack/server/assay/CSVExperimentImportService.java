@@ -30,8 +30,7 @@ public class CSVExperimentImportService {
 
     @Transactional
     public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
-        Assay assay = Assay.<Assay>find("id = ?1 and project.id = ?2", assayId, projectId)
-                .firstResultOptional().orElseThrow(NotFoundException::new);
+        Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
         if (file == null || !file.isFile()) {
             throw new BadRequestException("CSV file is missing");
         }
@@ -58,12 +57,8 @@ public class CSVExperimentImportService {
             return;
         }
 
-        Optional<Sample> sample = Sample.find(
-                        "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
-                                + "where a = ?3 and s = Sample)",
-                        projectId, sampleName.trim(), assay)
-                .firstResultOptional();
-        if (sample.isEmpty()) {
+        Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName.trim(), projectId);
+        if (sample.isEmpty() || assay.samples.stream().noneMatch(member -> member.id.equals(sample.get().id))) {
             errors.add(new CSVExperimentRowError(row, "Sample", sampleName,
                     "Sample does not exist in the project or is not associated with the assay"));
             return;
@@ -72,11 +67,12 @@ public class CSVExperimentImportService {
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
         int rowErrorCount = errors.size();
         List<PendingFile> pendingFiles = new ArrayList<>();
-        prepareFile(projectId, assay, sample.get(), value(record, "File Name"), value(record, "File md5"),
+        Long owningProjectId = assay.project.id;
+        prepareFile(owningProjectId, assay, sample.get(), value(record, "File Name"), value(record, "File md5"),
                 value(record, "File Unencrypted md5"), row, "File Name", importedReferences, pendingFiles, errors);
-        prepareFile(projectId, assay, sample.get(), value(record, "Forward File Name"), value(record, "Forward File md5"),
+        prepareFile(owningProjectId, assay, sample.get(), value(record, "Forward File Name"), value(record, "Forward File md5"),
                 value(record, "Forward File Unencrypted md5"), row, "Forward File Name", importedReferences, pendingFiles, errors);
-        prepareFile(projectId, assay, sample.get(), value(record, "Reverse File Name"), value(record, "Reverse File md5"),
+        prepareFile(owningProjectId, assay, sample.get(), value(record, "Reverse File Name"), value(record, "Reverse File md5"),
                 value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", importedReferences, pendingFiles, errors);
         if (errors.size() > rowErrorCount || hasError(errors, row, "Insert Size")) return;
 
@@ -91,7 +87,7 @@ public class CSVExperimentImportService {
         assay.sequencingLaboratory = value(record, "Sequencing Laboratory");
         assay.modifiedOn = Instant.now();
         assay.addSample(sample.get());
-        pendingFiles.forEach(pendingFile -> File.importPending(projectId, assay.id, sample.get(), assay,
+        pendingFiles.forEach(pendingFile -> File.importPending(owningProjectId, assay.id, sample.get(), assay,
                 pendingFile.fileName(), pendingFile.md5(), pendingFile.unencryptedMd5()));
     }
 

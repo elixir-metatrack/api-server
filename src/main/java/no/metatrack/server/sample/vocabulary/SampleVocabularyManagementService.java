@@ -3,6 +3,7 @@ package no.metatrack.server.sample.vocabulary;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
@@ -16,7 +17,8 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class SampleVocabularyManagementService {
     public List<SampleVocabularyResponse> list(Long projectId) {
-        requireProject(projectId);
+        Project project = requireProject(projectId);
+        if (project.isSubProject()) projectId = project.parentProject.id;
         Map<String, SampleVocabulary> vocabularies = SampleVocabulary.<SampleVocabulary>list("project.id", projectId).stream()
                 .collect(Collectors.toMap(vocabulary -> vocabulary.fieldKey, Function.identity()));
         return eligibleColumns(projectId).stream()
@@ -27,6 +29,8 @@ public class SampleVocabularyManagementService {
     }
 
     public SampleVocabularyResponse get(Long projectId, String fieldKey) {
+        Project project = requireProject(projectId);
+        if (project.isSubProject()) projectId = project.parentProject.id;
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
         SampleVocabulary vocabulary = findVocabulary(projectId, column.key());
         return SampleVocabularyResponse.configured(column, vocabulary);
@@ -34,7 +38,7 @@ public class SampleVocabularyManagementService {
 
     @Transactional
     public SampleVocabularyResponse replace(Long projectId, String fieldKey, PutSampleVocabularyRequest request) {
-        Project project = requireProject(projectId);
+        Project project = requireRootProject(projectId);
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
         List<String> values = validateTerms(request.terms());
         SampleVocabulary vocabulary = SampleVocabulary.<SampleVocabulary>find(
@@ -49,7 +53,7 @@ public class SampleVocabularyManagementService {
 
     @Transactional
     public void delete(Long projectId, String fieldKey) {
-        requireProject(projectId);
+        requireRootProject(projectId);
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
         findVocabulary(projectId, column.key()).delete();
     }
@@ -127,5 +131,11 @@ public class SampleVocabularyManagementService {
 
     private Project requireProject(Long projectId) {
         return Project.<Project>findByIdOptional(projectId).orElseThrow(() -> new NotFoundException("Project not found"));
+    }
+
+    private Project requireRootProject(Long projectId) {
+        Project project = requireProject(projectId);
+        if (project.isSubProject()) throw new ForbiddenException("Manage vocabularies in the parent project");
+        return project;
     }
 }

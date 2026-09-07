@@ -46,6 +46,14 @@ public class File extends PanacheEntity {
         return list("assay.id = ?1 and assay.project.id = ?2 order by fileName", assayId, projectId);
     }
 
+    public static List<File> findInAssayInProjectScope(Long projectId, Assay assay) {
+        if (assay.project.id.equals(projectId)) return findInAssay(projectId, assay.id);
+        return list("select f from File f join f.sample.linkedInSubProjects lp "
+                        + "where f.assay.id = ?1 and lp.id = ?2 and f.assay.project.id = ?3 "
+                        + "and f.sample.project.id = ?3 order by f.fileName",
+                assay.id, projectId, assay.project.id);
+    }
+
     public static List<File> findInSampleAndAssay(Long projectId, UUID sampleId, UUID assayId) {
         return list("sample.id = ?1 and assay.id = ?2 and sample.project.id = ?3 and assay.project.id = ?3 order by fileName",
                 sampleId, assayId, projectId);

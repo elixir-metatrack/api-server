@@ -220,17 +220,32 @@ when an accepted column alias was present in the uploaded file, and `sample` con
 
 ## Tests
 
-Run the test suite:
+Run the test suite with Docker available:
 
 ```shell
 ./mvnw test
 ```
+
+The sub-project regression tests start a disposable PostgreSQL 16 container and apply the real Flyway migrations.
+They use test configuration and mock identity/object-storage services; no application credentials or existing database
+are needed. To run only this database-backed suite, use `./mvnw -Dtest=SubProjectScopeTest test`.
 
 Integration tests can be run with:
 
 ```shell
 ./mvnw verify
 ```
+
+## Sub-project Access
+
+Sub-projects expose only their linked samples and the assays and files associated with those samples. Editors may
+update visible data, but adding or removing sample links requires `ADMIN` or `OWNER` membership in the parent project.
+Physical sample deletion and assay creation/deletion must use the parent project. Removing a visible sample from an
+assay affects only that sample's relationship and file metadata; hidden samples remain intact.
+
+Samples created individually or through CSV in a sub-project belong to the root project and are automatically linked
+into that sub-project. Metadata fields and vocabulary rules are inherited from the root; their definitions must be
+managed there. File upload/download paths use the root project ID while access is checked against the requested scope.
 
 ## Releases
 
