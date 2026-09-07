@@ -88,7 +88,7 @@ public class ProjectController {
     @Authenticated
     @Path("/{projectId}/member/{memberId}")
     public Response addMember(
-            @PathParam("projectId") Long projectId, @PathParam("memberId") UUID memberId, AddMemberRequest request) {
+            @PathParam("projectId") Long projectId, @PathParam("memberId") UUID memberId, @Valid AddMemberRequest request) {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 

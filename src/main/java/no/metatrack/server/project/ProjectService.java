@@ -1,7 +1,11 @@
 package no.metatrack.server.project;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
@@ -17,6 +21,9 @@ import java.util.UUID;
 @ApplicationScoped
 public class ProjectService {
     private final IdentityLookupService identityLookupService;
+
+    @Inject
+    ProjectRoleCheck projectRoleCheck;
 
     public ProjectService(IdentityLookupService identityLookupService) {
         this.identityLookupService = identityLookupService;
@@ -79,7 +86,9 @@ public class ProjectService {
 
     @Transactional
     public void addMember(Long projectId, UUID memberId, ProjectRole role) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
+        if (role == null) throw new BadRequestException("Member role is required");
+        if (role == ProjectRole.OWNER) requireOwner(projectId);
 
         if (ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member already exists", Response.Status.CONFLICT);
@@ -95,7 +104,7 @@ public class ProjectService {
 
     @Transactional
     public void removeMember(Long projectId, UUID memberId) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
         if (!ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
         }
@@ -104,11 +113,8 @@ public class ProjectService {
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
         if (member.role == ProjectRole.OWNER) {
-            long ownerCount = ProjectMember.count("project.id = ?1 and role = ?2", projectId, ProjectRole.OWNER);
-            if (ownerCount <= 1) {
-                throw new WebApplicationException(
-                        "Cannot remove the last owner of a project", Response.Status.BAD_REQUEST);
-            }
+            requireOwner(projectId);
+            requireAnotherOwner(projectId);
         }
 
         project.projectMembers.remove(member);
@@ -116,7 +122,8 @@ public class ProjectService {
 
     @Transactional
     public void updateMemberRole(Long projectId, UUID memberId, ProjectRole role) {
-        Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        lockProject(projectId);
+        if (role == null) throw new BadRequestException("Member role is required");
         if (!ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
         }
@@ -124,7 +131,27 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        if (member.role == ProjectRole.OWNER || role == ProjectRole.OWNER) requireOwner(projectId);
+        if (member.role == ProjectRole.OWNER && role != ProjectRole.OWNER) requireAnotherOwner(projectId);
         member.role = role;
+    }
+
+    private Project lockProject(Long projectId) {
+        // Serialize membership changes so concurrent requests cannot remove both remaining owners.
+        return Project.<Project>findByIdOptional(projectId, LockModeType.PESSIMISTIC_WRITE)
+                .orElseThrow(NotFoundException::new);
+    }
+
+    private void requireOwner(Long projectId) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.OWNER)) {
+            throw new ForbiddenException("Only project owners can grant or revoke the owner role");
+        }
+    }
+
+    private void requireAnotherOwner(Long projectId) {
+        if (ProjectMember.count("project.id = ?1 and role = ?2", projectId, ProjectRole.OWNER) <= 1) {
+            throw new BadRequestException("Cannot remove or demote the last owner of a project");
+        }
     }
 
     public Project getProjectById(long id) {
