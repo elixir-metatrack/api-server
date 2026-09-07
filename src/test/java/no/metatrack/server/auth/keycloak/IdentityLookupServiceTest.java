@@ -23,7 +23,7 @@ class IdentityLookupServiceTest {
     void resolvesUsername() {
         UUID userId = UUID.randomUUID();
         IdentityLookupService service = serviceReturning(
-                RestResponse.ok(new KeycloakUserRepresentation(userId.toString(), "user@example.org", null, null))
+                RestResponse.ok(new KeycloakUserRepresentation(userId.toString(), "user@example.org", "user@example.org", null))
         );
 
         assertEquals(Optional.of("user@example.org"), service.username(userId));
@@ -41,7 +41,7 @@ class IdentityLookupServiceTest {
         AtomicInteger calls = new AtomicInteger();
         KeycloakAdminClient client = clientUsing((realm, userId) -> {
             calls.incrementAndGet();
-            return RestResponse.ok(new KeycloakUserRepresentation(userId, userId + "@example.org", null, null));
+            return RestResponse.ok(new KeycloakUserRepresentation(userId, userId, userId + "@example.org", null));
         });
         IdentityLookupService service = new IdentityLookupService(client, REALM);
         UUID first = UUID.randomUUID();
