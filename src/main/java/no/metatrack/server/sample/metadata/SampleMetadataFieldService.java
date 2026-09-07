@@ -3,6 +3,7 @@ package no.metatrack.server.sample.metadata;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.project.Project;
 
@@ -28,16 +29,17 @@ public class SampleMetadataFieldService {
             "commune", "hospital_health_institution", "created_on", "modified_on", "custom_metadata");
 
     public List<SampleMetadataField> list(Long projectId, boolean includeArchived) {
-        requireProject(projectId);
+        Project project = requireProject(projectId);
+        Long owningProjectId = project.isSubProject() ? project.parentProject.id : project.id;
         if (includeArchived) {
-            return SampleMetadataField.list("project.id = ?1 order by key", projectId);
+            return SampleMetadataField.list("project.id = ?1 order by key", owningProjectId);
         }
-        return SampleMetadataField.list("project.id = ?1 and archivedOn is null order by key", projectId);
+        return SampleMetadataField.list("project.id = ?1 and archivedOn is null order by key", owningProjectId);
     }
 
     @Transactional
     public SampleMetadataField create(Long projectId, CreateSampleMetadataFieldRequest request) {
-        Project project = requireProject(projectId);
+        Project project = requireRootProject(projectId);
         String key = validateKey(request.key());
         String label = validateLabel(request.label());
         if (SampleMetadataField.count("project.id = ?1 and key = ?2", projectId, key) > 0) {
@@ -77,6 +79,7 @@ public class SampleMetadataFieldService {
     }
 
     SampleMetadataField find(Long projectId, UUID fieldId) {
+        requireRootProject(projectId);
         return SampleMetadataField.<SampleMetadataField>find("id = ?1 and project.id = ?2", fieldId, projectId)
                 .firstResultOptional()
                 .orElseThrow(NotFoundException::new);
@@ -101,5 +104,11 @@ public class SampleMetadataFieldService {
 
     private Project requireProject(Long projectId) {
         return Project.<Project>findByIdOptional(projectId).orElseThrow(() -> new NotFoundException("Project not found"));
+    }
+
+    private Project requireRootProject(Long projectId) {
+        Project project = requireProject(projectId);
+        if (project.isSubProject()) throw new ForbiddenException("Manage metadata fields in the parent project");
+        return project;
     }
 }

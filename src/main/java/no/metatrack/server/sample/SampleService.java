@@ -3,10 +3,13 @@ package no.metatrack.server.sample;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.project.ProjectRole;
+import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
@@ -29,6 +32,9 @@ public class SampleService {
     @Inject
     SampleVocabularyService vocabularyService;
 
+    @Inject
+    ProjectRoleCheck projectRoleCheck;
+
     public List<Sample> getAllSamples(Long projectId) {
         return Sample.getAllSamplesInProject(projectId);
     }
@@ -39,11 +45,7 @@ public class SampleService {
 
     @Transactional
     public void linkSamples(Long subProjectId, List<UUID> sampleIds) {
-        Project subProject = (Project) Project.findByIdOptional(subProjectId).orElseThrow(NotFoundException::new);
-        if (!subProject.isSubProject()) {
-            throw new WebApplicationException(
-                    "Project " + subProjectId + " is not a sub-project", Response.Status.BAD_REQUEST);
-        }
+        Project subProject = requireScopeAdmin(subProjectId);
 
         for (UUID sampleId : sampleIds) {
             Sample sample = Sample.<Sample>findByIdOptional(sampleId).orElseThrow(() -> new WebApplicationException(
@@ -59,13 +61,21 @@ public class SampleService {
 
     @Transactional
     public void unlinkSamples(Long subProjectId, List<UUID> sampleIds) {
+        Project subProject = requireScopeAdmin(subProjectId);
+        subProject.linkedSamples.removeIf(sample -> sampleIds.contains(sample.id));
+    }
+
+    private Project requireScopeAdmin(Long subProjectId) {
         Project subProject = (Project) Project.findByIdOptional(subProjectId).orElseThrow(NotFoundException::new);
         if (!subProject.isSubProject()) {
             throw new WebApplicationException(
                     "Project " + subProjectId + " is not a sub-project", Response.Status.BAD_REQUEST);
         }
 
-        subProject.linkedSamples.removeIf(sample -> sampleIds.contains(sample.id));
+        if (!projectRoleCheck.isAtLeast(subProject.parentProject.id, ProjectRole.ADMIN)) {
+            throw new ForbiddenException("Only parent project administrators can change linked samples");
+        }
+        return subProject;
     }
 
     public Sample getSampleByName(String name, Long projectId) {
@@ -292,13 +302,18 @@ public class SampleService {
     @Transactional
     public void deleteSample(Long projectId, UUID sampleId) {
         Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        if (!sample.project.id.equals(projectId)) {
+            throw new ForbiddenException("Remove linked samples through a parent project administrator; delete them only in the parent project");
+        }
         sample.delete();
     }
 
     @Transactional
     public List<SampleValidationViolation> bulkPatchSamples(Long projectId, BulkPatchSampleRequest request) {
         List<SampleValidationViolation> errors = new ArrayList<>();
-        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
+        Project project = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Long owningProjectId = project.isSubProject() ? project.parentProject.id : project.id;
+        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(owningProjectId);
 
         for (var data : request.sampleData()) {
 
@@ -357,7 +372,7 @@ public class SampleService {
             if (data.county() != null) sample.county = trim(data.county());
             if (data.commune() != null) sample.commune = trim(data.commune());
             if (data.hospitalHealthInstitution() != null) sample.hospitalHealthInstitution = trim(data.hospitalHealthInstitution());
-            metadataService.apply(projectId, sample, data.customMetadata());
+            metadataService.apply(sample.project.id, sample, data.customMetadata());
             sample.modifiedOn = Instant.now();
         }
 

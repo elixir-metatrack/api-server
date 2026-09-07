@@ -60,7 +60,7 @@ public class AssayController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        Assay assay = assayService.getAssayById(assayId);
+        Assay assay = assayService.getAssayById(projectId, assayId);
         return AssayResponse.fromEntity(assay);
     }
 
@@ -96,6 +96,7 @@ public class AssayController {
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
         assayService.updateAssay(
+                projectId,
                 assayId,
                 request.name(),
                 request.studyAccession(),
@@ -141,7 +142,7 @@ public class AssayController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        assayService.deleteAssay(assayId);
+        assayService.deleteAssay(projectId, assayId);
         return Response.noContent().build();
     }
 
@@ -181,9 +182,7 @@ public class AssayController {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
-        if (!Assay.existsAssayByIdInProjectOptional(projectId, assayId)) throw new NotFoundException("Assay not found");
-
-        List<Sample> samples = assayService.getAllSamplesInAssay(assayId);
+        List<Sample> samples = assayService.getAllSamplesInAssay(projectId, assayId);
         Map<UUID, Map<String, Object>> metadata = metadataService.getActiveMetadata(samples);
 
         return samples.stream()
