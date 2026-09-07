@@ -1,3 +1,5 @@
 package no.metatrack.server.project;
 
-public record ModifyMemberRoleRequest(ProjectRole role) {}
+import jakarta.validation.constraints.NotNull;
+
+public record ModifyMemberRoleRequest(@NotNull ProjectRole role) {}
