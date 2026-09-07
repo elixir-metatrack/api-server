@@ -4,7 +4,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
@@ -70,9 +72,11 @@ public class CSVSampleSheetImportService {
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
         List<SampleValidationViolation> errors = new ArrayList<>();
+        Project targetProject = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
         List<SampleMetadataField> customFields = SampleMetadataField.list(
-                "project.id = ?1 and archivedOn is null order by key", projectId);
-        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
+                "project.id = ?1 and archivedOn is null order by key", project.id);
+        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(project.id);
 
         try {
             char delimiter = detectDelimiter(file);

@@ -16,11 +16,8 @@ public class FileService {
     }
 
     public List<File> getAllFilesInAssay(Long projectId, UUID assayId) {
-        if (!Assay.existsAssayByIdInProjectOptional(projectId, assayId)) throw new NotFoundException();
-        // Files are indexed by the assay's actual (root) project, which may differ from
-        // the sub-project id the request came in through.
-        Assay assay = (Assay) Assay.findByIdOptional(assayId).orElseThrow(NotFoundException::new);
-        return File.findInAssay(assay.project.id, assayId);
+        Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
+        return File.findInAssayInProjectScope(projectId, assay);
     }
 
     public List<File> getFilesInSampleAndAssay(Long projectId, UUID assayId, UUID sampleId) {

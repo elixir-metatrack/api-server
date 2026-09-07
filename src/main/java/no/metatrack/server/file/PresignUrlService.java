@@ -26,13 +26,12 @@ public class PresignUrlService {
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
         Assay assay = findAssayForSample(projectId, assayId, sample.id);
 
-        String virtualPath = virtualPath(projectId, assayId, sampleName, fileName);
+        String virtualPath = virtualPath(sample.project.id, assayId, sampleName, fileName);
         var existingFile = File.findByVirtualPathOptional(virtualPath);
         String objectKey = objectKeyForUpload(existingFile, virtualPath);
         if (existingFile.isPresent()) {
             File file = existingFile.get();
-            file.sample = sample;
-            file.assay = assay;
+            requireFileRelationship(file, sample, assayId);
 
             return presignUpload(objectKey, expiryInSeconds);
         }
@@ -58,8 +57,9 @@ public class PresignUrlService {
             Long projectId, UUID assayId, String sampleName, String fileName, int expiryInSeconds) {
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
         findAssayForSample(projectId, assayId, sample.id);
-        String virtualPath = virtualPath(projectId, assayId, sampleName, fileName);
+        String virtualPath = virtualPath(sample.project.id, assayId, sampleName, fileName);
         File file = File.findByVirtualPathOptional(virtualPath).orElseThrow(NotFoundException::new);
+        requireFileRelationship(file, sample, assayId);
         String url = objectStorage.presignDownload(file.objectKey, Duration.ofSeconds(expiryInSeconds));
         return new PresignedUrl(url, file.objectKey);
     }
@@ -74,11 +74,16 @@ public class PresignUrlService {
     }
 
     private Assay findAssayForSample(Long projectId, UUID assayId, UUID sampleId) {
-        return Assay.<Assay>find(
-                        "select a from Assay a join a.samples s where a.id = ?1 and a.project.id = ?2 and s.id = ?3",
-                        assayId, projectId, sampleId)
-                .firstResultOptional()
-                .orElseThrow(NotFoundException::new);
+        Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
+        if (assay.samples.stream().noneMatch(sample -> sample.id.equals(sampleId))) throw new NotFoundException();
+        return assay;
+    }
+
+    private void requireFileRelationship(File file, Sample sample, UUID assayId) {
+        if (file.sample == null || !sample.id.equals(file.sample.id)
+                || file.assay == null || !assayId.equals(file.assay.id)) {
+            throw new NotFoundException();
+        }
     }
 
     static String uploadObjectKey(String virtualPath) {
