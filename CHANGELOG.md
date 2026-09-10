@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.4.0](https://github.com/elixir-metatrack/api-server/compare/0.3.0...0.4.0) (2026-09-10)
+
+
+### Features
+
+* add CSV experiment import functionality with error handling and enhanced file validation ([ee85ba2](https://github.com/elixir-metatrack/api-server/commit/ee85ba210e703ed0a9b8ed851308476dad845ec3))
+* add endpoint for retrieving storage statistics ([46dedf4](https://github.com/elixir-metatrack/api-server/commit/46dedf4f787c29fba2bd86e7adbef18b9bf31e3b))
+* add endpoint to retrieve assays for a sample by project ([6eef196](https://github.com/elixir-metatrack/api-server/commit/6eef196c705328c374a5525fd99beba1b9199f9d))
+* add ProjectStatisticsController with storage statistics endpoint ([b40a1a4](https://github.com/elixir-metatrack/api-server/commit/b40a1a412f028f0e04057d146cc23a9b0f07e698))
+* add storage statistics aggregation ([98108d9](https://github.com/elixir-metatrack/api-server/commit/98108d931cab6f89bfe375e38e3d45417abd45ce))
+* add support for sequencing metadata and file MD5 in database schema and domain model ([d7e2d69](https://github.com/elixir-metatrack/api-server/commit/d7e2d69a3a8bf4d9d4eea85daa3533f361bb67d5))
+* enhance CSV parsing with duplicate header detection, custom metadata resolution, and additional unit tests ([0cad222](https://github.com/elixir-metatrack/api-server/commit/0cad222f8fc9ea4414c58564eff138472cfb4250))
+* include sample count in ProjectResponse ([fcb1d0e](https://github.com/elixir-metatrack/api-server/commit/fcb1d0ed28ea4869d92202f1a035fa4d81fe418a))
+* refactor CSV parsing to handle metadata fields and improve preamble handling ([c9de1e2](https://github.com/elixir-metatrack/api-server/commit/c9de1e2d664c2a45c54b1ca072e0c382238298f2))
+
+
+### Bug Fixes
+
+* **deps:** update aws-java-sdk-v2 monorepo to v2.54.10 ([849f825](https://github.com/elixir-metatrack/api-server/commit/849f8250ce8040eedf615a182073c9a5cd2b42fc))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.54.13 ([8f817e5](https://github.com/elixir-metatrack/api-server/commit/8f817e5baadd3eea64015c50790b66b8ba07c4e9))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.54.15 ([353d0dc](https://github.com/elixir-metatrack/api-server/commit/353d0dc0672c9be811c99631e3d64fc7ba9f2b30))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.54.9 ([f307d9a](https://github.com/elixir-metatrack/api-server/commit/f307d9a944d036a3c6bcd930f8c92f122cc6a119))
+* **deps:** update quarkus ecosystem to v3.39.1 ([f4987fb](https://github.com/elixir-metatrack/api-server/commit/f4987fb387083b6aebddafc3abe856823f4a89ff))
+* **deps:** update quarkus ecosystem to v3.39.2 ([7d1641d](https://github.com/elixir-metatrack/api-server/commit/7d1641d4ef749115b74729d37e223d11e9b699c4))
+* move file listing to the assay controller ([bb008fe](https://github.com/elixir-metatrack/api-server/commit/bb008fe5d34e5f5e86b7b34cfe7f0b0e5e9aae53))
+* update `getAllAssaysInSample` to return a list instead of an empty OK response ([c697aff](https://github.com/elixir-metatrack/api-server/commit/c697affb4c2e322c8c14b0d9094fb29b7a84e256))
+
+
+### Tests
+
+* add unit tests for CSVExperimentImportSupport parsing methods ([5ed1a81](https://github.com/elixir-metatrack/api-server/commit/5ed1a81f08e505bd9d598cbb36ee567dbb6f11f9))
+* add unit tests for S3 object storage and project statistics functionality ([82ba45f](https://github.com/elixir-metatrack/api-server/commit/82ba45f92ac3786933cc434500712922d8c57e7c))
+
+
+### Miscellaneous Chores
+
+* add updated templates ([749401c](https://github.com/elixir-metatrack/api-server/commit/749401c0ca27cc4ed4aa1c94d256cd4be4c5f585))
+* **deps:** update actions/setup-java action to v6 ([8f9ec7d](https://github.com/elixir-metatrack/api-server/commit/8f9ec7d3da1cb310822bd4b7a762a60c9ef76257))
+* **deps:** update maven plugins ([8309a56](https://github.com/elixir-metatrack/api-server/commit/8309a565dc420104bfb2d6b66e759d5b3de57e9a))
+* **main:** release 0.3.1-SNAPSHOT ([a13fe05](https://github.com/elixir-metatrack/api-server/commit/a13fe057c1a2c8414dfbfd968b4a3160b9eb6848))
+* remove outdated templateV1.csv file ([3fa45c8](https://github.com/elixir-metatrack/api-server/commit/3fa45c88b57b81a56b80d930b6ea6a7ed32702d8))
+
 ## [0.3.0](https://github.com/elixir-metatrack/api-server/compare/0.2.0...0.3.0) (2026-08-19)
 
 
