@@ -65,3 +65,46 @@ taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
 keycloak-admin-api/mp-rest/url: ${KEYCLOAK_BASE_URL}
 keycloak:
   realm: ${KEYCLOAK_REALM}
+
+"%prod":
+  metatrack:
+    invitation:
+      login-url: ${INVITATION_LOGIN_URL}
+      registration-url: ${INVITATION_REGISTRATION_URL}
+  quarkus:
+    mailer:
+      mock: false
+      from: ${SMTP_FROM}
+      host: ${SMTP_HOST}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USERNAME}
+      password: ${SMTP_PASSWORD}
+      start-tls: REQUIRED
+      login: REQUIRED
+      tls: false
+      tls-configuration-name: invitation
+      timeout: 30S
+    tls:
+      invitation:
+        trust-all: false
+        hostname-verification-algorithm: HTTPS
+
+"%dev":
+  metatrack:
+    invitation:
+      login-url: ${INVITATION_LOGIN_URL:http://localhost:3000/login}
+      registration-url: ${INVITATION_REGISTRATION_URL:http://localhost:3000/register}
+  quarkus:
+    mailer:
+      mock: true
+      from: invitations@example.invalid
+
+"%test":
+  metatrack:
+    invitation:
+      login-url: https://spa.example.test/login
+      registration-url: https://spa.example.test/register
+  quarkus:
+    mailer:
+      mock: true
+      from: invitations@example.invalid
