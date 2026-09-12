@@ -2,12 +2,14 @@ package no.metatrack.server.auth.keycloak;
 
 import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
+import no.metatrack.server.auth.EmailAddress;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.resteasy.reactive.RestResponse;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +51,41 @@ public class IdentityLookupService {
                     "Keycloak user lookup failed (category=" + failureCategory(exception) + ")",
                     exception
             );
+        }
+    }
+
+    public Optional<KeycloakUserRepresentation> findByEmail(String email) {
+        String normalized = EmailAddress.normalize(email);
+        try (RestResponse<List<KeycloakUserRepresentation>> response =
+                     keycloakAdminClient.searchByEmail(realm, normalized, true)) {
+            if (response.getStatus() != ResponseStatus.OK) {
+                throw new KeycloakIdentityException(
+                        "Keycloak email lookup failed (category=upstream_http, status=" + response.getStatus() + ")");
+            }
+            List<KeycloakUserRepresentation> users = response.getEntity();
+            if (users == null) {
+                throw new KeycloakIdentityException("Keycloak email lookup returned an empty response");
+            }
+            KeycloakUserRepresentation match = null;
+            for (KeycloakUserRepresentation user : users) {
+                if (user == null || !normalized.equals(EmailAddress.normalize(user.email()))) {
+                    throw new KeycloakIdentityException("Keycloak email lookup returned an unexpected match");
+                }
+                UUID subject = UUID.fromString(user.id());
+                if (!subject.toString().equalsIgnoreCase(user.id())) {
+                    throw new KeycloakIdentityException("Keycloak email lookup returned an invalid subject");
+                }
+                if (match != null) {
+                    throw new KeycloakIdentityException("Keycloak email lookup returned ambiguous matches");
+                }
+                match = user;
+            }
+            return Optional.ofNullable(match);
+        } catch (KeycloakIdentityException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new KeycloakIdentityException(
+                    "Keycloak email lookup failed (category=" + failureCategory(exception) + ")", exception);
         }
     }
 
