@@ -1,6 +1,7 @@
 package no.metatrack.server.project;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
@@ -65,14 +66,14 @@ public class ProjectService {
 
     @Transactional
     public void deleteProject(Long projectId) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
 
         project.delete();
     }
 
     @Transactional
     public void addMember(Long projectId, UUID memberId, ProjectRole role) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
 
         if (ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member already exists", Response.Status.CONFLICT);
@@ -88,7 +89,7 @@ public class ProjectService {
 
     @Transactional
     public void removeMember(Long projectId, UUID memberId) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
         if (!ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
         }
@@ -96,6 +97,7 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        ProjectMember.getEntityManager().refresh(member);
         if (member.role == ProjectRole.OWNER) {
             long ownerCount = ProjectMember.count("project.id = ?1 and role = ?2", projectId, ProjectRole.OWNER);
             if (ownerCount <= 1) {
@@ -109,7 +111,7 @@ public class ProjectService {
 
     @Transactional
     public void updateMemberRole(Long projectId, UUID memberId, ProjectRole role) {
-        Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        lockProject(projectId);
         if (!ProjectMember.isMember(memberId, projectId)) {
             throw new WebApplicationException("Member doesn't exists", Response.Status.NOT_FOUND);
         }
@@ -117,7 +119,18 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        ProjectMember.getEntityManager().refresh(member);
         member.role = role;
+    }
+
+    @Transactional
+    public Project lockProject(Long projectId) {
+        // All membership writers and invitation decisions lock the project before any child rows.
+        Project project = Project.findById(projectId, LockModeType.PESSIMISTIC_WRITE);
+        if (project == null) {
+            throw new NotFoundException();
+        }
+        return project;
     }
 
     public Project getProjectById(long id) {
