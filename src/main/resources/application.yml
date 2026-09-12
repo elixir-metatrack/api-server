@@ -1,4 +1,7 @@
 quarkus:
+  mailer:
+    log-invalid-recipients: false
+    log-rejected-recipients: false
   http:
     cors:
       enabled: true
@@ -43,6 +46,10 @@ quarkus:
     path: /openapi
     always-include: true
 metatrack:
+  invitation:
+    expiry: ${INVITATION_EXPIRY:P7D}
+    resend-cooldown: ${INVITATION_RESEND_COOLDOWN:PT60S}
+    sending-timeout: ${INVITATION_SENDING_TIMEOUT:PT5M}
   s3:
     endpoint: ${S3_ENDPOINT}
     region: ${S3_REGION}
