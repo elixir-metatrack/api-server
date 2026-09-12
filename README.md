@@ -97,6 +97,8 @@ Run the native executable: `./target/server-1.0-SNAPSHOT-runner`
 src/main/java/no/metatrack/server/
 ├── auth/       # OIDC authentication and user management
 ├── project/    # Project lifecycle, memberships, and roles
+├── invitation/ # Immediate invitation email delivery and resend coordination
+├── notification/ # Persistent recipient inbox and post-login invitation claiming
 ├── sample/     # Sample management and CSV/TSV import
 ├── assay/      # Assay grouping and sample associations
 ├── file/       # File metadata, generic S3 URLs, and upload reconciliation
@@ -112,6 +114,108 @@ src/main/resources/
 
 When the application is running, the OpenAPI UI (scalar) is available at:
 `http://localhost:1234/scalar`.
+
+## Email Invitations and Notifications
+
+Project `ADMIN` and `OWNER` members can invite an email address with `VIEWER`, `EDITOR`, or `ADMIN` access,
+never above their own authority. Invitations cannot grant `OWNER`. Both registered and unregistered recipients
+receive email naming the inviter and project. No account is created and no membership is granted until acceptance.
+Existing direct-membership and user-initiated join-request APIs remain separate and compatible.
+
+### SPA API Contract
+
+Every route requires the SPA's normal bearer access token. Project administration routes also require project
+administrator authority. Request and response schemas are published in OpenAPI at `/q/openapi`.
+
+| Method and path | Behavior |
+|---|---|
+| `POST /api/projects/{projectId}/invitations` | Send `{ "email": "person@example.org", "role": "VIEWER" }`; returns `201` with the saved invitation and delivery outcome, even if SMTP fails |
+| `GET /api/projects/{projectId}/invitations?page=0&size=20` | Paginated administrative invitation list, including delivery outcomes |
+| `POST /api/projects/{projectId}/invitations/{id}/resend` | Explicit delivery attempt for a pending invitation; rechecks registration without extending expiry |
+| `DELETE /api/projects/{projectId}/invitations/{id}` | Revoke a pending invitation |
+| `POST /api/invitations/{id}/accept` | Recipient-only acceptance; creates membership transactionally |
+| `POST /api/invitations/{id}/decline` | Recipient-only decline; does not create membership |
+| `POST /api/notifications/sync` | Materialize eligible invitations using verified token identity; no email input |
+| `GET /api/notifications?page=0&size=20&unread=true` | Private paginated inbox, including total unread count and invitation actionability |
+| `PATCH /api/notifications/{id}` | Send `{ "read": true }` or `{ "read": false }`; changes only the caller's read state |
+
+Pagination uses zero-based pages and sizes from 1 to 100. Omit `unread` for all notifications; `false` selects read
+notifications. Treat display content as text, not HTML. Read state and invitation decisions are independent.
+
+After each successful sign-in, call synchronization, then load the inbox. A new recipient must complete registration,
+verify their email, and obtain a fresh access token containing verified email claims before synchronization can claim
+an invitation. Registration alone does not join a project. Synchronization is idempotent and never accepts an email
+address from the browser. Existing-account invitations are bound to the original Keycloak subject and cannot be
+claimed by a different account with the same email. Acceptance and decline also require a verified matching email.
+
+Use the returned invitation status/actionability to render actions, then refresh the inbox and project memberships
+after a decision. Server-side authorization remains decisive if state changes after listing. Repeating the same
+terminal decision succeeds; switching decisions fails. Existing membership roles are never replaced by acceptance.
+An inviter who loses sufficient authority can no longer grant access through an outstanding invitation.
+
+Invitation states are `PENDING`, `ACCEPTED`, `DECLINED`, `REVOKED`, and `EXPIRED`. Expiry is enforced on requests,
+without a scheduled worker. Self-invitations, existing members, and duplicate active project/email invitations are
+rejected. A fresh invitation can be created after expiry, decline, or revocation. Email matching trims whitespace and
+normalizes case without provider-specific alias rewriting. Responses do not reveal whether the recipient is registered.
+
+Errors: `400` invalid input/role/pagination; `401` unauthenticated; `403` insufficient authority or missing verified-email
+context; `404` inaccessible recipient resources; `409` duplicate, expired, or conflicting decision; `429` resend cooldown.
+Keycloak lookup failures use the existing upstream-error mapping and are never interpreted as an unregistered user.
+
+### Delivery and Resend UX
+
+Invitations and existing-account notifications commit before SMTP is attempted. Delivery is immediate, outside the
+database transaction, with no queue, automatic retries, or real-time push. Preserve the invitation ID after `201`:
+do not repeat creation to recover from mail failure; offer an explicit resend action instead.
+
+Responses include `deliveryStatus`, `deliveryAttemptedOn`, `deliveryCompletedOn`, and `deliveryRetryAfter`:
+
+- `NOT_ATTEMPTED`: no delivery attempt has been claimed.
+- `SENDING`: an attempt is in progress.
+- `SENT`: SMTP accepted the message; this does not confirm inbox delivery.
+- `FAILED`: a known pre-send failure prevented delivery.
+- `UNKNOWN`: delivery could not be confirmed, including SMTP errors/timeouts or an abandoned attempt.
+
+Respect `deliveryRetryAfter` before offering resend. Unresolved attempts become uncertain after the sending timeout;
+late results cannot overwrite newer attempts. Explicitly retrying uncertain delivery may send a duplicate email:
+SMTP cannot provide exactly-once delivery. Resend checks registration again, so a newly registered user receives the
+sign-in variant. Neither delivery failure nor resend extends the original invitation expiry.
+
+### Keycloak and SPA Prerequisites
+
+- Enable realm self-registration and email verification; configure Keycloak's own verification-email transport.
+- Enforce unique email addresses in the realm. Ambiguous exact-email search results are rejected, not guessed.
+- Include `email` and boolean `email_verified` claims in API access tokens, and retain the stable UUID `sub` claim.
+- Grant the existing confidential admin client's service account only the realm user-search/read permissions needed
+  for exact email and ID lookup (for example the applicable `query-users`/`view-users` permissions or fine-grained
+  equivalent); do not grant user-creation or realm-administration privileges solely for invitations.
+- Configure approved SPA redirect URIs and normal authorization-code flow with PKCE and OIDC state validation.
+- Provide trusted SPA `/login` and `/register` entry routes. The registration route initiates Keycloak registration
+  through the SPA's OIDC library and returns to the inbox after authentication. Do not use a static Keycloak
+  authorization URL missing state/PKCE. No bearer invitation token or client-supplied redirect is used.
+
+### SMTP and Invitation Configuration
+
+Production requires the following environment-backed settings in `application.yml`:
+
+| Variable | Meaning / default |
+|---|---|
+| `SMTP_FROM` | Sender email address |
+| `SMTP_HOST` | SMTP server hostname |
+| `SMTP_PORT` | SMTP submission port; `587` |
+| `SMTP_USERNAME` | SMTP authentication user |
+| `SMTP_PASSWORD` | SMTP secret; inject through deployment secret management |
+| `INVITATION_LOGIN_URL` | Absolute HTTPS SPA sign-in entry URL |
+| `INVITATION_REGISTRATION_URL` | Absolute HTTPS SPA registration entry URL |
+| `INVITATION_EXPIRY` | Invitation lifetime; `P7D` |
+| `INVITATION_RESEND_COOLDOWN` | Cooldown after completed attempts; `PT60S` |
+| `INVITATION_SENDING_TIMEOUT` | Unresolved-attempt timeout; `PT5M`, at least the positive cooldown |
+
+Entry URLs must not contain credentials, query strings, or fragments. Production requires authenticated STARTTLS,
+certificate/hostname verification, and disables mock delivery; mailer timeout is 30 seconds. Development and tests
+mock mail, with SPA entry defaults `http://localhost:3000/login` and `http://localhost:3000/register`.
+Do not log raw recipient emails, SMTP credentials, access tokens, or Keycloak response bodies. Apply Flyway migrations
+before serving the new endpoints; project deletion cascades to invitation-linked notifications.
 
 ## Sample Controlled Vocabularies
 
@@ -231,6 +335,12 @@ Integration tests can be run with:
 ```shell
 ./mvnw verify
 ```
+
+Invitation/notification PostgreSQL tests are opt-in. Point them only at a disposable test database using
+`INVITATION_TEST_JDBC_URL`, `INVITATION_TEST_DB_USER`, and `INVITATION_TEST_DB_PASSWORD`, then run `./mvnw test`.
+These tests exercise Flyway, transactional acceptance, concurrent decisions/delivery claims, notification deduplication,
+rollback, and deletion cleanup with mocked Keycloak and SMTP; without the variables the database tests are skipped.
+Never point this test configuration at production data.
 
 ## Releases
 
