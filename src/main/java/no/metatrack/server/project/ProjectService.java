@@ -73,7 +73,7 @@ public class ProjectService {
 
     @Transactional
     public void deleteProject(Long projectId) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project project = lockProject(projectId);
 
         if (!project.subProjects.isEmpty()) {
             throw new WebApplicationException(
@@ -112,6 +112,7 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        ProjectMember.getEntityManager().refresh(member);
         if (member.role == ProjectRole.OWNER) {
             requireOwner(projectId);
             requireAnotherOwner(projectId);
@@ -131,13 +132,15 @@ public class ProjectService {
         ProjectMember member =
                 ProjectMember.findMemberInProjectOptional(memberId, projectId).orElseThrow(NotFoundException::new);
 
+        ProjectMember.getEntityManager().refresh(member);
         if (member.role == ProjectRole.OWNER || role == ProjectRole.OWNER) requireOwner(projectId);
         if (member.role == ProjectRole.OWNER && role != ProjectRole.OWNER) requireAnotherOwner(projectId);
         member.role = role;
     }
 
-    private Project lockProject(Long projectId) {
-        // Serialize membership changes so concurrent requests cannot remove both remaining owners.
+    @Transactional
+    public Project lockProject(Long projectId) {
+        // All membership writers and invitation decisions lock the project before any child rows.
         return Project.<Project>findByIdOptional(projectId, LockModeType.PESSIMISTIC_WRITE)
                 .orElseThrow(NotFoundException::new);
     }

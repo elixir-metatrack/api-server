@@ -120,8 +120,8 @@ public class Sample extends PanacheEntityBase {
     @ManyToMany(mappedBy = "linkedSamples")
     public Set<Project> linkedInSubProjects = new HashSet<>();
 
-    public static boolean sampleExists(Long sampleId) {
-        return findByIdOptional(sampleId).isPresent();
+    public static boolean sampleExistsInProject(UUID sampleId, Long projectId) {
+        return count("id = ?1 and project.id = ?2", sampleId, projectId) > 0;
     }
 
     public static Optional<Sample> findSampleById(UUID sampleId) {
@@ -177,5 +177,9 @@ public class Sample extends PanacheEntityBase {
         return list("select s from Sample s join s.assays a join s.linkedInSubProjects lp "
                         + "where a.id = ?1 and lp.id = ?2 and a.project.id = ?3 and s.project.id = ?3",
                 assayId, projectId, project.parentProject.id);
+    }
+
+    public static List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {
+        return list("select a from Assay a join a.samples s where s.id = ?1 and a.project.id = ?2", sampleId, projectId);
     }
 }

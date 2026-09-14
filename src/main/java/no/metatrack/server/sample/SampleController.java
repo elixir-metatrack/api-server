@@ -6,6 +6,9 @@ import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import no.metatrack.server.assay.Assay;
+import no.metatrack.server.assay.AssayResponse;
+import no.metatrack.server.assay.AssayService;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.FileIngestService;
 import no.metatrack.server.file.FileResponse;
@@ -49,6 +52,9 @@ public class SampleController {
 
     @Inject
     SampleMetadataService metadataService;
+
+    @Inject
+    AssayService assayService;
 
     @GET
     @Authenticated
@@ -295,5 +301,18 @@ public class SampleController {
 
         sampleService.unlinkSamples(projectId, request.sampleIds());
         return Response.noContent().build();
+    }
+
+    @GET
+    @Authenticated
+    @Path("/{sampleId}/assays")
+    public List<AssayResponse> getAllAssaysInSample(
+            @PathParam("projectId") Long projectId, @PathParam("sampleId") UUID sampleId) {
+
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)) throw new ForbiddenException();
+
+        List<Assay> assays = assayService.getAllAssaysInSample(projectId, sampleId);
+        return assays.stream().map(AssayResponse::fromEntity).toList();
     }
 }

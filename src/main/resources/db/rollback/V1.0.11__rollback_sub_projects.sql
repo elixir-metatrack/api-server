@@ -1,4 +1,4 @@
--- Manual rollback for V1.0.9__add_sub_projects.sql
+-- Manual rollback for V1.0.11__add_sub_projects.sql
 --
 -- Flyway Community Edition does not support automatic "undo" migrations
 -- (that's a Flyway Teams feature). This script is NOT picked up by Flyway
@@ -10,11 +10,11 @@
 --
 -- How to run:
 --   docker exec -i pg-metatrack psql -U metatrack -d metatrack \
---     < src/main/resources/db/rollback/V1.0.9__rollback_sub_projects.sql
+--     < src/main/resources/db/rollback/V1.0.11__rollback_sub_projects.sql
 --
 -- After running this, also remove the corresponding row from
--- flyway_schema_history so Flyway doesn't think V1.0.9 is still applied:
---   DELETE FROM flyway_schema_history WHERE version = '1.0.9';
+-- flyway_schema_history so Flyway doesn't think V1.0.11 is still applied:
+--   DELETE FROM flyway_schema_history WHERE version = '1.0.11';
 
 -- Delete any sub-projects first (their samples/assays stay - they belong to
 -- the root project already, this only removes the sub-project rows).
