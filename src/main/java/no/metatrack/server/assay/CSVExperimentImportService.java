@@ -98,14 +98,14 @@ public class CSVExperimentImportService {
 
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
         int rowErrorCount = errors.size();
-        Set<String> rowReferences = new HashSet<>(importedReferences);
+        Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
         prepareFile(projectId, assay, sample.get(), value(record, "File Name"), value(record, "File md5"),
-                value(record, "File Unencrypted md5"), row, "File Name", rowReferences, pendingFiles, errors);
+                value(record, "File Unencrypted md5"), row, "File Name", importedReferences, rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Forward File Name"), value(record, "Forward File md5"),
-                value(record, "Forward File Unencrypted md5"), row, "Forward File Name", rowReferences, pendingFiles, errors);
+                value(record, "Forward File Unencrypted md5"), row, "Forward File Name", importedReferences, rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Reverse File Name"), value(record, "Reverse File md5"),
-                value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", rowReferences, pendingFiles, errors);
+                value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", importedReferences, rowReferences, pendingFiles, errors);
         if (errors.size() > rowErrorCount || hasError(errors, row, "Insert Size")) return;
 
         assay.instrumentModel = value(record, "Sequencing instrument");
@@ -126,14 +126,14 @@ public class CSVExperimentImportService {
 
     private void prepareFile(Long projectId, Assay assay, Sample sample, String fileName, String md5,
             String unencryptedMd5, String row, String field, Set<String> importedReferences,
-            List<PendingFile> pendingFiles, List<CSVExperimentRowError> errors) {
+            Set<String> rowReferences, List<PendingFile> pendingFiles, List<CSVExperimentRowError> errors) {
         boolean valid = true;
         if (fileName == null || fileName.isBlank()) {
             errors.add(new CSVExperimentRowError(row, field, fileName, "File name is required"));
             valid = false;
         } else {
             String reference = PresignUrlService.virtualPath(projectId, assay.id, sample.name, fileName);
-            if (!importedReferences.add(reference)) {
+            if (importedReferences.contains(reference) || !rowReferences.add(reference)) {
                 errors.add(new CSVExperimentRowError(row, field, fileName, "Duplicate file reference in import"));
                 valid = false;
             }
