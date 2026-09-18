@@ -5,6 +5,8 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
+import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.PresignUrlService;
@@ -18,15 +20,30 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 @ApplicationScoped
 public class CSVExperimentImportService {
+    private static final Map<String, String> VOCABULARY_HEADERS = Map.of(
+            "instrument_model", "Sequencing instrument",
+            "library_name", "Library Name",
+            "library_source", "Library Source",
+            "library_selection", "Library Selection",
+            "library_strategy", "Library Strategy",
+            "library_layout", "Library Layout",
+            "sequencing_platform", "Sequencing platform",
+            "sequencing_laboratory", "Sequencing Laboratory");
+
     @Inject
     CSVImportSupport csvImportSupport;
+
+    @Inject
+    AssayVocabularyService vocabularyService;
 
     @Transactional
     public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
@@ -38,10 +55,11 @@ public class CSVExperimentImportService {
 
         List<CSVExperimentRowError> errors = new ArrayList<>();
         Set<String> importedReferences = new HashSet<>();
+        AssayVocabularyRules rules = vocabularyService.loadRules();
         try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
             skipBom(reader);
             for (CSVRecord record : csvImportSupport.prepareRecords(reader, csvImportSupport.detectDelimiter(file))) {
-                importRecord(projectId, assay, record, errors, importedReferences);
+                importRecord(projectId, assay, record, errors, importedReferences, rules);
             }
         } catch (IOException e) {
             throw new BadRequestException("Unable to read CSV file", e);
@@ -50,7 +68,7 @@ public class CSVExperimentImportService {
     }
 
     private void importRecord(Long projectId, Assay assay, CSVRecord record, List<CSVExperimentRowError> errors,
-            Set<String> importedReferences) {
+            Set<String> importedReferences, AssayVocabularyRules rules) {
         String sampleName = value(record, "Sample");
         String row = "Row " + record.getRecordNumber();
         if (sampleName == null || sampleName.isBlank()) {
@@ -69,15 +87,25 @@ public class CSVExperimentImportService {
             return;
         }
 
+        Map<String, String> metadata = new LinkedHashMap<>();
+        VOCABULARY_HEADERS.forEach((field, header) -> metadata.put(field, value(record, header)));
+        var violations = AssayVocabularyService.validate(rules, assay.name, metadata);
+        if (!violations.isEmpty()) {
+            violations.forEach(violation -> errors.add(new CSVExperimentRowError(row,
+                    VOCABULARY_HEADERS.get(violation.field()), metadata.get(violation.field()), violation.message())));
+            return;
+        }
+
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
         int rowErrorCount = errors.size();
+        Set<String> rowReferences = new HashSet<>(importedReferences);
         List<PendingFile> pendingFiles = new ArrayList<>();
         prepareFile(projectId, assay, sample.get(), value(record, "File Name"), value(record, "File md5"),
-                value(record, "File Unencrypted md5"), row, "File Name", importedReferences, pendingFiles, errors);
+                value(record, "File Unencrypted md5"), row, "File Name", rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Forward File Name"), value(record, "Forward File md5"),
-                value(record, "Forward File Unencrypted md5"), row, "Forward File Name", importedReferences, pendingFiles, errors);
+                value(record, "Forward File Unencrypted md5"), row, "Forward File Name", rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Reverse File Name"), value(record, "Reverse File md5"),
-                value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", importedReferences, pendingFiles, errors);
+                value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", rowReferences, pendingFiles, errors);
         if (errors.size() > rowErrorCount || hasError(errors, row, "Insert Size")) return;
 
         assay.instrumentModel = value(record, "Sequencing instrument");
@@ -93,6 +121,7 @@ public class CSVExperimentImportService {
         assay.addSample(sample.get());
         pendingFiles.forEach(pendingFile -> File.importPending(projectId, assay.id, sample.get(), assay,
                 pendingFile.fileName(), pendingFile.md5(), pendingFile.unencryptedMd5()));
+        importedReferences.addAll(rowReferences);
     }
 
     private void prepareFile(Long projectId, Assay assay, Sample sample, String fileName, String md5,
