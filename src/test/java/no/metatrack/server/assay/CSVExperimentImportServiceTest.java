@@ -143,6 +143,24 @@ class CSVExperimentImportServiceTest {
     }
 
     @Test
+    void duplicateWithinRowDoesNotReserveReferencesForLaterRows() throws Exception {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(),
+                    row("platform", "lab", "100").replace("forward.fastq", "reads.fastq")
+                            + row("platform", "lab", "200"));
+            assertEquals(1, errors.size());
+            assertEquals("Row 1", errors.getFirst().row());
+            assertEquals("Forward File Name", errors.getFirst().field());
+            assertEquals("Duplicate file reference in import", errors.getFirst().message());
+            assertEquals(200, assay.insertSize);
+            verify(assay, times(1)).addSample(sample);
+            for (String name : List.of("reads.fastq", "forward.fastq", "reverse.fastq")) {
+                files.verify(() -> File.importPending(1L, assay.id, sample, assay, name, "md5", null), times(1));
+            }
+        }
+    }
+
+    @Test
     void invalidInsertSizeDoesNotReserveReferencesButSuccessfulRowsDo() throws Exception {
         try (MockedStatic<File> files = mockStatic(File.class)) {
             var errors = importRows(Map.of(), row("platform", "lab", "invalid")
