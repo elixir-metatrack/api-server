@@ -356,10 +356,12 @@ assay affects only that sample's relationship and file metadata; hidden samples 
 Samples created individually or through CSV in a sub-project belong to the root project and are automatically linked
 into that sub-project. Metadata fields and vocabulary rules are inherited from the root; their definitions must be
 managed there. File upload/download paths use the root project ID while access is checked against the requested scope.
+Per-sample assay lists and project storage statistics also respect the linked sample scope.
 
-The sub-project migration is `V1.0.11`; `V1.0.9` and `V1.0.10` are used by invitations and delivery on `main`.
-Development databases that already applied the earlier `V1.0.9__add_sub_projects.sql` need their schema and Flyway
-history reconciled before starting this version. Renaming the migration file does not update existing databases.
+The sub-project migration is `V1.0.12`; `V1.0.9` and `V1.0.10` are used by invitations and delivery, and
+`V1.0.11` is used by global assay vocabularies on `main`. Development databases that already applied an earlier
+`V1.0.9__add_sub_projects.sql` or `V1.0.11__add_sub_projects.sql` need their schema and Flyway history reconciled
+before starting this version. Renaming the migration file does not update existing databases.
 
 ## Releases
 

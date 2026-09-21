@@ -1,20 +1,29 @@
 package no.metatrack.server.assay;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.assay.vocabulary.AssayValidationViolation;
+import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
+import no.metatrack.server.assay.vocabulary.AssayVocabularyValidationException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
 public class AssayService {
+
+    @Inject
+    AssayVocabularyService vocabularyService;
 
     public Assay getAssayById(Long projectId, UUID assayId) {
         return Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
@@ -42,6 +51,8 @@ public class AssayService {
         }
         Project owningProject = targetProject;
 
+        validate(name, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout);
         Assay assay = new Assay();
         assay.name = name;
         assay.studyAccession = studyAccession;
@@ -74,6 +85,8 @@ public class AssayService {
             String libraryLayout,
             Integer insertSize) {
         Assay assay = getAssayById(projectId, assayId);
+        validate(name != null ? name : assay.name, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout);
         if (name != null) assay.name = name;
         if (studyAccession != null) assay.studyAccession = studyAccession;
         if (instrumentModel != null) assay.instrumentModel = instrumentModel;
@@ -84,6 +97,21 @@ public class AssayService {
         if (libraryLayout != null) assay.libraryLayout = libraryLayout;
         if (insertSize != null) assay.insertSize = insertSize;
         assay.modifiedOn = Instant.now();
+    }
+
+    private void validate(
+            String name, String studyAccession, String instrumentModel, String libraryName,
+            String librarySource, String librarySelection, String libraryStrategy, String libraryLayout) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("study_accession", studyAccession);
+        values.put("instrument_model", instrumentModel);
+        values.put("library_name", libraryName);
+        values.put("library_source", librarySource);
+        values.put("library_selection", librarySelection);
+        values.put("library_strategy", libraryStrategy);
+        values.put("library_layout", libraryLayout);
+        List<AssayValidationViolation> violations = vocabularyService.validate(name, values);
+        if (!violations.isEmpty()) throw new AssayVocabularyValidationException(violations);
     }
 
     @Transactional
@@ -139,7 +167,7 @@ public class AssayService {
     }
 
     public List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {
-        if (!Sample.sampleExistsInProject(sampleId, projectId)) throw new NotFoundException();
-        return Sample.getAllAssaysInSample(projectId, sampleId);
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        return Sample.getAllAssaysInSample(sample.project.id, sampleId);
     }
 }
