@@ -1,11 +1,10 @@
 package no.metatrack.server.assay;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,19 +39,19 @@ class CSVExperimentImportServiceTest {
         assay.id = UUID.randomUUID();
         assay.name = "assay";
         sample.name = "sample";
+        sample.id = UUID.randomUUID();
+        assay.project = new Project();
+        assay.project.id = 1L;
+        assay.samples.add(sample);
+        sample.assays.add(assay);
         service.csvImportSupport = new CSVImportSupport();
         service.vocabularyService = mock(AssayVocabularyService.class);
         when(service.vocabularyService.loadRules()).thenReturn(new AssayVocabularyRules(terms));
         Path csv = Files.writeString(directory.resolve("experiments.csv"), HEADER + rows);
-        PanacheQuery<Assay> assays = mock(PanacheQuery.class);
-        PanacheQuery<Sample> samples = mock(PanacheQuery.class);
-        when(assays.firstResultOptional()).thenReturn(Optional.of(assay));
-        when(samples.firstResultOptional()).thenReturn(Optional.of(sample));
-        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
-            entities.when(() -> Assay.find("id = ?1 and project.id = ?2", assay.id, 1L)).thenReturn(assays);
-            entities.when(() -> Sample.find(
-                    "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
-                            + "where a = ?3 and s = Sample)", 1L, "sample", assay)).thenReturn(samples);
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class);
+             MockedStatic<Sample> samples = mockStatic(Sample.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, assay.id)).thenReturn(Optional.of(assay));
+            samples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(Optional.of(sample));
             return service.importIntoAssay(1L, assay.id, csv.toFile());
         }
     }
@@ -94,8 +93,8 @@ class CSVExperimentImportServiceTest {
             assertNull(assay.libraryLayout);
             assertEquals(50, assay.insertSize);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
-            assertTrue(assay.samples.isEmpty());
-            assertTrue(sample.assays.isEmpty());
+            assertEquals(Set.of(sample), assay.samples);
+            assertEquals(Set.of(assay), sample.assays);
             verify(assay, never()).addSample(any());
             files.verifyNoInteractions();
         }

@@ -1,11 +1,14 @@
 package no.metatrack.server.project;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.WebApplicationException;
+import no.metatrack.server.auth.CurrentUser;
+import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.VerifiedEmailIdentity;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -16,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -23,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @QuarkusTest
 @TestProfile(ProjectInvitationPostgresProfile.class)
@@ -64,6 +69,9 @@ class ProjectInvitationPostgresTest {
 
     @Test
     void rolesSelfMembersDuplicatesAndNewAccountBinding() {
+        UserService users = mock(UserService.class);
+        when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner.toString(), "Owner", Set.of(), null, null, null));
+        QuarkusMock.installMockForType(users, UserService.class);
         for (ProjectRole role : ProjectRole.values()) {
             UUID actor = UUID.randomUUID();
             projects.addMember(projectId, actor, role);

@@ -23,15 +23,14 @@ class AssayControllerTest {
         controller.assayService = mock(AssayService.class);
         controller.metadataService = mock(SampleMetadataService.class);
 
-        try (MockedStatic<Project> project = mockStatic(Project.class);
-             MockedStatic<Assay> assay = mockStatic(Assay.class)) {
+        try (MockedStatic<Project> project = mockStatic(Project.class)) {
             project.when(() -> Project.projectExists(projectId)).thenReturn(true);
             when(controller.projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER)).thenReturn(true);
-            assay.when(() -> Assay.existsAssayByIdInProjectOptional(projectId, assayId)).thenReturn(false);
+            when(controller.assayService.getAllSamplesInAssay(projectId, assayId)).thenThrow(new NotFoundException());
 
             assertThrows(NotFoundException.class, () -> controller.getSamplesInAssay(projectId, assayId));
 
-            verifyNoInteractions(controller.assayService, controller.metadataService);
+            verifyNoInteractions(controller.metadataService);
         }
     }
 }

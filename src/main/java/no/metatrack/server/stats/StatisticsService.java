@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.ObjectStorage;
@@ -80,7 +81,9 @@ public class StatisticsService {
     }
 
     public StorageStatistics getProjectStorageStatistics(Long projectId) {
-        return aggregateStorage(File.findUploadedObjectKeysInProject(projectId), projectId + "/");
+        Project project = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Long owningProjectId = project.isSubProject() ? project.parentProject.id : project.id;
+        return aggregateStorage(File.findUploadedObjectKeysInProject(projectId), owningProjectId + "/");
     }
 
     private StorageStatistics aggregateStorage(List<String> trackedObjectKeys, String prefix) {

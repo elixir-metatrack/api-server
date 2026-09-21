@@ -41,6 +41,27 @@ public class Project extends PanacheEntity {
     @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     public Set<SampleVocabulary> sampleVocabularies = new HashSet<>();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_project_id")
+    public Project parentProject;
+
+    @OneToMany(mappedBy = "parentProject", fetch = FetchType.LAZY)
+    public Set<Project> subProjects = new HashSet<>();
+
+    // Only meaningful for sub-projects: the subset of the parent project's samples
+    // this sub-project has been given access to. Samples always physically belong
+    // to their root project (see Sample.project) - this is a visibility link, not ownership.
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "project_sample",
+            joinColumns = @JoinColumn(name = "project_id"),
+            inverseJoinColumns = @JoinColumn(name = "sample_id"))
+    public Set<Sample> linkedSamples = new HashSet<>();
+
+    public boolean isSubProject() {
+        return parentProject != null;
+    }
+
     public static boolean projectExists(Long projectId) {
         return findByIdOptional(projectId).isPresent();
     }
@@ -52,5 +73,9 @@ public class Project extends PanacheEntity {
     public static List<Project> findProjectsByMember(UUID userId) {
         return find("select distinct pm.project from ProjectMember pm where pm.memberId = ?1", userId)
                 .list();
+    }
+
+    public static List<Project> findSubProjects(Long parentProjectId) {
+        return list("parentProject.id = ?1", parentProjectId);
     }
 }

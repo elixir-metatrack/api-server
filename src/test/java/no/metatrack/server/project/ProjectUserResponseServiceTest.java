@@ -1,6 +1,7 @@
 package no.metatrack.server.project;
 
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
+import no.metatrack.server.auth.keycloak.KeycloakIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,19 +16,20 @@ import static org.mockito.Mockito.when;
 
 class ProjectUserResponseServiceTest {
     @Test
-    void memberResponsesIncludeResolvedAndMissingUsernames() {
+    void memberResponsesIncludeResolvedAndMissingIdentities() {
         IdentityLookupService identities = mock(IdentityLookupService.class);
         UUID foundId = UUID.randomUUID();
         UUID missingId = UUID.randomUUID();
-        when(identities.usernames(List.of(foundId, missingId)))
-                .thenReturn(Map.of(foundId, Optional.of("member@example.org"), missingId, Optional.empty()));
+        when(identities.identities(List.of(foundId, missingId)))
+                .thenReturn(Map.of(foundId, Optional.of(new KeycloakIdentity("member", "member@example.org")),
+                        missingId, Optional.empty()));
         ProjectMember found = member(foundId, ProjectRole.EDITOR);
         ProjectMember missing = member(missingId, ProjectRole.VIEWER);
 
         List<ProjectMemberResponse> responses = new ProjectMemberService(identities).toResponses(List.of(found, missing));
 
-        assertEquals(new ProjectMemberResponse(foundId, "member@example.org", ProjectRole.EDITOR), responses.getFirst());
-        assertEquals(new ProjectMemberResponse(missingId, null, ProjectRole.VIEWER), responses.getLast());
+        assertEquals(new ProjectMemberResponse(foundId, "member", "member@example.org", ProjectRole.EDITOR), responses.getFirst());
+        assertEquals(new ProjectMemberResponse(missingId, null, null, ProjectRole.VIEWER), responses.getLast());
     }
 
     @Test

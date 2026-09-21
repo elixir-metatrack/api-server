@@ -11,6 +11,7 @@ public record ProjectResponse(
         String ownerUsername,
         long sampleCount,
         Instant createdOn,
-        Instant modifiedOn
+        Instant modifiedOn,
+        Long parentProjectId
 ) {
 }

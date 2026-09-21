@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.sample.Sample;
 import org.jboss.logging.Logger;
 
 import java.util.UUID;
@@ -17,7 +18,8 @@ public class FileIngestService {
     ObjectStorage objectStorage;
 
     @Transactional
-    public void deleteFile(UUID fileUuid, UUID sampleId) {
+    public void deleteFile(Long projectId, UUID fileUuid, UUID sampleId) {
+        Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
         File file = File.<File>find("uuid = ?1 and sample.id = ?2", fileUuid, sampleId)
                 .firstResultOptional()
                 .orElseThrow(() -> new NotFoundException("File not found"));

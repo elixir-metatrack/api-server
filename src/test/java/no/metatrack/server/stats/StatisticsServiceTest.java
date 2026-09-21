@@ -1,8 +1,10 @@
 package no.metatrack.server.stats;
 
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import no.metatrack.server.file.File;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.file.ObjectStorage;
 import no.metatrack.server.file.StorageObjectMetadata;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +14,7 @@ import org.mockito.MockedStatic;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.contains;
@@ -121,7 +124,11 @@ class StatisticsServiceTest {
 
     @Test
     void scopesProjectListingAndPreventsDuplicateCounts() {
-        try (MockedStatic<File> files = mockStatic(File.class)) {
+        Project project = new Project();
+        project.id = 42L;
+        try (MockedStatic<File> files = mockStatic(File.class);
+             MockedStatic<PanacheEntityBase> projects = mockStatic(PanacheEntityBase.class)) {
+            projects.when(() -> Project.findByIdOptional(42L)).thenReturn(Optional.of(project));
             files.when(() -> File.findUploadedObjectKeysInProject(42L))
                     .thenReturn(List.of("42/tracked", "42/tracked"));
             when(objectStorage.listObjects("42/")).thenReturn(List.of(

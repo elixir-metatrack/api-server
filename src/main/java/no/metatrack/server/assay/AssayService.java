@@ -3,6 +3,7 @@ package no.metatrack.server.assay;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.vocabulary.AssayValidationViolation;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
@@ -24,8 +25,8 @@ public class AssayService {
     @Inject
     AssayVocabularyService vocabularyService;
 
-    public Assay getAssayById(UUID assayId) {
-        return (Assay) Assay.findByIdOptional(assayId).orElseThrow(NotFoundException::new);
+    public Assay getAssayById(Long projectId, UUID assayId) {
+        return Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
     }
 
     public List<Assay> getAllAssaysInProject(Long projectId) {
@@ -44,7 +45,12 @@ public class AssayService {
             String librarySelection,
             String libraryLayout,
             Integer insertSize) {
-        Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (targetProject.isSubProject()) {
+            throw new ForbiddenException("Create experiments in the parent project");
+        }
+        Project owningProject = targetProject;
+
         validate(name, studyAccession, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout);
         Assay assay = new Assay();
@@ -57,16 +63,17 @@ public class AssayService {
         assay.libraryStrategy = libraryStrategy;
         assay.libraryLayout = libraryLayout;
         assay.insertSize = insertSize;
-        assay.project = project;
+        assay.project = owningProject;
         assay.createdOn = Instant.now();
         assay.modifiedOn = Instant.now();
 
-        project.assays.add(assay);
+        owningProject.assays.add(assay);
         return assay;
     }
 
     @Transactional
     public void updateAssay(
+            Long projectId,
             UUID assayId,
             String name,
             String studyAccession,
@@ -77,7 +84,7 @@ public class AssayService {
             String libraryStrategy,
             String libraryLayout,
             Integer insertSize) {
-        Assay assay = getAssayById(assayId);
+        Assay assay = getAssayById(projectId, assayId);
         validate(name != null ? name : assay.name, studyAccession, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout);
         if (name != null) assay.name = name;
@@ -108,14 +115,17 @@ public class AssayService {
     }
 
     @Transactional
-    public void deleteAssay(UUID assayId) {
-        Assay assay = getAssayById(assayId);
+    public void deleteAssay(Long projectId, UUID assayId) {
+        Assay assay = getAssayById(projectId, assayId);
+        if (!assay.project.id.equals(projectId)) {
+            throw new ForbiddenException("Delete shared experiments from the parent project");
+        }
         assay.delete();
     }
 
     @Transactional
     public List<String> addSamplesToAssay(Long projectId, List<String> sampleNames, UUID assayId) {
-        Assay assay = getAssayById(assayId);
+        Assay assay = getAssayById(projectId, assayId);
         List<String> errors = new ArrayList<>();
 
         for (String sampleName : sampleNames) {
@@ -135,7 +145,7 @@ public class AssayService {
     @Transactional
     public List<String> removeSamplesFromAssay(Long projectId, List<String> sampleNames, UUID assayId) {
         List<String> errors = new ArrayList<>();
-        Assay assay = getAssayById(assayId);
+        Assay assay = getAssayById(projectId, assayId);
 
         for (String sampleName : sampleNames) {
             Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName, projectId);
@@ -151,13 +161,13 @@ public class AssayService {
         return errors;
     }
 
-    public List<Sample> getAllSamplesInAssay(UUID assayId) {
-        getAssayById(assayId);
-        return Sample.findSamplesInAssay(assayId);
+    public List<Sample> getAllSamplesInAssay(Long projectId, UUID assayId) {
+        getAssayById(projectId, assayId);
+        return Sample.findSamplesInAssayInProjectScope(projectId, assayId);
     }
 
     public List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {
-        if (!Sample.sampleExistsInProject(sampleId, projectId)) throw new NotFoundException();
-        return Sample.getAllAssaysInSample(projectId, sampleId);
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        return Sample.getAllAssaysInSample(sample.project.id, sampleId);
     }
 }

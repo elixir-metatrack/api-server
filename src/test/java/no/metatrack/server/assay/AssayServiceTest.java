@@ -94,13 +94,13 @@ class AssayServiceTest {
         Assay assay = new Assay();
         assay.name = "existing";
         UUID id = UUID.randomUUID();
-        try (MockedStatic<PanacheEntityBase> assays = mockStatic(PanacheEntityBase.class)) {
-            assays.when(() -> Assay.findByIdOptional(id)).thenReturn(Optional.of(assay));
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
             var exception = assertThrows(AssayVocabularyValidationException.class, () ->
-                    service.updateAssay(id, null, "bad", "bad", "bad", "bad", "bad", "bad", "bad", null));
+                    service.updateAssay(1L, id, null, "bad", "bad", "bad", "bad", "bad", "bad", "bad", null));
             assertEquals(7, exception.violations().size());
             assertEquals("existing", exception.violations().getFirst().assay());
-            service.updateAssay(id, null, "study", "instrument", "library", "source",
+            service.updateAssay(1L, id, null, "study", "instrument", "library", "source",
                     "selection", "strategy", "layout", null);
             assertEquals("selection", assay.librarySelection);
             assertEquals("strategy", assay.libraryStrategy);
@@ -121,10 +121,10 @@ class AssayServiceTest {
         assay.modifiedOn = Instant.EPOCH;
         UUID id = UUID.randomUUID();
         var service = serviceWithRules(Map.of("library_layout", Set.of("PAIRED")));
-        try (MockedStatic<PanacheEntityBase> assays = mockStatic(PanacheEntityBase.class)) {
-            assays.when(() -> Assay.findByIdOptional(id)).thenReturn(Optional.of(assay));
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
             assertThrows(AssayVocabularyValidationException.class, () ->
-                    service.updateAssay(id, "new", "study", "instrument", "library", "source",
+                    service.updateAssay(1L, id, "new", "study", "instrument", "library", "source",
                             "selection", "strategy", "invalid", 200));
             assertEquals("old", assay.name);
             assertNull(assay.studyAccession);
@@ -148,17 +148,17 @@ class AssayServiceTest {
         UUID id = UUID.randomUUID();
         var service = serviceWithRules(Map.of("library_layout", Set.of("PAIRED"),
                 "sequencing_platform", Set.of("ILLUMINA")));
-        try (MockedStatic<PanacheEntityBase> assays = mockStatic(PanacheEntityBase.class)) {
-            assays.when(() -> Assay.findByIdOptional(id)).thenReturn(Optional.of(assay));
-            service.updateAssay(id, "new", null, null, null, null, null, null, null, 200);
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
+            service.updateAssay(1L, id, "new", null, null, null, null, null, null, null, 200);
             assertEquals("new", assay.name);
             assertEquals("legacy", assay.libraryLayout);
             assertEquals("legacy platform", assay.sequencingPlatform);
             assertEquals(200, assay.insertSize);
-            service.updateAssay(id, null, null, null, "unconfigured", null, null, null, " \t ", null);
+            service.updateAssay(1L, id, null, null, null, "unconfigured", null, null, null, " \t ", null);
             assertEquals(" \t ", assay.libraryLayout);
             assertEquals("unconfigured", assay.libraryName);
-            service.updateAssay(id, null, null, null, null, null, null, null, "PAIRED", null);
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, "PAIRED", null);
             assertEquals("PAIRED", assay.libraryLayout);
             assertNotNull(assay.modifiedOn);
         }
@@ -170,7 +170,7 @@ class AssayServiceTest {
         AssayService service = new AssayService();
 
         try (MockedStatic<Sample> sample = mockStatic(Sample.class)) {
-            sample.when(() -> Sample.sampleExistsInProject(sampleId, projectId)).thenReturn(false);
+            sample.when(() -> Sample.findByIdInProjectScope(sampleId, projectId)).thenReturn(Optional.empty());
 
             assertThrows(NotFoundException.class, () -> service.getAllAssaysInSample(projectId, sampleId));
 

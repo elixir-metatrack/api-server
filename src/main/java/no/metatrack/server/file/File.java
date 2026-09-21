@@ -2,7 +2,9 @@ package no.metatrack.server.file;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.*;
+import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.Assay;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 
 import java.util.List;
@@ -46,6 +48,14 @@ public class File extends PanacheEntity {
         return list("assay.id = ?1 and assay.project.id = ?2 order by fileName", assayId, projectId);
     }
 
+    public static List<File> findInAssayInProjectScope(Long projectId, Assay assay) {
+        if (assay.project.id.equals(projectId)) return findInAssay(projectId, assay.id);
+        return list("select f from File f join f.sample.linkedInSubProjects lp "
+                        + "where f.assay.id = ?1 and lp.id = ?2 and f.assay.project.id = ?3 "
+                        + "and f.sample.project.id = ?3 order by f.fileName",
+                assay.id, projectId, assay.project.id);
+    }
+
     public static List<File> findInSampleAndAssay(Long projectId, UUID sampleId, UUID assayId) {
         return list("sample.id = ?1 and assay.id = ?2 and sample.project.id = ?3 and assay.project.id = ?3 order by fileName",
                 sampleId, assayId, projectId);
@@ -58,6 +68,14 @@ public class File extends PanacheEntity {
     }
 
     public static List<String> findUploadedObjectKeysInProject(Long projectId) {
+        Project project = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
+        if (project.isSubProject()) {
+            return find("select distinct f.objectKey from File f join f.sample.linkedInSubProjects lp "
+                            + "where f.status = ?1 and lp.id = ?2 and f.sample.project.id = ?3 "
+                            + "and f.assay.project.id = ?3", UploadStatus.UPLOADED, projectId, project.parentProject.id)
+                    .project(String.class)
+                    .list();
+        }
         return find("select distinct f.objectKey from File f where f.status = ?1 " +
                         "and (f.sample.project.id = ?2 or f.assay.project.id = ?2)",
                 UploadStatus.UPLOADED, projectId)
