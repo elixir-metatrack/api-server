@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import no.metatrack.server.assay.vocabulary.AssayVocabularyValidationException;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
@@ -17,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -45,7 +45,10 @@ public class CSVExperimentImportService {
     @Inject
     AssayVocabularyService vocabularyService;
 
-    @Transactional
+    @Inject
+    CSVExperimentRowWriter rowWriter;
+
+    @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
         Assay assay = Assay.<Assay>find("id = ?1 and project.id = ?2", assayId, projectId)
                 .firstResultOptional().orElseThrow(NotFoundException::new);
@@ -108,19 +111,21 @@ public class CSVExperimentImportService {
                 value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", importedReferences, rowReferences, pendingFiles, errors);
         if (errors.size() > rowErrorCount || hasError(errors, row, "Insert Size")) return;
 
-        assay.instrumentModel = value(record, "Sequencing instrument");
-        assay.libraryName = value(record, "Library Name");
-        assay.librarySource = value(record, "Library Source");
-        assay.librarySelection = value(record, "Library Selection");
-        assay.libraryStrategy = value(record, "Library Strategy");
-        assay.libraryLayout = value(record, "Library Layout");
-        assay.insertSize = insertSize;
-        assay.sequencingPlatform = value(record, "Sequencing platform");
-        assay.sequencingLaboratory = value(record, "Sequencing Laboratory");
-        assay.modifiedOn = Instant.now();
-        assay.addSample(sample.get());
-        pendingFiles.forEach(pendingFile -> File.importPending(projectId, assay.id, sample.get(), assay,
-                pendingFile.fileName(), pendingFile.md5(), pendingFile.unencryptedMd5()));
+        try {
+            rowWriter.write(projectId, assay.id, sampleName.trim(),
+                    patchValue(record, "Sequencing instrument"), patchValue(record, "Library Name"),
+                    patchValue(record, "Library Source"), patchValue(record, "Library Selection"),
+                    patchValue(record, "Library Strategy"), patchValue(record, "Library Layout"), insertSize,
+                    value(record, "Sequencing platform"), value(record, "Sequencing Laboratory"), pendingFiles);
+        } catch (AssayVocabularyValidationException e) {
+            e.violations().forEach(violation -> errors.add(new CSVExperimentRowError(row,
+                    VOCABULARY_HEADERS.getOrDefault(violation.field(), violation.field()),
+                    metadata.get(violation.field()), violation.message())));
+            return;
+        } catch (CSVExperimentRowWriter.FileConflictException e) {
+            errors.add(new CSVExperimentRowError(row, e.field(), e.fileName(), e.getMessage()));
+            return;
+        }
         importedReferences.addAll(rowReferences);
     }
 
@@ -152,7 +157,7 @@ public class CSVExperimentImportService {
             valid = false;
         }
         if (valid) {
-            pendingFiles.add(new PendingFile(fileName, md5, unencryptedMd5));
+            pendingFiles.add(new PendingFile(field, fileName, md5, unencryptedMd5));
         }
     }
 
@@ -171,12 +176,17 @@ public class CSVExperimentImportService {
         return errors.stream().anyMatch(error -> error.row().equals(row) && error.field().equals(field));
     }
 
-    private record PendingFile(String fileName, String md5, String unencryptedMd5) {
+    record PendingFile(String field, String fileName, String md5, String unencryptedMd5) {
     }
 
     private String value(CSVRecord record, String header) {
         String value = csvImportSupport.getMappedValue(record, header);
         return value == null ? null : value.trim();
+    }
+
+    private String patchValue(CSVRecord record, String header) {
+        String value = value(record, header);
+        return value == null || value.isBlank() ? null : value;
     }
 
     private void skipBom(BufferedReader reader) throws IOException {
