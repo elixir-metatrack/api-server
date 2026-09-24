@@ -24,8 +24,8 @@ public class CSVExperimentRowWriter {
                 librarySelection, libraryStrategy, libraryLayout, insertSize);
         Assay assay = assayService.getAssayById(assayId);
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
-        assay.sequencingPlatform = sequencingPlatform;
-        assay.sequencingLaboratory = sequencingLaboratory;
+        if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;
+        if (sequencingLaboratory != null) assay.sequencingLaboratory = sequencingLaboratory;
         assayService.associateSample(assay, sample);
         for (var pendingFile : pendingFiles) {
             File.importPending(projectId, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),

@@ -100,6 +100,7 @@ public class CSVExperimentImportService {
         }
 
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
+        if (hasMetadataConflict(assay, metadata, insertSize, row, errors)) return;
         int rowErrorCount = errors.size();
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
@@ -116,7 +117,7 @@ public class CSVExperimentImportService {
                     patchValue(record, "Sequencing instrument"), patchValue(record, "Library Name"),
                     patchValue(record, "Library Source"), patchValue(record, "Library Selection"),
                     patchValue(record, "Library Strategy"), patchValue(record, "Library Layout"), insertSize,
-                    value(record, "Sequencing platform"), value(record, "Sequencing Laboratory"), pendingFiles);
+                    patchValue(record, "Sequencing platform"), patchValue(record, "Sequencing Laboratory"), pendingFiles);
         } catch (AssayVocabularyValidationException e) {
             e.violations().forEach(violation -> errors.add(new CSVExperimentRowError(row,
                     VOCABULARY_HEADERS.getOrDefault(violation.field(), violation.field()),
@@ -170,6 +171,35 @@ public class CSVExperimentImportService {
             errors.add(new CSVExperimentRowError(row, field, value, "Invalid integer value: '" + value + "'"));
             return null;
         }
+    }
+
+    private boolean hasMetadataConflict(Assay assay, Map<String, String> metadata, Integer insertSize,
+            String row, List<CSVExperimentRowError> errors) {
+        Map<String, String> existingValues = Map.of(
+                "instrument_model", assay.instrumentModel == null ? "" : assay.instrumentModel,
+                "library_name", assay.libraryName == null ? "" : assay.libraryName,
+                "library_source", assay.librarySource == null ? "" : assay.librarySource,
+                "library_selection", assay.librarySelection == null ? "" : assay.librarySelection,
+                "library_strategy", assay.libraryStrategy == null ? "" : assay.libraryStrategy,
+                "library_layout", assay.libraryLayout == null ? "" : assay.libraryLayout,
+                "sequencing_platform", assay.sequencingPlatform == null ? "" : assay.sequencingPlatform,
+                "sequencing_laboratory", assay.sequencingLaboratory == null ? "" : assay.sequencingLaboratory);
+        boolean hasConflict = false;
+        for (Map.Entry<String, String> entry : metadata.entrySet()) {
+            String incoming = entry.getValue();
+            String existing = existingValues.get(entry.getKey());
+            if (incoming != null && !incoming.isBlank() && !existing.isBlank() && !existing.equals(incoming)) {
+                errors.add(new CSVExperimentRowError(row, VOCABULARY_HEADERS.get(entry.getKey()), incoming,
+                        "Cannot replace existing value '" + existing + "' with '" + incoming + "'"));
+                hasConflict = true;
+            }
+        }
+        if (insertSize != null && assay.insertSize != null && !assay.insertSize.equals(insertSize)) {
+            errors.add(new CSVExperimentRowError(row, "Insert Size", insertSize.toString(),
+                    "Cannot replace existing value '" + assay.insertSize + "' with '" + insertSize + "'"));
+            hasConflict = true;
+        }
+        return hasConflict;
     }
 
     private boolean hasError(List<CSVExperimentRowError> errors, String row, String field) {
