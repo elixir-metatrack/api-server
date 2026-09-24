@@ -1,15 +1,22 @@
 package no.metatrack.server.sample;
 
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
+import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
 import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,8 +25,44 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
 class CSVSampleSheetImportServiceTest {
+    @TempDir
+    Path directory;
+
+    @Test
+    void validRowsUseApiCreationWhileInvalidRowsRemainIsolated() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.sampleService = mock(SampleService.class, invocation -> {
+            if ("second".equals(invocation.getArgument(1))) {
+                throw new SampleVocabularyValidationException(List.of(new SampleValidationViolation(
+                        "second", "host_sex", "male", "Invalid vocabulary value")));
+            }
+            return null;
+        });
+        Path csv = Files.writeString(directory.resolve("samples.csv"),
+                "Sample Name,Tax ID,Host Sex,custom_status\n"
+                        + "first,287,female,known\n"
+                        + "bad,not-an-integer,male,unknown\n"
+                        + "second,288,male,unknown\n");
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            var errors = service.importNewSamples(1L, csv.toFile());
+            assertEquals(2, errors.size());
+            assertEquals("tax_id", errors.get(0).fieldKey());
+            assertEquals("host_sex", errors.get(1).fieldKey());
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                    .toList();
+            assertEquals(List.of("first", "second"), calls.stream()
+                    .map(invocation -> (String) invocation.getArgument(1)).toList());
+            assertEquals(Integer.valueOf(287), calls.getFirst().getArgument(3));
+            assertEquals("female", calls.getFirst().getArgument(24));
+        }
+    }
+
     @Test
     void ignoresTemplatePreambleAndAlignmentColumn() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
