@@ -37,12 +37,19 @@ class CSVExperimentImportServiceTest {
     private final CSVExperimentImportService service = new CSVExperimentImportService();
 
     private List<CSVExperimentRowError> importRows(Map<String, Set<String>> terms, String rows) throws Exception {
-        assay.id = UUID.randomUUID();
+        if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
         sample.name = "sample";
         service.csvImportSupport = new CSVImportSupport();
         service.vocabularyService = mock(AssayVocabularyService.class);
         when(service.vocabularyService.loadRules()).thenReturn(new AssayVocabularyRules(terms));
+        AssayService assayService = new AssayService();
+        assayService.vocabularyService = service.vocabularyService;
+        service.rowWriter = new CSVExperimentRowWriter();
+        service.rowWriter.assayService = assayService;
+        when(service.vocabularyService.validate(anyString(), anyMap())).thenAnswer(invocation ->
+                AssayVocabularyService.validate(new AssayVocabularyRules(terms),
+                        invocation.getArgument(0), invocation.getArgument(1)));
         Path csv = Files.writeString(directory.resolve("experiments.csv"), HEADER + rows);
         PanacheQuery<Assay> assays = mock(PanacheQuery.class);
         PanacheQuery<Sample> samples = mock(PanacheQuery.class);
@@ -50,6 +57,9 @@ class CSVExperimentImportServiceTest {
         when(samples.firstResultOptional()).thenReturn(Optional.of(sample));
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
             entities.when(() -> Assay.find("id = ?1 and project.id = ?2", assay.id, 1L)).thenReturn(assays);
+            entities.when(() -> Assay.findByIdOptional(assay.id)).thenReturn(Optional.of(assay));
+            entities.when(() -> Sample.find("project.id = ?1 and name = ?2", 1L, "sample"))
+                    .thenReturn(samples);
             entities.when(() -> Sample.find(
                     "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
                             + "where a = ?3 and s = Sample)", 1L, "sample", assay)).thenReturn(samples);
@@ -143,6 +153,21 @@ class CSVExperimentImportServiceTest {
     }
 
     @Test
+    void missingPatchValuesPreserveExistingAssayFields() throws Exception {
+        assay.instrumentModel = "existing instrument";
+        assay.insertSize = 45;
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), row("platform", "lab", "")
+                    .replace("sample,instrument,library", "sample,,library"));
+            assertTrue(errors.isEmpty());
+            assertEquals("existing instrument", assay.instrumentModel);
+            assertEquals("library", assay.libraryName);
+            assertEquals(45, assay.insertSize);
+            assertEquals("platform", assay.sequencingPlatform);
+        }
+    }
+
+    @Test
     void duplicateWithinRowDoesNotReserveReferencesForLaterRows() throws Exception {
         try (MockedStatic<File> files = mockStatic(File.class)) {
             var errors = importRows(Map.of(),
@@ -172,6 +197,40 @@ class CSVExperimentImportServiceTest {
             assertEquals(200, assay.insertSize);
             verify(assay, times(1)).addSample(sample);
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null), times(1));
+        }
+    }
+
+    @Test
+    void pendingFileConflictRejectsRowWithoutUpdatingAssay() throws Exception {
+        assay.id = UUID.randomUUID();
+        assay.instrumentModel = "previous";
+        assay.modifiedOn = Instant.EPOCH;
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(() -> File.validateImportPending(1L, assay.id, sample, assay,
+                    "reads.fastq", "md5", null)).thenReturn(Optional.of("Conflicting file metadata"));
+            var errors = importRows(Map.of(), row("platform", "lab", "100"));
+            assertEquals(1, errors.size());
+            assertEquals("File Name", errors.getFirst().field());
+            assertEquals("Conflicting file metadata", errors.getFirst().message());
+            assertEquals("previous", assay.instrumentModel);
+            assertEquals(Instant.EPOCH, assay.modifiedOn);
+            verify(assay, never()).addSample(any());
+            files.verify(() -> File.importPending(anyLong(), any(), any(), any(), any(), any(), any()), never());
+        }
+    }
+
+    @Test
+    void conflictAfterPrevalidationIsReportedAndDoesNotReserveReferences() throws Exception {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(() -> File.importPending(eq(1L), any(), any(), any(), eq("reads.fastq"),
+                    eq("md5"), isNull())).thenReturn(Optional.of("Late file conflict"))
+                    .thenReturn(Optional.empty());
+            var errors = importRows(Map.of(), row("platform", "lab", "100") + row("platform", "lab", "200"));
+            assertEquals(1, errors.size());
+            assertEquals("Row 1", errors.getFirst().row());
+            assertEquals("File Name", errors.getFirst().field());
+            assertEquals("Late file conflict", errors.getFirst().message());
+            assertEquals(200, assay.insertSize);
         }
     }
 }
