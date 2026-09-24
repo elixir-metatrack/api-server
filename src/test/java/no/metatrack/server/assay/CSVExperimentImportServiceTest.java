@@ -144,7 +144,7 @@ class CSVExperimentImportServiceTest {
         try (MockedStatic<File> files = mockStatic(File.class)) {
             var errors = importRows(Map.of("sequencing_platform", Set.of("ILLUMINA")), row(" ", "any lab", ""));
             assertTrue(errors.isEmpty());
-            assertEquals("", assay.sequencingPlatform);
+            assertNull(assay.sequencingPlatform);
             assertEquals("any lab", assay.sequencingLaboratory);
             assertNull(assay.insertSize);
             verify(assay).addSample(sample);
@@ -164,6 +164,55 @@ class CSVExperimentImportServiceTest {
             assertEquals("library", assay.libraryName);
             assertEquals(45, assay.insertSize);
             assertEquals("platform", assay.sequencingPlatform);
+        }
+    }
+
+    @Test
+    void blankPlatformAndLaboratoryPreserveExistingAssayFields() throws Exception {
+        assay.sequencingPlatform = "existing platform";
+        assay.sequencingLaboratory = "existing laboratory";
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), row(" ", "", ""));
+            assertTrue(errors.isEmpty());
+            assertEquals("existing platform", assay.sequencingPlatform);
+            assertEquals("existing laboratory", assay.sequencingLaboratory);
+        }
+    }
+
+    @Test
+    void resubmissionAllowsBackfillingAndUnchangedMetadata() throws Exception {
+        assay.instrumentModel = "instrument";
+        assay.libraryName = "library";
+        assay.sequencingPlatform = "platform";
+        assay.insertSize = 100;
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), row("platform", "lab", "100"));
+            assertTrue(errors.isEmpty());
+            assertEquals("instrument", assay.instrumentModel);
+            assertEquals("library", assay.libraryName);
+            assertEquals("source", assay.librarySource);
+            assertEquals("lab", assay.sequencingLaboratory);
+            assertEquals(100, assay.insertSize);
+            verify(assay).addSample(sample);
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null));
+        }
+    }
+
+    @Test
+    void resubmissionRejectsReplacementOfPopulatedMetadata() throws Exception {
+        assay.instrumentModel = "previous instrument";
+        assay.modifiedOn = Instant.EPOCH;
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), row("platform", "lab", "100"));
+            assertEquals(1, errors.size());
+            assertEquals("Sequencing instrument", errors.getFirst().field());
+            assertEquals("instrument", errors.getFirst().value());
+            assertEquals("Cannot replace existing value 'previous instrument' with 'instrument'",
+                    errors.getFirst().message());
+            assertEquals("previous instrument", assay.instrumentModel);
+            assertEquals(Instant.EPOCH, assay.modifiedOn);
+            verify(assay, never()).addSample(any());
+            files.verifyNoInteractions();
         }
     }
 
@@ -190,10 +239,11 @@ class CSVExperimentImportServiceTest {
         try (MockedStatic<File> files = mockStatic(File.class)) {
             var errors = importRows(Map.of(), row("platform", "lab", "invalid")
                     + row("platform", "lab", "200") + row("platform", "lab", "300"));
-            assertEquals(4, errors.size());
+            assertEquals(2, errors.size());
             assertEquals("Insert Size", errors.getFirst().field());
-            assertTrue(errors.subList(1, 4).stream().allMatch(error -> error.row().equals("Row 3")
-                    && error.message().equals("Duplicate file reference in import")));
+            assertEquals("Row 3", errors.get(1).row());
+            assertEquals("Insert Size", errors.get(1).field());
+            assertEquals("Cannot replace existing value '200' with '300'", errors.get(1).message());
             assertEquals(200, assay.insertSize);
             verify(assay, times(1)).addSample(sample);
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null), times(1));
@@ -203,7 +253,7 @@ class CSVExperimentImportServiceTest {
     @Test
     void pendingFileConflictRejectsRowWithoutUpdatingAssay() throws Exception {
         assay.id = UUID.randomUUID();
-        assay.instrumentModel = "previous";
+        assay.instrumentModel = "instrument";
         assay.modifiedOn = Instant.EPOCH;
         try (MockedStatic<File> files = mockStatic(File.class)) {
             files.when(() -> File.validateImportPending(1L, assay.id, sample, assay,
@@ -212,7 +262,7 @@ class CSVExperimentImportServiceTest {
             assertEquals(1, errors.size());
             assertEquals("File Name", errors.getFirst().field());
             assertEquals("Conflicting file metadata", errors.getFirst().message());
-            assertEquals("previous", assay.instrumentModel);
+            assertEquals("instrument", assay.instrumentModel);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
             verify(assay, never()).addSample(any());
             files.verify(() -> File.importPending(anyLong(), any(), any(), any(), any(), any(), any()), never());
@@ -226,11 +276,13 @@ class CSVExperimentImportServiceTest {
                     eq("md5"), isNull())).thenReturn(Optional.of("Late file conflict"))
                     .thenReturn(Optional.empty());
             var errors = importRows(Map.of(), row("platform", "lab", "100") + row("platform", "lab", "200"));
-            assertEquals(1, errors.size());
+            assertEquals(2, errors.size());
             assertEquals("Row 1", errors.getFirst().row());
             assertEquals("File Name", errors.getFirst().field());
             assertEquals("Late file conflict", errors.getFirst().message());
-            assertEquals(200, assay.insertSize);
+            assertEquals("Row 2", errors.get(1).row());
+            assertEquals("Insert Size", errors.get(1).field());
+            assertEquals(100, assay.insertSize);
         }
     }
 }
