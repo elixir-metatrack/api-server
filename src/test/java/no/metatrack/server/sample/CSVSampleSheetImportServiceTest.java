@@ -34,6 +34,8 @@ class CSVSampleSheetImportServiceTest {
     @Test
     void validRowsUseApiCreationWhileInvalidRowsRemainIsolated() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
         service.sampleService = mock(SampleService.class, invocation -> {
             if ("second".equals(invocation.getArgument(1))) {
                 throw new SampleVocabularyValidationException(List.of(new SampleValidationViolation(
@@ -60,6 +62,29 @@ class CSVSampleSheetImportServiceTest {
                     .map(invocation -> (String) invocation.getArgument(1)).toList());
             assertEquals(Integer.valueOf(287), calls.getFirst().getArgument(3));
             assertEquals("female", calls.getFirst().getArgument(24));
+        }
+    }
+
+    @Test
+    void rejectsCsvRowsWithValuesOutsideConfiguredVocabulary() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(
+                new SampleVocabularyRules(Set.of(), Map.of("host_sex", Set.of("female"))));
+        service.sampleService = mock(SampleService.class);
+        Path csv = Files.writeString(directory.resolve("invalid-vocabulary.csv"),
+                "Sample Name,Host Sex\nsample-1,male\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+
+            List<SampleValidationViolation> errors = service.importNewSamples(1L, csv.toFile());
+
+            assertEquals(1, errors.size());
+            assertEquals("host_sex", errors.getFirst().fieldKey());
+            assertEquals("male", errors.getFirst().rejectedValue());
+            verifyNoInteractions(service.sampleService);
         }
     }
 
