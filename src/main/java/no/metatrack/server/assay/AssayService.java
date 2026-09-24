@@ -124,7 +124,7 @@ public class AssayService {
                 errors.add("Sample with name " + sampleName + " does not exist in project " + projectId);
                 continue;
             }
-            assay.addSample(sample.get());
+            associateSample(assay, sample.get());
         }
 
         if (errors.isEmpty()) return List.of();
@@ -154,6 +154,10 @@ public class AssayService {
     public List<Sample> getAllSamplesInAssay(UUID assayId) {
         getAssayById(assayId);
         return Sample.findSamplesInAssay(assayId);
+    }
+
+    void associateSample(Assay assay, Sample sample) {
+        assay.addSample(sample);
     }
 
     public List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {

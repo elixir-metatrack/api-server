@@ -5,12 +5,10 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.WebApplicationException;
-import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
-import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
-import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -25,13 +23,11 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -61,20 +57,16 @@ public class CSVSampleSheetImportService {
     SampleMetadataService metadataService;
 
     @Inject
-    SampleVocabularyService vocabularyService;
+    SampleService sampleService;
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
 
-    @Transactional
+    @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
         List<SampleValidationViolation> errors = new ArrayList<>();
-        List<Sample> samplesToSave = new ArrayList<>();
-        Map<Sample, Map<String, Object>> metadataToSave = new IdentityHashMap<>();
-        Project project = Project.findById(projectId);
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", projectId);
-        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
 
         try {
             char delimiter = detectDelimiter(file);
@@ -104,18 +96,9 @@ public class CSVSampleSheetImportService {
                         continue;
                     }
 
-                    if (Sample.find("name = ?1 and project = ?2", name, project)
-                            .firstResultOptional()
-                            .isPresent()) {
-                        errors.add(new SampleValidationViolation(
-                                name, "name", name, "Sample name '" + name + "' already exists in this project"));
-                        continue;
-                    }
-
                     List<SampleValidationViolation> rowErrors = new ArrayList<>();
 
                     Sample sample = new Sample();
-                    sample.project = project;
                     sample.name = name;
                     sample.alias = getMappedValue(rec, "alias");
                     sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, name, rowErrors);
@@ -191,15 +174,28 @@ public class CSVSampleSheetImportService {
                         }
                     }
 
-                    rowErrors.addAll(SampleVocabularyService.validate(
-                            vocabularyRules, name, builtInValues(sample), customMetadata));
-
-                    sample.createdOn = Instant.now();
-                    sample.modifiedOn = Instant.now();
-
                     if (rowErrors.isEmpty()) {
-                        samplesToSave.add(sample);
-                        metadataToSave.put(sample, customMetadata);
+                        try {
+                            sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
+                                    sample.hostTaxId, sample.mlst, sample.location, sample.sequencingLab,
+                                    sample.institution, sample.isolationSource, sample.collectionDate,
+                                    sample.hostHealthState, sample.projectTitle, sample.description, sample.isolate,
+                                    sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
+                                    sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
+                                    sample.collectorName, sample.collectingInstitution, sample.hostSex,
+                                    sample.influenzaTestMethod, sample.influenzaTestResult, sample.otherPathogensTested,
+                                    sample.otherPathogensTestResult, sample.hostHabitat,
+                                    sample.isolationSourceHostAssociated, sample.hostBehaviour,
+                                    sample.isolationSourceNonHostAssociated, sample.influenzaVirusType,
+                                    sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
+                                    sample.county, sample.commune, sample.hospitalHealthInstitution, customMetadata);
+                        } catch (SampleVocabularyValidationException e) {
+                            errors.addAll(e.violations());
+                        } catch (WebApplicationException e) {
+                            if (e.getResponse().getStatus() != 409) throw e;
+                            errors.add(new SampleValidationViolation(name, "name", name,
+                                    "Sample name '" + name + "' already exists in this project"));
+                        }
                     } else {
                         errors.addAll(rowErrors);
                     }
@@ -208,11 +204,6 @@ public class CSVSampleSheetImportService {
         } catch (IOException e) {
             throw new WebApplicationException(e.getMessage(), 500);
         }
-
-        samplesToSave.forEach(sample -> {
-            sample.persist();
-            metadataService.apply(projectId, sample, metadataToSave.get(sample));
-        });
 
         return errors;
     }
