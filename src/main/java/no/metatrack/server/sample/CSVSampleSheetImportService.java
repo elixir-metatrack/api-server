@@ -8,6 +8,8 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -59,6 +61,9 @@ public class CSVSampleSheetImportService {
     @Inject
     SampleService sampleService;
 
+    @Inject
+    SampleVocabularyService vocabularyService;
+
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
 
@@ -67,6 +72,7 @@ public class CSVSampleSheetImportService {
         List<SampleValidationViolation> errors = new ArrayList<>();
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", projectId);
+        SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
 
         try {
             char delimiter = detectDelimiter(file);
@@ -172,6 +178,11 @@ public class CSVSampleSheetImportService {
                         } catch (BadRequestException e) {
                             rowErrors.add(new SampleValidationViolation(name, field.key, rawValue, e.getMessage()));
                         }
+                    }
+
+                    if (rowErrors.isEmpty()) {
+                        rowErrors.addAll(SampleVocabularyService.validate(
+                                vocabularyRules, name, builtInValues(sample), customMetadata));
                     }
 
                     if (rowErrors.isEmpty()) {
