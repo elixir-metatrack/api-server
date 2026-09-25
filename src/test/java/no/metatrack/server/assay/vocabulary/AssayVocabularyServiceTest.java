@@ -68,12 +68,16 @@ class AssayVocabularyServiceTest {
         GlobalAssayVocabularyTerm term = new GlobalAssayVocabularyTerm();
         term.value = "ILLUMINA";
         vocabulary.terms.add(term);
+        GlobalAssayVocabulary emptyVocabulary = new GlobalAssayVocabulary();
+        emptyVocabulary.fieldKey = "library_layout";
         GlobalAssayVocabulary excluded = new GlobalAssayVocabulary();
         excluded.fieldKey = "name";
         try (MockedStatic<PanacheEntityBase> store = mockStatic(PanacheEntityBase.class)) {
-            store.when(GlobalAssayVocabulary::listAll).thenReturn(List.of(vocabulary, excluded));
+            store.when(GlobalAssayVocabulary::listAll).thenReturn(List.of(vocabulary, emptyVocabulary, excluded));
             AssayVocabularyService service = new AssayVocabularyService();
-            assertEquals(Map.of("sequencing_platform", Set.of("ILLUMINA")), service.loadRules().allowedTerms());
+            assertEquals(Map.of("sequencing_platform", Set.of("ILLUMINA"), "library_layout", Set.of()),
+                    service.loadRules().allowedTerms());
+            assertTrue(service.validate("assay-1", Map.of("library_layout", "initial value")).isEmpty());
             assertEquals(1, service.validate("assay-1", Map.of("sequencing_platform", "invalid")).size());
         }
     }
