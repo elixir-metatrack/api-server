@@ -29,7 +29,7 @@ public class AssayVocabularyService {
         values.forEach((fieldKey, value) -> {
             if (AssayVocabularyBuiltInCatalog.find(fieldKey).isEmpty()) return;
             Set<String> allowed = rules.allowedTerms().get(fieldKey);
-            if (allowed == null || value == null || value.trim().isEmpty()) return;
+            if (allowed == null || allowed.isEmpty() || value == null || value.trim().isEmpty()) return;
             if (!allowed.contains(value.trim())) {
                 violations.add(new AssayValidationViolation(
                         assay, fieldKey, value, "Value is not in the configured vocabulary"));
