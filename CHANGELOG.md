@@ -1,5 +1,66 @@
 # Changelog
 
+## [0.5.0](https://github.com/elixir-metatrack/api-server/compare/0.4.0...0.5.0) (2026-09-25)
+
+
+### Features
+
+* add API controllers and models for managing global assay vocabularies ([0e31707](https://github.com/elixir-metatrack/api-server/commit/0e317075600a655f27bcb5f20401f1006ce647cf))
+* add controllers, request/response models, and validation for project invitation APIs ([a5062fc](https://github.com/elixir-metatrack/api-server/commit/a5062fcd274ac53e84e5ef0cb618411a771fb0f0))
+* add CSVExperimentRowWriter for handling row-level assay updates and refactor CSV import services to improve modularity and error handling ([2051b9d](https://github.com/elixir-metatrack/api-server/commit/2051b9d4c646f1c9ba6687f004e98161d115b906))
+* add database schema and domain model for project invitations and notifications ([a214fb8](https://github.com/elixir-metatrack/api-server/commit/a214fb85f1abeac87bdb3526375bb1406611b16e))
+* add domain model and database schema for global assay vocabularies and terms ([35a954a](https://github.com/elixir-metatrack/api-server/commit/35a954a231968eec0f6189c958eb9875af8c09b6))
+* add email normalization and lookup functionality for Keycloak users ([c078220](https://github.com/elixir-metatrack/api-server/commit/c0782207cdda63e7c4823cc292ff1710c66cef34))
+* add metadata conflict detection in CSV import to prevent overwrites of existing assay values ([90db9da](https://github.com/elixir-metatrack/api-server/commit/90db9dab45a472805816c9277363828ca6e29357))
+* add ProjectInvitationTransactions to handle project invitation lifecycle and configuration options ([e1a688b](https://github.com/elixir-metatrack/api-server/commit/e1a688bf9e58be78598437c9ce00841b11738b76))
+* add quarkus-mailer dependency to support email functionality ([5ff9d8a](https://github.com/elixir-metatrack/api-server/commit/5ff9d8a9e5a5338cc73339c11d4df17701c7de08))
+* add ReadRole enumeration and integrate file read roles into CSV import process ([826a828](https://github.com/elixir-metatrack/api-server/commit/826a8281d53ddaa71a3e909a81d211d769beb318))
+* add services, models, and validation for assay vocabulary management and validation ([ae99de6](https://github.com/elixir-metatrack/api-server/commit/ae99de664bbbe326a80cd41e594d96b47e9c88d0))
+* extend Keycloak user representation with email fields and add email lookup functionality ([fbe6d5f](https://github.com/elixir-metatrack/api-server/commit/fbe6d5f7ed78799fc43ac40cc2ac0feaf74b43b0))
+* implement InvitationEmailService for rendering and sending project invitation emails ([456a6e5](https://github.com/elixir-metatrack/api-server/commit/456a6e5760da53f3aa421a96d9b60d8499023c9f))
+* implement NotificationService with synchronization, pagination, and read-state update handling ([076bc83](https://github.com/elixir-metatrack/api-server/commit/076bc83001e292661853d751bbc4c6a3d53696dc))
+* implement project locking with pessimistic writing to prevent concurrent modifications ([b467852](https://github.com/elixir-metatrack/api-server/commit/b467852db9e2a496f521094205564263d3c7c984))
+* implement ProjectInvitationService to manage creation, listing, acceptance, and revocation of project invitations ([1025c52](https://github.com/elixir-metatrack/api-server/commit/1025c52204b2a975a1d96e6f940fe9e6db5606fd))
+* integrate assay vocabulary validation in CSV import and AssayService ([c942f0a](https://github.com/elixir-metatrack/api-server/commit/c942f0a7b708def012ce9de032751b889f1e19db))
+* integrate sample vocabulary validation into CSV import process ([37195fc](https://github.com/elixir-metatrack/api-server/commit/37195fc52cb25d06336991c858ce060430946bd7))
+* introduce InvitationCoordinator and InvitationDeliveryTransactions to manage invitation delivery orchestration and lifecycle ([318cd05](https://github.com/elixir-metatrack/api-server/commit/318cd05739f8166e2a55005c37c4127f7ace3bea))
+* introduce InvitationCoordinator and InvitationDeliveryTransactions to manage invitation delivery orchestration and lifecycle ([18dec52](https://github.com/elixir-metatrack/api-server/commit/18dec52aabdd76f51b74016d6e24f3c96affc2e1))
+
+
+### Bug Fixes
+
+* correct library layout value in experiment_SE.csv template ([926125c](https://github.com/elixir-metatrack/api-server/commit/926125c34e36d4e01e892519a3d59b57bed0d996))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.54.20 ([fd13530](https://github.com/elixir-metatrack/api-server/commit/fd135309888a93cff8e0978cdb17fa20587ad3f7))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.55.0 ([6d91311](https://github.com/elixir-metatrack/api-server/commit/6d913110ffdfa9803bbe2b277e7ae3739ba721db))
+* **deps:** update quarkus ecosystem to v3.39.3 ([e3f9c33](https://github.com/elixir-metatrack/api-server/commit/e3f9c33de74697eb83cad0d0a14f739841b394ce))
+* **deps:** update quarkus ecosystem to v3.39.4 ([a805588](https://github.com/elixir-metatrack/api-server/commit/a805588e491ad46e64470f297ca530751fcb03f2))
+* handle empty allowed terms in assay vocabulary validation ([c1a31fb](https://github.com/elixir-metatrack/api-server/commit/c1a31fb2aa31af55930a9e920352ad689432d9a4))
+* handle empty allowed terms in sample vocabulary validation ([a88b579](https://github.com/elixir-metatrack/api-server/commit/a88b57969380d2615c5211bdf5fbef345819d8c8))
+* resolve duplicate file reference handling within import rows and improve error validation ([a93dff5](https://github.com/elixir-metatrack/api-server/commit/a93dff535e889452c9a516770058980c34e8fdf6))
+* Return empty vocabularies for unconfigured fields ([09b2bff](https://github.com/elixir-metatrack/api-server/commit/09b2bffbea5473d21fc6f596f8a182249755e474))
+
+
+### Documentation
+
+* update README with detailed documentation for invitation and notification APIs, lifecycle, configuration, and usage ([8788f0e](https://github.com/elixir-metatrack/api-server/commit/8788f0eb0d43c167b373e8b3f40aab5748f92484))
+
+
+### Tests
+
+* add comprehensive unit and integration tests for user verification, invitation delivery, email rendering, and notifications ([adc7e4a](https://github.com/elixir-metatrack/api-server/commit/adc7e4ae29721cb5fe1b55452a41eca6782d1c68))
+* add comprehensive unit tests for assay vocabulary services, controllers, and migration ([7130f0a](https://github.com/elixir-metatrack/api-server/commit/7130f0ac923604c7d843895952e34e64398ba3be))
+* add unit test for CSV import rejecting rows with invalid vocabulary values ([c7507fa](https://github.com/elixir-metatrack/api-server/commit/c7507faffc915d8098923481765472682d787480))
+* enhance CSV import tests to validate metadata preservation, conflict handling, and error reporting ([5a82b32](https://github.com/elixir-metatrack/api-server/commit/5a82b32469682491b02ca728705f4d1db658d885))
+* extend unit tests for assay and sample CSV imports to cover edge cases and ensure robust validation ([f319b55](https://github.com/elixir-metatrack/api-server/commit/f319b55ee2c49329ebc5eb81edb6ce190519d908))
+
+
+### Miscellaneous Chores
+
+* **main:** release 0.4.1-SNAPSHOT ([3ca6b9b](https://github.com/elixir-metatrack/api-server/commit/3ca6b9b1d32ebf13e614de4e348038fbab2956dd))
+* remove inferred columns from sample templates ([6db3c21](https://github.com/elixir-metatrack/api-server/commit/6db3c218caa26e96dfd13ea1a33eda3227f79ee6))
+* replace deprecated template files ([8820bd1](https://github.com/elixir-metatrack/api-server/commit/8820bd1d239d2c1183c9978e2d5d32ae584ff118))
+* setup a basic agents.md file with project guidance ([1b56192](https://github.com/elixir-metatrack/api-server/commit/1b56192ac5c39d01b59305e3b1e84d2518f6b580))
+
 ## [0.4.0](https://github.com/elixir-metatrack/api-server/compare/0.3.0...0.4.0) (2026-09-10)
 
 
