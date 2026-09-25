@@ -34,6 +34,25 @@ class SampleVocabularyServiceTest {
     }
 
     @Test
+    void acceptsValuesWhenConfiguredVocabularyIsEmpty() {
+        assertTrue(SampleVocabularyService.findViolations(
+                "sample-1", Map.of("status", "initial value"), Map.of("status", Set.of())).isEmpty());
+    }
+
+    @Test
+    void appliesEmptyAndPopulatedGlobalBuiltInVocabularies() {
+        SampleVocabularyRules emptyGlobalRules = SampleVocabularyService.composeRules(
+                Set.of(), Map.of("host_sex", Set.of()), Map.of());
+        SampleVocabularyRules populatedGlobalRules = SampleVocabularyService.composeRules(
+                Set.of(), Map.of("host_sex", Set.of("female")), Map.of());
+
+        assertTrue(SampleVocabularyService.validate(
+                emptyGlobalRules, "sample-1", Map.of("host_sex", "initial value"), Map.of()).isEmpty());
+        assertEquals(1, SampleVocabularyService.validate(
+                populatedGlobalRules, "sample-1", Map.of("host_sex", "male"), Map.of()).size());
+    }
+
+    @Test
     void reportsEveryCaseSensitiveMismatchWithContext() {
         Map<String, Object> candidates = new LinkedHashMap<>();
         candidates.put("host_sex", "Female");

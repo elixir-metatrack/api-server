@@ -75,7 +75,7 @@ public class SampleVocabularyService {
         List<SampleValidationViolation> violations = new ArrayList<>();
         candidates.forEach((fieldKey, rejectedValue) -> {
             Set<String> allowed = allowedTerms.get(fieldKey);
-            if (allowed == null || rejectedValue == null) return;
+            if (allowed == null || allowed.isEmpty() || rejectedValue == null) return;
             String normalized = rejectedValue instanceof String text ? text.trim() : rejectedValue.toString();
             if (normalized.isEmpty()) return;
             if (!allowed.contains(normalized)) {
