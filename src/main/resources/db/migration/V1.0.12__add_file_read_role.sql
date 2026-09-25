@@ -1,0 +1,1 @@
+alter table file add column read_role varchar(255);

@@ -6,6 +6,7 @@ import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
+import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,6 +73,49 @@ class CSVExperimentImportServiceTest {
                 + insertSize + ",reads.fastq,md5,forward.fastq,md5,reverse.fastq,md5\n";
     }
 
+    private String singleEndRow() {
+        return row("platform", "lab", "").replace(",forward.fastq,md5,reverse.fastq,md5", ",,,,");
+    }
+
+    private String pairedEndRow() {
+        return row("platform", "lab", "100")
+                .replace(",reads.fastq,md5,", ",,,")
+                .replace("forward.fastq,md5,reverse.fastq,md5",
+                        "forward.fastq,forward-md5,reverse.fastq,reverse-md5");
+    }
+
+    @Test
+    void singleEndTemplateAssignsSingleReadRole() throws Exception {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), singleEndRow());
+
+            assertTrue(errors.isEmpty());
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
+            files.verifyNoMoreInteractions();
+        }
+    }
+
+    @Test
+    void pairedEndTemplateAssignsForwardAndReverseRoles() throws Exception {
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            var errors = importRows(Map.of(), pairedEndRow());
+
+            assertTrue(errors.isEmpty());
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "forward.fastq", "forward-md5", null,
+                    ReadRole.FORWARD));
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "reverse.fastq", "reverse-md5", null,
+                    ReadRole.REVERSE));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "forward.fastq", "forward-md5", null,
+                    ReadRole.FORWARD));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reverse.fastq", "reverse-md5", null,
+                    ReadRole.REVERSE));
+            files.verifyNoMoreInteractions();
+        }
+    }
+
     @Test
     void invalidMetadataReportsCsvHeadersWithoutAnySideEffects() throws Exception {
         assay.instrumentModel = "legacy instrument";
@@ -130,10 +174,18 @@ class CSVExperimentImportServiceTest {
             assertTrue(assay.samples.contains(sample));
             assertTrue(sample.assays.contains(assay));
             verify(assay, times(1)).addSample(sample);
-            for (String name : List.of("reads.fastq", "forward.fastq", "reverse.fastq")) {
-                files.verify(() -> File.importPending(1L, assay.id, sample, assay, name, "md5", null), times(1));
-                files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, name, "md5", null), times(1));
-            }
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "forward.fastq", "md5", null,
+                    ReadRole.FORWARD));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reverse.fastq", "md5", null,
+                    ReadRole.REVERSE));
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "forward.fastq", "md5", null,
+                    ReadRole.FORWARD));
+            files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "reverse.fastq", "md5", null,
+                    ReadRole.REVERSE));
             files.verifyNoMoreInteractions();
         }
         verify(service.vocabularyService, times(1)).loadRules();
@@ -148,7 +200,8 @@ class CSVExperimentImportServiceTest {
             assertEquals("any lab", assay.sequencingLaboratory);
             assertNull(assay.insertSize);
             verify(assay).addSample(sample);
-            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
         }
     }
 
@@ -194,7 +247,8 @@ class CSVExperimentImportServiceTest {
             assertEquals("lab", assay.sequencingLaboratory);
             assertEquals(100, assay.insertSize);
             verify(assay).addSample(sample);
-            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
         }
     }
 
@@ -228,9 +282,12 @@ class CSVExperimentImportServiceTest {
             assertEquals("Duplicate file reference in import", errors.getFirst().message());
             assertEquals(200, assay.insertSize);
             verify(assay, times(1)).addSample(sample);
-            for (String name : List.of("reads.fastq", "forward.fastq", "reverse.fastq")) {
-                files.verify(() -> File.importPending(1L, assay.id, sample, assay, name, "md5", null), times(1));
-            }
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE), times(1));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "forward.fastq", "md5", null,
+                    ReadRole.FORWARD), times(1));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reverse.fastq", "md5", null,
+                    ReadRole.REVERSE), times(1));
         }
     }
 
@@ -246,7 +303,8 @@ class CSVExperimentImportServiceTest {
             assertEquals("Cannot replace existing value '200' with '300'", errors.get(1).message());
             assertEquals(200, assay.insertSize);
             verify(assay, times(1)).addSample(sample);
-            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null), times(1));
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE), times(1));
         }
     }
 
@@ -257,7 +315,7 @@ class CSVExperimentImportServiceTest {
         assay.modifiedOn = Instant.EPOCH;
         try (MockedStatic<File> files = mockStatic(File.class)) {
             files.when(() -> File.validateImportPending(1L, assay.id, sample, assay,
-                    "reads.fastq", "md5", null)).thenReturn(Optional.of("Conflicting file metadata"));
+                    "reads.fastq", "md5", null, ReadRole.SINGLE)).thenReturn(Optional.of("Conflicting file metadata"));
             var errors = importRows(Map.of(), row("platform", "lab", "100"));
             assertEquals(1, errors.size());
             assertEquals("File Name", errors.getFirst().field());
@@ -265,7 +323,7 @@ class CSVExperimentImportServiceTest {
             assertEquals("instrument", assay.instrumentModel);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
             verify(assay, never()).addSample(any());
-            files.verify(() -> File.importPending(anyLong(), any(), any(), any(), any(), any(), any()), never());
+            files.verify(() -> File.importPending(anyLong(), any(), any(), any(), any(), any(), any(), any()), never());
         }
     }
 
@@ -273,7 +331,7 @@ class CSVExperimentImportServiceTest {
     void conflictAfterPrevalidationIsReportedAndDoesNotReserveReferences() throws Exception {
         try (MockedStatic<File> files = mockStatic(File.class)) {
             files.when(() -> File.importPending(eq(1L), any(), any(), any(), eq("reads.fastq"),
-                    eq("md5"), isNull())).thenReturn(Optional.of("Late file conflict"))
+                    eq("md5"), isNull(), eq(ReadRole.SINGLE))).thenReturn(Optional.of("Late file conflict"))
                     .thenReturn(Optional.empty());
             var errors = importRows(Map.of(), row("platform", "lab", "100") + row("platform", "lab", "200"));
             assertEquals(2, errors.size());

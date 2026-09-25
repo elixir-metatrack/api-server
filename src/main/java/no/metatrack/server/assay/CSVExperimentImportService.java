@@ -11,6 +11,7 @@ import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.PresignUrlService;
+import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
 import org.apache.commons.csv.CSVRecord;
 
@@ -105,11 +106,14 @@ public class CSVExperimentImportService {
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
         prepareFile(projectId, assay, sample.get(), value(record, "File Name"), value(record, "File md5"),
-                value(record, "File Unencrypted md5"), row, "File Name", importedReferences, rowReferences, pendingFiles, errors);
+                value(record, "File Unencrypted md5"), ReadRole.SINGLE, row, "File Name", importedReferences,
+                rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Forward File Name"), value(record, "Forward File md5"),
-                value(record, "Forward File Unencrypted md5"), row, "Forward File Name", importedReferences, rowReferences, pendingFiles, errors);
+                value(record, "Forward File Unencrypted md5"), ReadRole.FORWARD, row, "Forward File Name",
+                importedReferences, rowReferences, pendingFiles, errors);
         prepareFile(projectId, assay, sample.get(), value(record, "Reverse File Name"), value(record, "Reverse File md5"),
-                value(record, "Reverse File Unencrypted md5"), row, "Reverse File Name", importedReferences, rowReferences, pendingFiles, errors);
+                value(record, "Reverse File Unencrypted md5"), ReadRole.REVERSE, row, "Reverse File Name",
+                importedReferences, rowReferences, pendingFiles, errors);
         if (errors.size() > rowErrorCount || hasError(errors, row, "Insert Size")) return;
 
         try {
@@ -131,8 +135,9 @@ public class CSVExperimentImportService {
     }
 
     private void prepareFile(Long projectId, Assay assay, Sample sample, String fileName, String md5,
-            String unencryptedMd5, String row, String field, Set<String> importedReferences,
+            String unencryptedMd5, ReadRole readRole, String row, String field, Set<String> importedReferences,
             Set<String> rowReferences, List<PendingFile> pendingFiles, List<CSVExperimentRowError> errors) {
+        if ((fileName == null || fileName.isBlank()) && (md5 == null || md5.isBlank())) return;
         boolean valid = true;
         if (fileName == null || fileName.isBlank()) {
             errors.add(new CSVExperimentRowError(row, field, fileName, "File name is required"));
@@ -150,7 +155,7 @@ public class CSVExperimentImportService {
         }
         if (!valid) return;
 
-        File.validateImportPending(projectId, assay.id, sample, assay, fileName, md5, unencryptedMd5)
+        File.validateImportPending(projectId, assay.id, sample, assay, fileName, md5, unencryptedMd5, readRole)
                 .ifPresent(message -> {
                     errors.add(new CSVExperimentRowError(row, field, fileName, message));
                 });
@@ -158,7 +163,7 @@ public class CSVExperimentImportService {
             valid = false;
         }
         if (valid) {
-            pendingFiles.add(new PendingFile(field, fileName, md5, unencryptedMd5));
+            pendingFiles.add(new PendingFile(field, fileName, md5, unencryptedMd5, readRole));
         }
     }
 
@@ -206,7 +211,7 @@ public class CSVExperimentImportService {
         return errors.stream().anyMatch(error -> error.row().equals(row) && error.field().equals(field));
     }
 
-    record PendingFile(String field, String fileName, String md5, String unencryptedMd5) {
+    record PendingFile(String field, String fileName, String md5, String unencryptedMd5, ReadRole readRole) {
     }
 
     private String value(CSVRecord record, String header) {

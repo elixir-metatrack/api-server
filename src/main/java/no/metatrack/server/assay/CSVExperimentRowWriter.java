@@ -29,7 +29,7 @@ public class CSVExperimentRowWriter {
         assayService.associateSample(assay, sample);
         for (var pendingFile : pendingFiles) {
             File.importPending(projectId, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
-                    pendingFile.unencryptedMd5()).ifPresent(message -> {
+                    pendingFile.unencryptedMd5(), pendingFile.readRole()).ifPresent(message -> {
                 throw new FileConflictException(pendingFile.field(), pendingFile.fileName(), message);
             });
         }

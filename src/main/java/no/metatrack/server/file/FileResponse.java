@@ -10,11 +10,17 @@ public record FileResponse(
         UploadStatus status,
         UUID uploadedBy,
         UUID sampleId,
-        UUID assayId) {
+        UUID assayId,
+        ReadRole readRole,
+        String md5,
+        String unencryptedMd5) {
     public static FileResponse fromEntity(File file) {
         return new FileResponse(
                 file.uuid, file.fileName, file.virtualPath, file.objectKey, file.status, file.uploadedBy,
                 file.sample == null ? null : file.sample.id,
-                file.assay == null ? null : file.assay.id);
+                file.assay == null ? null : file.assay.id,
+                file.readRole,
+                file.md5,
+                file.unencryptedMd5);
     }
 }

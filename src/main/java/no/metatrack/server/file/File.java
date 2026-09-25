@@ -21,6 +21,9 @@ public class File extends PanacheEntity {
 
     String unencryptedMd5;
 
+    @Enumerated(EnumType.STRING)
+    ReadRole readRole;
+
     @Column(unique = true, nullable = false)
     String virtualPath;
 
@@ -91,14 +94,15 @@ public class File extends PanacheEntity {
 
     public static Optional<String> validateImportPending(
             Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
-            String unencryptedMd5) {
+            String unencryptedMd5, ReadRole readRole) {
         String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
         Optional<File> existing = findByVirtualPathOptional(virtualPath);
         if (existing.isPresent()) {
             File file = existing.get();
             if (file.status != UploadStatus.PENDING || file.sample != sample || file.assay != assay
                     || !java.util.Objects.equals(file.md5, md5)
-                    || !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5)) {
+                    || !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5)
+                    || (file.readRole != null && file.readRole != readRole)) {
                 return Optional.of("Conflicting file metadata for '" + fileName + "'");
             }
         }
@@ -107,19 +111,24 @@ public class File extends PanacheEntity {
 
     public static Optional<String> importPending(
             Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
-            String unencryptedMd5) {
+            String unencryptedMd5, ReadRole readRole) {
         Optional<String> validationError = validateImportPending(
-                projectId, assayId, sample, assay, fileName, md5, unencryptedMd5);
+                projectId, assayId, sample, assay, fileName, md5, unencryptedMd5, readRole);
         if (validationError.isPresent()) return validationError;
 
         String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
-        if (findByVirtualPathOptional(virtualPath).isPresent()) return Optional.empty();
+        Optional<File> existing = findByVirtualPathOptional(virtualPath);
+        if (existing.isPresent()) {
+            if (existing.get().readRole == null) existing.get().readRole = readRole;
+            return Optional.empty();
+        }
 
         File file = new File();
         file.uuid = UUID.randomUUID();
         file.fileName = fileName;
         file.md5 = md5;
         file.unencryptedMd5 = unencryptedMd5;
+        file.readRole = readRole;
         file.virtualPath = virtualPath;
         file.objectKey = PresignUrlService.uploadObjectKey(virtualPath);
         file.status = UploadStatus.PENDING;
