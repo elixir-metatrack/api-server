@@ -28,7 +28,10 @@ public class GlobalSampleVocabularyManagementService {
 
     public SampleVocabularyResponse get(String fieldKey) {
         SampleVocabularyColumn column = requireEligibleColumn(fieldKey);
-        return SampleVocabularyResponse.configured(column, findVocabulary(column.key()));
+        return GlobalSampleVocabulary.<GlobalSampleVocabulary>find("fieldKey", column.key())
+                .firstResultOptional()
+                .map(vocabulary -> SampleVocabularyResponse.configured(column, vocabulary))
+                .orElseGet(() -> SampleVocabularyResponse.eligible(column));
     }
 
     @Transactional

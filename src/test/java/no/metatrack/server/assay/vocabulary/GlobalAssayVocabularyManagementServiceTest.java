@@ -95,12 +95,14 @@ class GlobalAssayVocabularyManagementServiceTest {
     }
 
     @Test
-    void missingReadAndDeleteReturnNotFound() {
+    void missingReadReturnsEmptyVocabularyAndDeleteReturnsNotFound() {
         try (MockedStatic<PanacheEntityBase> persistence = mockStatic(PanacheEntityBase.class)) {
             stubVocabulary(persistence, "library_layout", Optional.empty());
 
-            assertEquals(404, assertThrows(NotFoundException.class,
-                    () -> service.get("library_layout")).getResponse().getStatus());
+            AssayVocabularyResponse response = service.get("library_layout");
+            assertNull(response.id());
+            assertEquals(List.of(), response.terms());
+
             assertEquals(404, assertThrows(NotFoundException.class,
                     () -> service.delete("library_layout")).getResponse().getStatus());
         }

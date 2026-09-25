@@ -259,13 +259,13 @@ custom metadata from built-in sample attributes. A null `id` means that the fiel
 unrestricted. The list should therefore drive client controls instead of maintaining a duplicate list of eligible
 built-in fields.
 
-A viewer can fetch one configured vocabulary with
-`GET /api/projects/{projectId}/sample-vocabularies/{fieldKey}`. This endpoint returns `404` when no vocabulary is
-configured; use the collection endpoint when the UI also needs unrestricted eligible fields.
+A viewer can fetch one vocabulary with
+`GET /api/projects/{projectId}/sample-vocabularies/{fieldKey}`. If none is configured, the response still has the
+same shape, with `id: null` and `terms: []`; use the collection endpoint when the UI also needs all eligible fields.
 
 ### Managing a Vocabulary
 
-Only project admins can configure vocabularies. `PUT` creates a vocabulary or atomically replaces its complete term
+Only project admins and owners can configure project vocabularies. Built-in sample and assay vocabularies are global and can be configured only by users with the `system-admin` role. `PUT` creates a vocabulary or atomically replaces its complete term
 set:
 
 ```http

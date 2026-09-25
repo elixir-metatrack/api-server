@@ -28,8 +28,11 @@ public class SampleVocabularyManagementService {
 
     public SampleVocabularyResponse get(Long projectId, String fieldKey) {
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
-        SampleVocabulary vocabulary = findVocabulary(projectId, column.key());
-        return SampleVocabularyResponse.configured(column, vocabulary);
+        return SampleVocabulary.<SampleVocabulary>find(
+                        "project.id = ?1 and fieldKey = ?2", projectId, column.key())
+                .firstResultOptional()
+                .map(vocabulary -> SampleVocabularyResponse.configured(column, vocabulary))
+                .orElseGet(() -> SampleVocabularyResponse.eligible(column));
     }
 
     @Transactional

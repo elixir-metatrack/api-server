@@ -24,7 +24,10 @@ public class GlobalAssayVocabularyManagementService {
 
     public AssayVocabularyResponse get(String fieldKey) {
         AssayVocabularyColumn column = requireEligibleColumn(fieldKey);
-        return AssayVocabularyResponse.configured(column, findVocabulary(column.key()));
+        return GlobalAssayVocabulary.<GlobalAssayVocabulary>find("fieldKey", column.key())
+                .firstResultOptional()
+                .map(vocabulary -> AssayVocabularyResponse.configured(column, vocabulary))
+                .orElseGet(() -> AssayVocabularyResponse.eligible(column));
     }
 
     @Transactional

@@ -77,13 +77,11 @@ class GlobalAssayVocabularyControllerTest {
     @Test
     void preservesServiceErrorSemantics() {
         when(service.get("unknown")).thenThrow(new BadRequestException());
-        when(service.get("library_layout")).thenThrow(new NotFoundException());
         PutAssayVocabularyRequest request = new PutAssayVocabularyRequest(List.of());
         when(service.replace("library_layout", request)).thenThrow(new BadRequestException());
         doThrow(new NotFoundException()).when(service).delete("library_layout");
 
         assertEquals(400, assertThrows(BadRequestException.class, () -> controller.get("unknown")).getResponse().getStatus());
-        assertEquals(404, assertThrows(NotFoundException.class, () -> controller.get("library_layout")).getResponse().getStatus());
         assertEquals(400, assertThrows(BadRequestException.class,
                 () -> controller.replace("library_layout", request)).getResponse().getStatus());
         assertEquals(404, assertThrows(NotFoundException.class,
