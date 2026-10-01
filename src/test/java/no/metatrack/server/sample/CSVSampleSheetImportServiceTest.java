@@ -8,6 +8,7 @@ import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
+import no.metatrack.server.spreadsheet.SpreadsheetTable;
 import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -239,6 +240,41 @@ class CSVSampleSheetImportServiceTest {
         assertEquals(2, SampleVocabularyService.validate(
                         rules, "sample-2", Map.of("host_sex", "male"), Map.of("custom_status", "unknown"))
                 .size());
+    }
+
+    @Test
+    void validatesWorkbookHeadersBeforeImportingRows() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        SampleMetadataField customField = metadataField("custom_status", "Status");
+
+        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
+                spreadsheet(service, "alias\nvalue\n"), List.of(customField)));
+        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
+                spreadsheet(service, "name,typo\nsample,value\n"), List.of(customField)));
+        service.validateSpreadsheet(
+                spreadsheet(service, "name,custom_status\nsample,ready\n"), List.of(customField));
+    }
+
+    @Test
+    void rejectsWorkbookWithoutDataRows() {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        SpreadsheetTable table = new SpreadsheetTable(
+                "Samples", List.of("name"), List.of(), Map.of(), Map.of());
+
+        BadRequestException error = assertThrows(
+                BadRequestException.class, () -> service.validateSpreadsheet(table, List.of()));
+
+        assertTrue(error.getMessage().contains("no data rows"));
+    }
+
+    private SpreadsheetTable spreadsheet(CSVSampleSheetImportService service, String contents) throws Exception {
+        List<CSVRecord> records = service.prepareRecords(new StringReader(contents), ',');
+        return new SpreadsheetTable(
+                "Samples",
+                records.getFirst().getParser().getHeaderNames(),
+                records,
+                Map.of(1L, 2),
+                Map.of());
     }
 
     private SampleMetadataField metadataField(String key, String label) {

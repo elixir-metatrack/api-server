@@ -1,6 +1,7 @@
 package no.metatrack.server.sample.vocabulary;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
@@ -37,7 +38,7 @@ public class SampleVocabularyManagementService {
 
     @Transactional
     public SampleVocabularyResponse replace(Long projectId, String fieldKey, PutSampleVocabularyRequest request) {
-        Project project = requireProject(projectId);
+        Project project = requireProjectForUpdate(projectId);
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
         List<String> values = validateTerms(request.terms());
         SampleVocabulary vocabulary = SampleVocabulary.<SampleVocabulary>find(
@@ -51,8 +52,18 @@ public class SampleVocabularyManagementService {
     }
 
     @Transactional
+    public void createFromImport(Long projectId, String fieldKey, List<String> terms) {
+        Project project = requireProjectForUpdate(projectId);
+        SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
+        List<String> values = validateTerms(terms);
+        // Create only: a concurrent definition must cause a conflict, never an overwrite.
+        SampleVocabulary vocabulary = createVocabulary(project, column.key());
+        reconcileTerms(vocabulary, values);
+    }
+
+    @Transactional
     public void delete(Long projectId, String fieldKey) {
-        requireProject(projectId);
+        requireProjectForUpdate(projectId);
         SampleVocabularyColumn column = requireEligibleColumn(projectId, fieldKey);
         findVocabulary(projectId, column.key()).delete();
     }
@@ -130,5 +141,11 @@ public class SampleVocabularyManagementService {
 
     private Project requireProject(Long projectId) {
         return Project.<Project>findByIdOptional(projectId).orElseThrow(() -> new NotFoundException("Project not found"));
+    }
+
+    private Project requireProjectForUpdate(Long projectId) {
+        Project project = Project.findById(projectId, LockModeType.PESSIMISTIC_WRITE);
+        if (project == null) throw new NotFoundException("Project not found");
+        return project;
     }
 }

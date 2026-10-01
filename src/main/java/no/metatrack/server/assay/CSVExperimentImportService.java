@@ -13,6 +13,9 @@ import no.metatrack.server.file.File;
 import no.metatrack.server.file.PresignUrlService;
 import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
+import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import no.metatrack.server.spreadsheet.TableUploadSupport;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.BufferedReader;
@@ -39,6 +42,12 @@ public class CSVExperimentImportService {
             "library_layout", "Library Layout",
             "sequencing_platform", "Sequencing platform",
             "sequencing_laboratory", "Sequencing Laboratory");
+    private static final Set<String> IMPORT_HEADERS = Set.of(
+            "sample", "file md5", "file name", "file unencrypted md5",
+            "forward file md5", "forward file name", "forward file unencrypted md5",
+            "insert size", "reverse file md5", "reverse file name", "reverse file unencrypted md5",
+            "sequencing platform", "sequencing instrument", "library name", "library layout",
+            "library selection", "library source", "library strategy", "sequencing laboratory");
 
     @Inject
     CSVImportSupport csvImportSupport;
@@ -49,40 +58,74 @@ public class CSVExperimentImportService {
     @Inject
     CSVExperimentRowWriter rowWriter;
 
+    @Inject
+    SpreadsheetImportSupport spreadsheetSupport;
+
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
         Assay assay = Assay.<Assay>find("id = ?1 and project.id = ?2", assayId, projectId)
                 .firstResultOptional().orElseThrow(NotFoundException::new);
         if (file == null || !file.isFile()) {
-            throw new BadRequestException("CSV file is missing");
+            throw new BadRequestException("Import file is missing");
         }
 
+        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file)
+                ? spreadsheetSupport.read(file, false)
+                : null;
+        if (spreadsheet != null) validateSpreadsheet(spreadsheet);
+        List<CSVRecord> records = spreadsheet == null ? readCsvRecords(file) : spreadsheet.records();
         List<CSVExperimentRowError> errors = new ArrayList<>();
         Set<String> importedReferences = new HashSet<>();
         AssayVocabularyRules rules = vocabularyService.loadRules();
-        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-            skipBom(reader);
-            for (CSVRecord record : csvImportSupport.prepareRecords(reader, csvImportSupport.detectDelimiter(file))) {
-                importRecord(projectId, assay, record, errors, importedReferences, rules);
-            }
-        } catch (IOException e) {
-            throw new BadRequestException("Unable to read CSV file", e);
+
+        for (CSVRecord record : records) {
+            String row = spreadsheet == null
+                    ? "Row " + record.getRecordNumber()
+                    : spreadsheet.location(record);
+            importRecord(projectId, assay, record, errors, importedReferences, rules, row);
         }
         return errors;
     }
 
+    private List<CSVRecord> readCsvRecords(java.io.File file) {
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            skipBom(reader);
+            return csvImportSupport.prepareRecords(reader, csvImportSupport.detectDelimiter(file));
+        } catch (IOException e) {
+            throw new BadRequestException("Unable to read CSV file", e);
+        }
+    }
+
+    void validateSpreadsheet(SpreadsheetTable table) {
+        if (table.headers().stream()
+                .map(csvImportSupport::normalizeHeader)
+                .noneMatch("sample"::equals)) {
+            throw new BadRequestException("Experiments worksheet must contain a Sample column");
+        }
+        if (table.records().isEmpty()) {
+            throw new BadRequestException("Experiments worksheet contains no data rows");
+        }
+
+        List<String> unknownHeaders = table.headers().stream()
+                .filter(header -> !IMPORT_HEADERS.contains(csvImportSupport.normalizeHeader(header)))
+                .toList();
+        if (!unknownHeaders.isEmpty()) {
+            throw new BadRequestException("Experiments worksheet contains unknown columns: "
+                    + String.join(", ", unknownHeaders));
+        }
+    }
+
     private void importRecord(Long projectId, Assay assay, CSVRecord record, List<CSVExperimentRowError> errors,
-            Set<String> importedReferences, AssayVocabularyRules rules) {
+            Set<String> importedReferences, AssayVocabularyRules rules, String row) {
         String sampleName = value(record, "Sample");
-        String row = "Row " + record.getRecordNumber();
         if (sampleName == null || sampleName.isBlank()) {
             errors.add(new CSVExperimentRowError(row, "Sample", sampleName, "Sample column is missing or empty"));
             return;
         }
 
         Optional<Sample> sample = Sample.find(
-                        "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
-                                + "where a = ?3 and s = Sample)",
+                        "select s from Sample s join s.assays a "
+                                + "where s.project.id = ?1 and s.name = ?2 and a = ?3",
                         projectId, sampleName.trim(), assay)
                 .firstResultOptional();
         if (sample.isEmpty()) {

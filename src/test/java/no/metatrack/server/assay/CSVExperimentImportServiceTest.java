@@ -2,16 +2,20 @@ package no.metatrack.server.assay;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import io.quarkus.hibernate.orm.panache.PanacheQuery;
+import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
+import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -62,8 +66,8 @@ class CSVExperimentImportServiceTest {
             entities.when(() -> Sample.find("project.id = ?1 and name = ?2", 1L, "sample"))
                     .thenReturn(samples);
             entities.when(() -> Sample.find(
-                    "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
-                            + "where a = ?3 and s = Sample)", 1L, "sample", assay)).thenReturn(samples);
+                    "select s from Sample s join s.assays a "
+                            + "where s.project.id = ?1 and s.name = ?2 and a = ?3", 1L, "sample", assay)).thenReturn(samples);
             return service.importIntoAssay(1L, assay.id, csv.toFile());
         }
     }
@@ -342,5 +346,31 @@ class CSVExperimentImportServiceTest {
             assertEquals("Insert Size", errors.get(1).field());
             assertEquals(100, assay.insertSize);
         }
+    }
+
+    @Test
+    void validatesWorkbookHeadersAndRowsBeforeImporting() throws Exception {
+        service.csvImportSupport = new CSVImportSupport();
+
+        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
+                spreadsheet("File Name\nreads.fastq\n")));
+        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
+                spreadsheet("Sample,Unexpected\nsample,value\n")));
+
+        SpreadsheetTable empty = new SpreadsheetTable(
+                "Experiments", List.of("Sample"), List.of(), Map.of(), Map.of());
+        BadRequestException error = assertThrows(
+                BadRequestException.class, () -> service.validateSpreadsheet(empty));
+        assertTrue(error.getMessage().contains("no data rows"));
+    }
+
+    private SpreadsheetTable spreadsheet(String contents) throws Exception {
+        List<CSVRecord> records = service.csvImportSupport.prepareRecords(new StringReader(contents), ',');
+        return new SpreadsheetTable(
+                "Experiments",
+                records.getFirst().getParser().getHeaderNames(),
+                records,
+                Map.of(1L, 2),
+                Map.of());
     }
 }

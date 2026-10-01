@@ -18,23 +18,17 @@ import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
+import no.metatrack.server.spreadsheet.TableUploadSupport;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Path("/api/projects/{projectId}/samples")
 public class SampleController {
-    private static final Set<String> ALLOWED_SAMPLESHEET_TYPES = Set.of(
-            "text/csv",
-            "text/plain",
-            "text/tab-separated-values",
-            "text/tsv",
-            "application/vnd.ms-excel"
-    );
+
     @Inject
     SampleService sampleService;
 
@@ -225,12 +219,7 @@ public class SampleController {
 
         if (file == null) throw new BadRequestException("No file uploaded");
 
-        String contentType = file.contentType();
-        String baseContentType = contentType != null ? contentType.split(";")[0].trim().toLowerCase() : null;
-
-        if (baseContentType == null || !ALLOWED_SAMPLESHEET_TYPES.contains(baseContentType)) {
-            throw new WebApplicationException("File must be a CSV or TSV file", 400);
-        }
+        TableUploadSupport.validate(file);
 
         List<SampleValidationViolation> errors = csvSampleSheetImportService.importNewSamples(
                 projectId, file.filePath().toFile());

@@ -322,6 +322,17 @@ not interpret that status as a rollback of the entire bulk operation. CSV/TSV er
 when an accepted column alias was present in the uploaded file, and `sample` contains the sample name when available
 (or row context when it is not).
 
+## Excel Table Imports
+
+Sample and experiment uploads accept `.xlsx` and `.xls` as well as the existing CSV/TSV formats.
+They use the same multipart `file` parameter and endpoints:
+
+- `POST /api/projects/{projectId}/samples/samplesheet`
+- `POST /api/projects/{projectId}/assays/{assayId}/experiments`
+
+The server detects Excel files from their contents. Downloadable XLSX templates and the worksheet format
+are described in [Excel template version 1](docs/excel-template-v1.md).
+
 ## Tests
 
 Run the test suite:

@@ -11,6 +11,10 @@ import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
+import no.metatrack.server.sample.vocabulary.SpreadsheetVocabularyImportService;
+import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import no.metatrack.server.spreadsheet.TableUploadSupport;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -31,6 +35,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,6 +69,12 @@ public class CSVSampleSheetImportService {
     @Inject
     SampleVocabularyService vocabularyService;
 
+    @Inject
+    SpreadsheetImportSupport spreadsheetSupport;
+
+    @Inject
+    SpreadsheetVocabularyImportService spreadsheetVocabularies;
+
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
 
@@ -72,151 +83,192 @@ public class CSVSampleSheetImportService {
         List<SampleValidationViolation> errors = new ArrayList<>();
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", projectId);
+        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file) ? spreadsheetSupport.read(file, true) : null;
+        if (spreadsheet != null) {
+            // Vocabulary imports can write data, so reject an invalid data sheet first.
+            validateSpreadsheet(spreadsheet, customFields);
+            spreadsheetVocabularies.apply(projectId, spreadsheet, customFields);
+        }
         SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(projectId);
+        List<CSVRecord> records = spreadsheet == null ? readCsvRecords(file) : spreadsheet.records();
+        Set<String> namesInFile = new HashSet<>();
 
-        try {
-            char delimiter = detectDelimiter(file);
+        for (CSVRecord rec : records) {
+            String name = getMappedValue(rec, "name", "Sample Name");
+            String row = spreadsheet == null
+                    ? "Row " + rec.getRecordNumber()
+                    : spreadsheet.location(rec);
+            String rowLabel = name == null || name.isBlank() || spreadsheet == null
+                    ? (name == null || name.isBlank() ? row : name)
+                    : name + " (" + row + ")";
 
-            try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-                reader.mark(1);
-                if (reader.read() != 0xFEFF) {
-                    reader.reset();
-                }
+            if (name == null || name.isBlank()) {
+                errors.add(new SampleValidationViolation(
+                        row, "name", name, "Name column is missing or empty"));
+                continue;
+            }
 
-                List<CSVRecord> records = prepareRecords(reader, delimiter);
+            if (!namesInFile.add(name)) {
+                errors.add(new SampleValidationViolation(
+                        rowLabel, "name", name, "Duplicate sample name within this file: '" + name + "'"));
+                continue;
+            }
 
-                Set<String> namesInFile = new HashSet<>();
+            List<SampleValidationViolation> rowErrors = new ArrayList<>();
 
-                for (CSVRecord rec : records) {
-                    String name = getMappedValue(rec, "name", "Sample Name");
+            Sample sample = new Sample();
+            sample.name = name;
+            sample.alias = getMappedValue(rec, "alias");
+            sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, rowLabel, rowErrors);
+            sample.hostTaxId =
+                    parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, rowLabel, rowErrors);
+            sample.mlst = getMappedValue(rec, "mlst", "MLST");
+            sample.isolationSource = getMappedValue(rec, "isolation_source", "Isolation Source");
 
-                    if (name == null || name.isBlank()) {
-                        errors.add(new SampleValidationViolation(
-                                "Row " + rec.getRecordNumber(), "name", name, "Name column is missing or empty"));
-                        continue;
-                    }
-
-                    if (!namesInFile.add(name)) {
-                        errors.add(new SampleValidationViolation(
-                                name, "name", name, "Duplicate sample name within this file: '" + name + "'"));
-                        continue;
-                    }
-
-                    List<SampleValidationViolation> rowErrors = new ArrayList<>();
-
-                    Sample sample = new Sample();
-                    sample.name = name;
-                    sample.alias = getMappedValue(rec, "alias");
-                    sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, name, rowErrors);
-                    sample.hostTaxId =
-                            parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, name, rowErrors);
-                    sample.mlst = getMappedValue(rec, "mlst", "MLST");
-                    sample.isolationSource = getMappedValue(rec, "isolation_source", "Isolation Source");
-
-                    String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
-                    if (rawDate != null && !rawDate.isBlank()) {
-                        try {
-                            sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
-                        } catch (DateTimeParseException e) {
-                            rowErrors.add(new SampleValidationViolation(
-                                    name,
-                                    "collection_date",
-                                    rawDate,
-                                    "Invalid date '" + rawDate
-                                            + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
-                        }
-                    }
-
-                    sample.location = getMappedValue(rec, "location", "Geographic Location");
-                    sample.sequencingLab = getMappedValue(rec, "sequencing_lab", "Collected By");
-                    sample.institution = getMappedValue(rec, "institution", "Collecting Institution");
-                    sample.hostHealthState = getMappedValue(rec, "host_health_state", "Host Health State");
-
-                    sample.projectTitle = getMappedValue(rec, "project_title", "Project Title");
-                    sample.description = getMappedValue(rec, "description", "Description");
-                    sample.isolate = getMappedValue(rec, "isolate", "Isolate");
-                    sample.collectedBy = getMappedValue(rec, "collected_by", "Collected By");
-                    sample.latitude = parseOptionalDouble(rec, new String[] {"latitude", "Latitude"}, name, rowErrors);
-                    sample.longitude =
-                            parseOptionalDouble(rec, new String[] {"longitude", "Longitude"}, name, rowErrors);
-                    sample.environmentalSample = getMappedValue(rec, "environmental_sample", "Environmental Sample");
-                    sample.hostAssociated = getMappedValue(rec, "host_associated", "Host Associated");
-                    sample.hostCommonName = getMappedValue(rec, "host_common_name", "Host Common Name");
-                    sample.hostSubjectId = getMappedValue(rec, "host_subject_id", "Host Subject ID");
-                    sample.collectorName = getMappedValue(rec, "collector_name", "Collector Name");
-                    sample.collectingInstitution =
-                            getMappedValue(rec, "collecting_institution", "Collecting Institution");
-                    sample.hostSex = getMappedValue(rec, "host_sex", "Host Sex");
-                    sample.influenzaTestMethod = getMappedValue(rec, "influenza_test_method", "Influenza Test Method");
-                    sample.influenzaTestResult = getMappedValue(rec, "influenza_test_result", "Influenza Test Result");
-                    sample.otherPathogensTested =
-                            getMappedValue(rec, "other_pathogens_tested", "Other Pathogens Tested");
-                    sample.otherPathogensTestResult =
-                            getMappedValue(rec, "other_pathogens_test_result", "Other Pathogens Test Result");
-                    sample.hostHabitat = getMappedValue(rec, "host_habitat", "Host Habitat");
-                    sample.isolationSourceHostAssociated =
-                            getMappedValue(rec, "isolation_source_host_associated", "Isolation Source Host-Associated");
-                    sample.hostBehaviour = getMappedValue(rec, "host_behaviour", "Host Behaviour");
-                    sample.isolationSourceNonHostAssociated = getMappedValue(
-                            rec, "isolation_source_non_host_associated", "Isolation Source Non-Host-Associated");
-                    sample.influenzaVirusType = getMappedValue(rec, "influenza_virus_type", "Influenza Virus Type");
-                    sample.influenzaSubType = getMappedValue(rec, "influenza_sub_type", "Influenza Sub Type");
-                    sample.serovar = getMappedValue(rec, "serovar", "Serovar");
-                    sample.strain = getMappedValue(rec, "strain", "Strain");
-                    sample.hostAge = getMappedValue(rec, "host_age", "Host Age");
-                    sample.county = getMappedValue(rec, "county", "County");
-                    sample.commune = getMappedValue(rec, "commune", "Commune");
-                    sample.hospitalHealthInstitution =
-                            getMappedValue(rec, "hospital_health_institution", "Hospital/Health institution");
-
-                    Map<String, Object> customMetadata = new LinkedHashMap<>();
-                    for (SampleMetadataField field : customFields) {
-                        String rawValue = getCustomMetadataValue(rec, field, customFields);
-                        if (rawValue == null || rawValue.isBlank()) continue;
-                        try {
-                            customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
-                        } catch (BadRequestException e) {
-                            rowErrors.add(new SampleValidationViolation(name, field.key, rawValue, e.getMessage()));
-                        }
-                    }
-
-                    if (rowErrors.isEmpty()) {
-                        rowErrors.addAll(SampleVocabularyService.validate(
-                                vocabularyRules, name, builtInValues(sample), customMetadata));
-                    }
-
-                    if (rowErrors.isEmpty()) {
-                        try {
-                            sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
-                                    sample.hostTaxId, sample.mlst, sample.location, sample.sequencingLab,
-                                    sample.institution, sample.isolationSource, sample.collectionDate,
-                                    sample.hostHealthState, sample.projectTitle, sample.description, sample.isolate,
-                                    sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
-                                    sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
-                                    sample.collectorName, sample.collectingInstitution, sample.hostSex,
-                                    sample.influenzaTestMethod, sample.influenzaTestResult, sample.otherPathogensTested,
-                                    sample.otherPathogensTestResult, sample.hostHabitat,
-                                    sample.isolationSourceHostAssociated, sample.hostBehaviour,
-                                    sample.isolationSourceNonHostAssociated, sample.influenzaVirusType,
-                                    sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
-                                    sample.county, sample.commune, sample.hospitalHealthInstitution, customMetadata);
-                        } catch (SampleVocabularyValidationException e) {
-                            errors.addAll(e.violations());
-                        } catch (WebApplicationException e) {
-                            if (e.getResponse().getStatus() != 409) throw e;
-                            errors.add(new SampleValidationViolation(name, "name", name,
-                                    "Sample name '" + name + "' already exists in this project"));
-                        }
-                    } else {
-                        errors.addAll(rowErrors);
-                    }
+            String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
+            if (rawDate != null && !rawDate.isBlank()) {
+                try {
+                    sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
+                } catch (DateTimeParseException e) {
+                    rowErrors.add(new SampleValidationViolation(
+                            rowLabel,
+                            "collection_date",
+                            rawDate,
+                            "Invalid date '" + rawDate
+                                    + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
                 }
             }
-        } catch (IOException e) {
-            throw new WebApplicationException(e.getMessage(), 500);
+
+            sample.location = getMappedValue(rec, "location", "Geographic Location");
+            sample.sequencingLab = getMappedValue(rec, "sequencing_lab", "Collected By");
+            sample.institution = getMappedValue(rec, "institution", "Collecting Institution");
+            sample.hostHealthState = getMappedValue(rec, "host_health_state", "Host Health State");
+
+            sample.projectTitle = getMappedValue(rec, "project_title", "Project Title");
+            sample.description = getMappedValue(rec, "description", "Description");
+            sample.isolate = getMappedValue(rec, "isolate", "Isolate");
+            sample.collectedBy = getMappedValue(rec, "collected_by", "Collected By");
+            sample.latitude = parseOptionalDouble(rec, new String[] {"latitude", "Latitude"}, rowLabel, rowErrors);
+            sample.longitude =
+                    parseOptionalDouble(rec, new String[] {"longitude", "Longitude"}, rowLabel, rowErrors);
+            sample.environmentalSample = getMappedValue(rec, "environmental_sample", "Environmental Sample");
+            sample.hostAssociated = getMappedValue(rec, "host_associated", "Host Associated");
+            sample.hostCommonName = getMappedValue(rec, "host_common_name", "Host Common Name");
+            sample.hostSubjectId = getMappedValue(rec, "host_subject_id", "Host Subject ID");
+            sample.collectorName = getMappedValue(rec, "collector_name", "Collector Name");
+            sample.collectingInstitution =
+                    getMappedValue(rec, "collecting_institution", "Collecting Institution");
+            sample.hostSex = getMappedValue(rec, "host_sex", "Host Sex");
+            sample.influenzaTestMethod = getMappedValue(rec, "influenza_test_method", "Influenza Test Method");
+            sample.influenzaTestResult = getMappedValue(rec, "influenza_test_result", "Influenza Test Result");
+            sample.otherPathogensTested =
+                    getMappedValue(rec, "other_pathogens_tested", "Other Pathogens Tested");
+            sample.otherPathogensTestResult =
+                    getMappedValue(rec, "other_pathogens_test_result", "Other Pathogens Test Result");
+            sample.hostHabitat = getMappedValue(rec, "host_habitat", "Host Habitat");
+            sample.isolationSourceHostAssociated =
+                    getMappedValue(rec, "isolation_source_host_associated", "Isolation Source Host-Associated");
+            sample.hostBehaviour = getMappedValue(rec, "host_behaviour", "Host Behaviour");
+            sample.isolationSourceNonHostAssociated = getMappedValue(
+                    rec, "isolation_source_non_host_associated", "Isolation Source Non-Host-Associated");
+            sample.influenzaVirusType = getMappedValue(rec, "influenza_virus_type", "Influenza Virus Type");
+            sample.influenzaSubType = getMappedValue(rec, "influenza_sub_type", "Influenza Sub Type");
+            sample.serovar = getMappedValue(rec, "serovar", "Serovar");
+            sample.strain = getMappedValue(rec, "strain", "Strain");
+            sample.hostAge = getMappedValue(rec, "host_age", "Host Age");
+            sample.county = getMappedValue(rec, "county", "County");
+            sample.commune = getMappedValue(rec, "commune", "Commune");
+            sample.hospitalHealthInstitution =
+                    getMappedValue(rec, "hospital_health_institution", "Hospital/Health institution");
+
+            Map<String, Object> customMetadata = new LinkedHashMap<>();
+            for (SampleMetadataField field : customFields) {
+                String rawValue = getCustomMetadataValue(rec, field, customFields);
+                if (rawValue == null || rawValue.isBlank()) continue;
+                try {
+                    customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
+                } catch (BadRequestException e) {
+                    rowErrors.add(new SampleValidationViolation(rowLabel, field.key, rawValue, e.getMessage()));
+                }
+            }
+
+            if (rowErrors.isEmpty()) {
+                rowErrors.addAll(SampleVocabularyService.validate(
+                        vocabularyRules, rowLabel, builtInValues(sample), customMetadata));
+            }
+
+            if (rowErrors.isEmpty()) {
+                try {
+                    sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
+                            sample.hostTaxId, sample.mlst, sample.location, sample.sequencingLab,
+                            sample.institution, sample.isolationSource, sample.collectionDate,
+                            sample.hostHealthState, sample.projectTitle, sample.description, sample.isolate,
+                            sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
+                            sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
+                            sample.collectorName, sample.collectingInstitution, sample.hostSex,
+                            sample.influenzaTestMethod, sample.influenzaTestResult, sample.otherPathogensTested,
+                            sample.otherPathogensTestResult, sample.hostHabitat,
+                            sample.isolationSourceHostAssociated, sample.hostBehaviour,
+                            sample.isolationSourceNonHostAssociated, sample.influenzaVirusType,
+                            sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
+                            sample.county, sample.commune, sample.hospitalHealthInstitution, customMetadata);
+                } catch (SampleVocabularyValidationException e) {
+                    for (SampleValidationViolation violation : e.violations()) {
+                        errors.add(new SampleValidationViolation(
+                                rowLabel, violation.fieldKey(), violation.rejectedValue(), violation.message()));
+                    }
+                } catch (WebApplicationException e) {
+                    if (e.getResponse().getStatus() != 409) throw e;
+                    errors.add(new SampleValidationViolation(rowLabel, "name", name,
+                            "Sample name '" + name + "' already exists in this project"));
+                }
+            } else {
+                errors.addAll(rowErrors);
+            }
         }
 
         return errors;
+    }
+
+    private List<CSVRecord> readCsvRecords(File file) {
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            reader.mark(1);
+            if (reader.read() != 0xFEFF) reader.reset();
+            return prepareRecords(reader, detectDelimiter(file));
+        } catch (IOException e) {
+            throw new BadRequestException("Unable to read CSV file", e);
+        }
+    }
+
+    void validateSpreadsheet(SpreadsheetTable table, List<SampleMetadataField> customFields) {
+        if (!hasHeader(table.headers(), "name", "Sample Name")) {
+            throw new BadRequestException("Samples worksheet must contain a name or Sample Name column");
+        }
+        if (table.records().isEmpty()) {
+            throw new BadRequestException("Samples worksheet contains no data rows");
+        }
+
+        Set<String> acceptedHeaders = new LinkedHashSet<>(BUILT_IN_HEADERS);
+        for (SampleMetadataField field : customFields) {
+            acceptedHeaders.add(normalizeHeader(field.key));
+            if (!isAmbiguousLabel(field, customFields)) {
+                acceptedHeaders.add(normalizeHeader(field.label));
+            }
+        }
+
+        List<String> unknownHeaders = table.headers().stream()
+                .filter(header -> !acceptedHeaders.contains(normalizeHeader(header)))
+                .toList();
+        if (!unknownHeaders.isEmpty()) {
+            throw new BadRequestException("Samples worksheet contains unknown columns: "
+                    + String.join(", ", unknownHeaders));
+        }
+    }
+
+    private boolean hasHeader(List<String> headers, String... expectedHeaders) {
+        Set<String> expected = new HashSet<>();
+        for (String header : expectedHeaders) expected.add(normalizeHeader(header));
+        return headers.stream().map(this::normalizeHeader).anyMatch(expected::contains);
     }
 
     List<CSVRecord> prepareRecords(Reader reader, char delimiter) throws IOException {
