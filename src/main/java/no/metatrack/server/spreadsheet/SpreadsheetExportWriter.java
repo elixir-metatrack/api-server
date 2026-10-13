@@ -4,7 +4,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.file.FileResponse;
-import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
@@ -135,9 +134,15 @@ public class SpreadsheetExportWriter {
         List<Object> values = new ArrayList<>(Arrays.asList(sample.name, assay.studyAccession, assay.instrumentModel,
                 assay.libraryName, assay.librarySource, assay.librarySelection, assay.libraryStrategy, assay.libraryLayout,
                 assay.insertSize, assay.sequencingPlatform, assay.sequencingLaboratory));
-        values.addAll(Collections.nCopies(9, null));
+        values.addAll(Collections.nCopies(EXPERIMENT_HEADERS.size() - values.size(), null));
         if (file != null) {
-            int offset = file.readRole() == ReadRole.FORWARD ? 14 : file.readRole() == ReadRole.REVERSE ? 17 : 11;
+            // Older file records have no read role; keep them in the single-file columns.
+            String fileColumn = switch (file.readRole()) {
+                case FORWARD -> "Forward File Name";
+                case REVERSE -> "Reverse File Name";
+                case null, default -> "File Name";
+            };
+            int offset = EXPERIMENT_HEADERS.indexOf(fileColumn);
             values.set(offset, file.name());
             values.set(offset + 1, file.md5());
             values.set(offset + 2, file.unencryptedMd5());
@@ -204,9 +209,7 @@ public class SpreadsheetExportWriter {
             Cell cell = row.createCell(column);
             if (value instanceof Boolean bool) {
                 cell.setCellValue(bool);
-            } else if (value instanceof Number numeric && Double.isFinite(numeric.doubleValue())
-                    && new BigDecimal(numeric.toString()).compareTo(
-                            new BigDecimal(NumberToTextConverter.toText(numeric.doubleValue()))) == 0) {
+            } else if (value instanceof Number numeric && canWriteAsNumber(numeric)) {
                 cell.setCellValue(numeric.doubleValue());
                 cell.setCellStyle(number);
             } else {
@@ -215,6 +218,14 @@ public class SpreadsheetExportWriter {
                 if (text.length() > 32767) throw new BadRequestException("A value exceeds Excel's 32,767 character cell limit");
                 cell.setCellValue(text);
             }
+        }
+
+        private boolean canWriteAsNumber(Number value) {
+            double numeric = value.doubleValue();
+            if (!Double.isFinite(numeric)) return false;
+            // Excel may round large or precise numbers. Use text if a reimport would change the value.
+            BigDecimal exported = new BigDecimal(NumberToTextConverter.toText(numeric));
+            return new BigDecimal(value.toString()).compareTo(exported) == 0;
         }
 
         byte[] finish() throws IOException {
