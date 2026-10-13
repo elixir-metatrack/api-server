@@ -368,7 +368,7 @@ not interpret that status as a rollback of the entire bulk operation. CSV/TSV er
 when an accepted column alias was present in the uploaded file, and `sample` contains the sample name when available
 (or row context when it is not).
 
-## Excel Table Imports
+## Excel Table Imports and Exports
 
 Sample and experiment uploads accept `.xlsx` and `.xls` as well as the existing CSV/TSV formats.
 They use the same multipart `file` parameter and endpoints:
@@ -378,6 +378,16 @@ They use the same multipart `file` parameter and endpoints:
 
 The server detects Excel files from their contents. Downloadable XLSX templates and the worksheet format
 are described in [Excel template version 1](docs/excel-template-v1.md).
+
+Project viewers can export sample data or experiment data in an assay as XLSX:
+
+- `POST /api/projects/{projectId}/samples/export`
+- `POST /api/projects/{projectId}/assays/{assayId}/experiments/export`
+
+Send JSON `{"sampleNames":["sample-1","sample-2"]}` (1–10,000 distinct sample names).
+The webapp's **Export Excel** button exports selected rows, or filtered rows across all pages when
+nothing is selected. Exports include all importable fields, active custom sample metadata and custom
+text vocabularies. See the format document for reimport requirements and size limits.
 
 ## Tests
 

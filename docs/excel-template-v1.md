@@ -14,6 +14,48 @@ remains available. XLSX templates are generated from the existing bundled CSV co
 These downloads contain no project data and are public, like the CSV templates. Templates are shared across
 projects; add any project-specific custom attribute columns yourself using their field keys.
 
+## Export existing data
+
+Use **Export Excel** in the Samples table or inside an assay's Experiment table. If rows are selected,
+the export contains the selected rows matching the current filter; otherwise it contains all filtered
+rows across all pages. Exports include every importable field, regardless of column visibility. The
+existing TSV download remains available.
+
+Authenticated project VIEWERs (or higher) can use these endpoints with
+`Content-Type: application/json` and a body such as `{"sampleNames":["sample-1","sample-2"]}`:
+
+| POST endpoint | Download |
+| --- | --- |
+| `/api/projects/{projectId}/samples/export` | `samples-{projectId}.xlsx` |
+| `/api/projects/{projectId}/assays/{assayId}/experiments/export` | `experiments-{assayId}.xlsx` |
+
+Select 1–10,000 distinct sample names. Names must belong to the requested project and, for experiments,
+be linked to the requested assay. A missing or inaccessible selected sample rejects the export instead
+of silently returning a subset. Responses are private (`Cache-Control: no-store`).
+
+The exported first sheet uses the version 1 import layout. Sample exports use canonical field keys,
+include active custom fields, and include configured custom TEXT vocabularies on a second sheet.
+Archived fields, database IDs, timestamps, storage paths and taxonomy display labels are not exported.
+Dates use ISO text, booleans remain booleans, and numeric values use Excel numbers where precision can
+be preserved. Higher precision decimals are stored as text. Identifiers and text beginning with `=`
+remain text, never formulas.
+
+Experiment exports include sequencing/library metadata, Study Accession, and file names/checksums.
+Each file has its own row in the appropriate single/forward/reverse columns; this preserves multiple
+files of one read role without guessing file pairs. Samples without files have a metadata-only row.
+Legacy files without a read role use the single-file columns. Files lacking an MD5 can be exported,
+but their MD5 must be filled in before importing those rows.
+
+Reimport uses the existing creation and permission rules. Sample imports do not overwrite existing names:
+use a different target project or rename samples first. Create matching custom field keys and types in
+the target project before importing; new vocabulary definitions require ADMIN/OWNER. Experiment imports
+require the referenced samples to already exist and be linked to the target assay. Existing metadata/file
+conflicts are still rejected, and importing file references does not copy stored file contents.
+
+Exports are limited to 500,000 cells, 511 data columns, 100,000 worksheet rows and 20 MiB. Values longer
+than Excel's 32,767-character cell limit are rejected rather than truncated. Select fewer samples if an
+export exceeds the limits. Downloads use `.xlsx`, while imports continue to accept `.xls` and `.xlsx`.
+
 ## First worksheet: data
 
 The first worksheet contains Sample or Experiment rows. Worksheet names are descriptive; their order determines
