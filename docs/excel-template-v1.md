@@ -8,7 +8,8 @@ remains available. XLSX templates are generated from the existing bundled CSV co
 | `/api/templates/excel/sample` | `sample-v1.xlsx` |
 | `/api/templates/excel/sample_extended` | `sample_extended-v1.xlsx` |
 | `/api/templates/excel/sample_virus` | `sample_virus-v1.xlsx` |
-| `/api/templates/excel/experiment` | `experiment-v1.xlsx` |
+| `/api/templates/excel/experiment_PE` | `experiment_PE-v1.xlsx` |
+| `/api/templates/excel/experiment_SE` | `experiment_SE-v1.xlsx` |
 
 These downloads contain no project data and are public, like the CSV templates. Templates are shared across
 projects; add any project-specific custom attribute columns yourself using their field keys.
@@ -36,8 +37,14 @@ are rejected with their worksheet position. The data sheet must contain at least
 `Sample Name`/`name` or `Sample` column. Unknown columns are rejected instead of being silently ignored; Sample
 columns may use a built-in header or an active custom attribute key (an unambiguous custom label is also accepted).
 Paste formula results as values before importing. Excel dates are read as ISO dates (`YYYY-MM-DD`); boolean cells
-become `true`/`false`. Other cells use their displayed value, including number formats with leading zeros. Store
-identifiers as text to avoid Excel changing them.
+become `true`/`false`. Numeric metadata (Tax ID, Host Tax ID, Latitude, Longitude, Insert Size and custom NUMBER
+attributes) uses the stored numeric value, ignoring display rounding, separators and other number formatting.
+Text fields use their displayed value, including number formats with leading zeros. Store identifiers as text
+to avoid Excel changing them.
+
+Collection dates in text cells and CSV/TSV files accept `yyyy-MM-dd`, `d/M/yyyy` and `M/d/yyyy`, as well as
+two-digit years (2000–2099) in slash dates. Invalid calendar dates are rejected. Ambiguous slash dates use
+day/month/year: `3/4/2026` means 3 April. Prefer ISO dates to avoid ambiguity.
 
 ## Optional second worksheet: Sample vocabularies
 

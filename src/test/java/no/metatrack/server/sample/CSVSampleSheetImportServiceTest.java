@@ -5,20 +5,30 @@ import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
+import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
 import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.sample.vocabulary.SpreadsheetVocabularyImportService;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedStatic;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -94,6 +104,75 @@ class CSVSampleSheetImportServiceTest {
             assertEquals("host_sex", errors.getFirst().fieldKey());
             assertEquals("male", errors.getFirst().rejectedValue());
             verifyNoInteractions(service.sampleService);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2024-02-29,2024-02-29", "29/2/2024,2024-02-29", "12/31/2026,2026-12-31",
+            "31/12/26,2026-12-31", "12/31/26,2026-12-31", "3/4/2026,2026-04-03",
+            "2025-02-29,", "31/02/2026,", "02/29/2025,", "2026-04-31,"})
+    void validatesCollectionDatesWithoutSilentlyChangingDays(String input, String expected) throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        Path csv = Files.writeString(directory.resolve("dates.csv"),
+                "name,collection_date\nsample-1," + input + "\n");
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            var errors = service.importNewSamples(1L, csv.toFile());
+            if (expected == null) {
+                assertEquals(1, errors.size());
+                assertEquals("collection_date", errors.getFirst().fieldKey());
+                assertEquals(input, errors.getFirst().rejectedValue());
+                verifyNoInteractions(service.sampleService);
+            } else {
+                assertTrue(errors.isEmpty(), errors.toString());
+                var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                        .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
+                assertEquals(1, calls.size());
+                assertEquals(LocalDate.parse(expected), calls.getFirst().getArgument(10));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"xls,concentration", "xls,Concentration value", "xlsx,concentration", "xlsx,Concentration value"})
+    void importsCustomNumbersByKeyOrLabelWithoutRounding(String format, String header) throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        service.metadataService = new SampleMetadataService();
+        service.spreadsheetSupport = new SpreadsheetImportSupport();
+        service.spreadsheetVocabularies = mock(SpreadsheetVocabularyImportService.class);
+        SampleMetadataField field = metadataField("concentration", "Concentration value");
+        field.type = SampleMetadataFieldType.NUMBER;
+        Path path = directory.resolve("numbers." + format);
+        try (Workbook workbook = format.equals("xls") ? new HSSFWorkbook() : new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Samples");
+            var headers = sheet.createRow(0);
+            headers.createCell(0).setCellValue("name");
+            headers.createCell(1).setCellValue(header);
+            var data = sheet.createRow(1);
+            data.createCell(0).setCellValue("sample-1");
+            var cell = data.createCell(1);
+            cell.setCellValue(1234.56789);
+            var style = workbook.createCellStyle();
+            style.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+            cell.setCellStyle(style);
+            try (var output = Files.newOutputStream(path)) { workbook.write(output); }
+        }
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
+            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
+            assertEquals(1, calls.size());
+            Object[] arguments = calls.getFirst().getArguments();
+            assertEquals(Map.of("concentration", new BigDecimal("1234.56789")), arguments[arguments.length - 1]);
         }
     }
 

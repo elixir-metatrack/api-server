@@ -8,6 +8,7 @@ import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
+import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
@@ -34,6 +35,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -77,8 +79,13 @@ public class CSVSampleSheetImportService {
     @Inject
     SpreadsheetVocabularyImportService spreadsheetVocabularies;
 
-    private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("[yyyy-MM-dd][d/M/yyyy][d/M/yy][MM/dd/yyyy][MM/dd/yy]");
+    // Prefer day/month for ambiguous slash dates, preserving the existing import convention.
+    private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
+            DateTimeFormatter.ISO_LOCAL_DATE,
+            DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d/M/uu").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("M/d/uuuu").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("M/d/uu").withResolverStyle(ResolverStyle.STRICT));
 
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
@@ -87,7 +94,15 @@ public class CSVSampleSheetImportService {
         Project project = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", project.id);
-        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file) ? spreadsheetSupport.read(file, true) : null;
+        Set<String> customNumberHeaders = new HashSet<>();
+        for (SampleMetadataField field : customFields) {
+            if (field.type == SampleMetadataFieldType.NUMBER) {
+                customNumberHeaders.add(field.key);
+                if (!isAmbiguousLabel(field, customFields)) customNumberHeaders.add(field.label);
+            }
+        }
+        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file)
+                ? spreadsheetSupport.read(file, true, customNumberHeaders) : null;
         if (spreadsheet != null) {
             // Vocabulary imports can write data, so reject an invalid data sheet first.
             validateSpreadsheet(spreadsheet, customFields);
@@ -132,14 +147,15 @@ public class CSVSampleSheetImportService {
             String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
             if (rawDate != null && !rawDate.isBlank()) {
                 try {
-                    sample.collectionDate = LocalDate.parse(rawDate.trim(), DATE_FORMATTER);
+                    sample.collectionDate = parseCollectionDate(rawDate.trim());
                 } catch (DateTimeParseException e) {
                     rowErrors.add(new SampleValidationViolation(
                             rowLabel,
                             "collection_date",
                             rawDate,
                             "Invalid date '" + rawDate
-                                    + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, MM/dd/yyyy"));
+                                    + "'. Accepted formats: yyyy-MM-dd, d/M/yyyy, M/d/yyyy (also two-digit years)."
+                                    + " Ambiguous slash dates use day/month/year."));
                 }
             }
 
@@ -232,6 +248,17 @@ public class CSVSampleSheetImportService {
         }
 
         return errors;
+    }
+
+    private LocalDate parseCollectionDate(String value) {
+        for (DateTimeFormatter formatter : DATE_FORMATTERS) {
+            try {
+                return LocalDate.parse(value, formatter);
+            } catch (DateTimeParseException ignored) {
+                // Try each format separately: optional sections do not provide parsing alternatives.
+            }
+        }
+        throw new DateTimeParseException("Invalid collection date", value, 0);
     }
 
     private List<CSVRecord> readCsvRecords(File file) {
