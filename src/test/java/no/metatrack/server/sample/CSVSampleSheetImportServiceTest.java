@@ -12,6 +12,7 @@ import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
 import no.metatrack.server.spreadsheet.SpreadsheetTable;
 import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.spreadsheet.SpreadsheetExportWriter;
 import no.metatrack.server.sample.vocabulary.SpreadsheetVocabularyImportService;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -43,6 +44,50 @@ import static org.mockito.Mockito.*;
 class CSVSampleSheetImportServiceTest {
     @TempDir
     Path directory;
+
+    @Test
+    void importsExportedSamplesWithDistinctBuiltInAliasesAndCustomMetadata() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        service.metadataService = new SampleMetadataService();
+        service.spreadsheetSupport = new SpreadsheetImportSupport();
+        service.spreadsheetVocabularies = mock(SpreadsheetVocabularyImportService.class);
+        Sample source = new Sample();
+        source.id = java.util.UUID.randomUUID();
+        source.name = "00012";
+        source.institution = "owner institution";
+        source.collectingInstitution = "collecting institution";
+        source.sequencingLab = "sequencing lab";
+        source.collectedBy = "collector";
+        source.collectionDate = LocalDate.of(2024, 2, 29);
+        source.latitude = 69.649208;
+        SampleMetadataField field = metadataField("amount", "Amount");
+        field.type = SampleMetadataFieldType.NUMBER;
+        Map<String, Object> values = Map.of("amount", new BigDecimal("12345678901234567890.12345"));
+        byte[] bytes = new SpreadsheetExportWriter().samples(List.of(source), List.of(field),
+                Map.of(source.id, values), List.of());
+        Path path = Files.write(directory.resolve("export.xlsx"), bytes);
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
+            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
+            assertEquals(1, calls.size());
+            var call = calls.getFirst();
+            assertEquals(source.name, call.getArgument(1));
+            assertEquals(source.sequencingLab, call.getArgument(7));
+            assertEquals(source.institution, call.getArgument(8));
+            assertEquals(source.collectionDate, call.getArgument(10));
+            assertEquals(source.collectedBy, call.getArgument(15));
+            assertEquals(source.latitude, call.getArgument(16));
+            assertEquals(source.collectingInstitution, call.getArgument(23));
+            Object[] arguments = call.getArguments();
+            assertEquals(values, arguments[arguments.length - 1]);
+        }
+    }
 
     @Test
     void validRowsUseApiCreationWhileInvalidRowsRemainIsolated() throws Exception {

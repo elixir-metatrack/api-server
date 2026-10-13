@@ -34,6 +34,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class CSVExperimentImportService {
     private static final Map<String, String> VOCABULARY_HEADERS = Map.of(
+            "study_accession", "Study Accession",
             "instrument_model", "Sequencing instrument",
             "library_name", "Library Name",
             "library_source", "Library Source",
@@ -43,7 +44,7 @@ public class CSVExperimentImportService {
             "sequencing_platform", "Sequencing platform",
             "sequencing_laboratory", "Sequencing Laboratory");
     private static final Set<String> IMPORT_HEADERS = Set.of(
-            "sample", "file md5", "file name", "file unencrypted md5",
+            "sample", "study accession", "file md5", "file name", "file unencrypted md5",
             "forward file md5", "forward file name", "forward file unencrypted md5",
             "insert size", "reverse file md5", "reverse file name", "reverse file unencrypted md5",
             "sequencing platform", "sequencing instrument", "library name", "library layout",
@@ -157,6 +158,7 @@ public class CSVExperimentImportService {
 
         try {
             rowWriter.write(projectId, assay.id, sampleName.trim(),
+                    patchValue(record, "Study Accession"),
                     patchValue(record, "Sequencing instrument"), patchValue(record, "Library Name"),
                     patchValue(record, "Library Source"), patchValue(record, "Library Selection"),
                     patchValue(record, "Library Strategy"), patchValue(record, "Library Layout"), insertSize,
@@ -220,6 +222,7 @@ public class CSVExperimentImportService {
     private boolean hasMetadataConflict(Assay assay, Map<String, String> metadata, Integer insertSize,
             String row, List<CSVExperimentRowError> errors) {
         Map<String, String> existingValues = Map.of(
+                "study_accession", assay.studyAccession == null ? "" : assay.studyAccession,
                 "instrument_model", assay.instrumentModel == null ? "" : assay.instrumentModel,
                 "library_name", assay.libraryName == null ? "" : assay.libraryName,
                 "library_source", assay.librarySource == null ? "" : assay.librarySource,

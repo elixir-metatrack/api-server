@@ -7,8 +7,12 @@ import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.file.FileResponse;
+import no.metatrack.server.file.UploadStatus;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import no.metatrack.server.spreadsheet.SpreadsheetExportWriter;
+import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
 import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +45,10 @@ class CSVExperimentImportServiceTest {
     private final CSVExperimentImportService service = new CSVExperimentImportService();
 
     private List<CSVExperimentRowError> importRows(Map<String, Set<String>> terms, String rows) throws Exception {
+        return importFile(terms, Files.writeString(directory.resolve("experiments.csv"), HEADER + rows));
+    }
+
+    private List<CSVExperimentRowError> importFile(Map<String, Set<String>> terms, Path path) throws Exception {
         if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
         assay.project = new Project();
@@ -49,6 +57,7 @@ class CSVExperimentImportServiceTest {
         if (sample.id == null) sample.id = UUID.randomUUID();
         assay.samples.add(sample);
         service.csvImportSupport = new CSVImportSupport();
+        service.spreadsheetSupport = new SpreadsheetImportSupport();
         service.vocabularyService = mock(AssayVocabularyService.class);
         when(service.vocabularyService.loadRules()).thenReturn(new AssayVocabularyRules(terms));
         AssayService assayService = new AssayService();
@@ -58,13 +67,66 @@ class CSVExperimentImportServiceTest {
         when(service.vocabularyService.validate(anyString(), anyMap())).thenAnswer(invocation ->
                 AssayVocabularyService.validate(new AssayVocabularyRules(terms),
                         invocation.getArgument(0), invocation.getArgument(1)));
-        Path csv = Files.writeString(directory.resolve("experiments.csv"), HEADER + rows);
         try (MockedStatic<Assay> scopedAssays = mockStatic(Assay.class);
              MockedStatic<Sample> scopedSamples = mockStatic(Sample.class)) {
             scopedAssays.when(() -> Assay.findByIdInProjectScope(1L, assay.id)).thenReturn(Optional.of(assay));
             scopedSamples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(Optional.of(sample));
-            return service.importIntoAssay(1L, assay.id, csv.toFile());
+            return service.importIntoAssay(1L, assay.id, path.toFile());
         }
+    }
+
+    @Test
+    void importsExportedExperimentsIncludingStudyAccessionAndMultipleFilesPerRole() throws Exception {
+        Assay source = new Assay();
+        source.id = UUID.randomUUID();
+        source.studyAccession = "PRJ1234";
+        source.libraryName = "00012";
+        source.sequencingPlatform = "ILLUMINA";
+        source.sequencingLaboratory = "Lab";
+        source.insertSize = 1234;
+        sample.id = UUID.randomUUID();
+        sample.name = "sample";
+        List<FileResponse> files = List.of(
+                exportFile(source, "single.fastq", ReadRole.SINGLE),
+                exportFile(source, "r1.fastq", ReadRole.FORWARD),
+                exportFile(source, "r1-lane2.fastq", ReadRole.FORWARD),
+                exportFile(source, "r2.fastq", ReadRole.REVERSE));
+        Path path = Files.write(directory.resolve("export.xlsx"),
+                new SpreadsheetExportWriter().experiments(source, List.of(sample), files));
+        try (MockedStatic<File> fileEntities = mockStatic(File.class)) {
+            assertTrue(importFile(Map.of(), path).isEmpty());
+            for (FileResponse file : files) {
+                fileEntities.verify(() -> File.importPending(1L, assay.id, sample, assay, file.name(),
+                        file.md5(), file.unencryptedMd5(), file.readRole()));
+            }
+            assertEquals(source.studyAccession, assay.studyAccession);
+            assertEquals(source.libraryName, assay.libraryName);
+            assertEquals(source.sequencingPlatform, assay.sequencingPlatform);
+            assertEquals(source.sequencingLaboratory, assay.sequencingLaboratory);
+            assertEquals(source.insertSize, assay.insertSize);
+        }
+    }
+
+    @Test
+    void exportedStudyAccessionCannotReplaceExistingValue() throws Exception {
+        assay.id = UUID.randomUUID();
+        assay.studyAccession = "existing";
+        Assay source = new Assay();
+        source.id = assay.id;
+        source.studyAccession = "different";
+        sample.id = UUID.randomUUID();
+        sample.name = "sample";
+        Path path = Files.write(directory.resolve("conflict.xlsx"),
+                new SpreadsheetExportWriter().experiments(source, List.of(sample), List.of()));
+        var errors = importFile(Map.of(), path);
+        assertEquals(1, errors.size());
+        assertEquals("Study Accession", errors.getFirst().field());
+        assertEquals("existing", assay.studyAccession);
+    }
+
+    private FileResponse exportFile(Assay source, String name, ReadRole role) {
+        return new FileResponse(UUID.randomUUID(), name, null, null, UploadStatus.PENDING, null,
+                sample.id, source.id, role, "md5", "plain-md5");
     }
 
     private String row(String platform, String laboratory, String insertSize) {
@@ -83,10 +145,10 @@ class CSVExperimentImportServiceTest {
         try (MockedStatic<Sample> samples = mockStatic(Sample.class);
              MockedStatic<File> files = mockStatic(File.class)) {
             samples.when(() -> Sample.findBySampleNameInProject("sample", 2L)).thenReturn(Optional.of(sample));
-            writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null,
+            writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null, null,
                     List.of(new CSVExperimentImportService.PendingFile(
                             "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)));
-            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null);
+            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null, null);
             verify(writer.assayService).associateSample(assay, sample);
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));

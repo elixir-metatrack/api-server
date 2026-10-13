@@ -62,7 +62,7 @@ public class CSVSampleSheetImportService {
             "host behaviour", "isolation_source_non_host_associated", "isolation source non-host-associated",
             "influenza_virus_type", "influenza virus type", "influenza_sub_type", "influenza sub type", "serovar",
             "strain", "host_age", "host age", "county", "commune", "hospital_health_institution",
-            "hospital/health institution");
+            "hospital/health institution", "collecting_institution");
 
     @Inject
     SampleMetadataService metadataService;
