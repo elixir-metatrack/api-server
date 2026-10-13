@@ -92,6 +92,7 @@ public class SpreadsheetImportSupport {
                 }
             }
 
+            // Reuse the CSV importers, but keep Excel row numbers for errors after skipping blank rows.
             Map<Long, Integer> rowNumbers = new LinkedHashMap<>();
             StringWriter text = new StringWriter();
             try (CSVPrinter printer = new CSVPrinter(text, CSVFormat.DEFAULT)) {

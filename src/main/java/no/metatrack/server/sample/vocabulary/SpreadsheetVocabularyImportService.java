@@ -30,10 +30,10 @@ public class SpreadsheetVocabularyImportService {
 
     @Transactional
     public void apply(Long projectId, SpreadsheetTable table, List<SampleMetadataField> fields) {
-        if (!table.vocabularies().isEmpty()) {
-            // Serialize definition checks and creation so two imports cannot both observe a missing vocabulary.
-            Project.findById(projectId, LockModeType.PESSIMISTIC_WRITE);
-        }
+        if (table.vocabularies().isEmpty()) return;
+
+        // Prevent concurrent imports from both trying to create the same vocabulary.
+        Project.findById(projectId, LockModeType.PESSIMISTIC_WRITE);
         Map<String, List<String>> additions = new LinkedHashMap<>();
         for (var entry : table.vocabularies().entrySet()) {
             String key = entry.getKey();
@@ -41,12 +41,12 @@ public class SpreadsheetVocabularyImportService {
                 throw new BadRequestException("Vocabularies: built-in attribute '" + key
                         + "' uses an administrator-managed vocabulary");
             }
-            fields.stream()
-                    .filter(field -> field.key.equals(key)
-                            && field.archivedOn == null
-                            && field.type == SampleMetadataFieldType.TEXT)
-                    .findFirst().orElseThrow(() -> new BadRequestException(
-                            "Vocabularies: '" + key + "' must be an existing custom TEXT attribute"));
+            if (fields.stream().noneMatch(field -> field.key.equals(key)
+                    && field.archivedOn == null
+                    && field.type == SampleMetadataFieldType.TEXT)) {
+                throw new BadRequestException(
+                        "Vocabularies: '" + key + "' must be an existing custom TEXT attribute");
+            }
             if (table.headers().stream().noneMatch(header -> key.equalsIgnoreCase(header))) {
                 throw new BadRequestException("Vocabularies: custom attribute '" + key
                         + "' must appear by its field key in the data sheet");
