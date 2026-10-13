@@ -1,6 +1,6 @@
 # Excel template version 1
 
-Use **Download Excel template** in the Sample or Experiment toolbar. The existing CSV template download
+Use **XLS Template** in the Sample or Experiment toolbar. The existing CSV template download
 remains available. XLSX templates are generated from the existing bundled CSV column definitions:
 
 | GET endpoint | Download |
@@ -16,10 +16,10 @@ projects; add any project-specific custom attribute columns yourself using their
 
 ## Export existing data
 
-Use **Export Excel** in the Samples table or inside an assay's Experiment table. If rows are selected,
+Use **XLS** in the Samples table or inside an assay's Experiment table to download an XLSX file. If rows are selected,
 the export contains the selected rows matching the current filter; otherwise it contains all filtered
 rows across all pages. Exports include every importable field, regardless of column visibility. The
-existing TSV download remains available.
+**TSV** button uses the same row selection and exports the visible data columns.
 
 Authenticated project VIEWERs (or higher) can use these endpoints with
 `Content-Type: application/json` and a body such as `{"sampleNames":["sample-1","sample-2"]}`:

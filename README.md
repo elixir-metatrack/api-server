@@ -385,7 +385,7 @@ Project viewers can export sample data or experiment data in an assay as XLSX:
 - `POST /api/projects/{projectId}/assays/{assayId}/experiments/export`
 
 Send JSON `{"sampleNames":["sample-1","sample-2"]}` (1–10,000 distinct sample names).
-The webapp's **Export Excel** button exports selected rows, or filtered rows across all pages when
+The webapp's **XLS** button downloads an XLSX file with selected rows, or filtered rows across all pages when
 nothing is selected. Exports include all importable fields, active custom sample metadata and custom
 text vocabularies. See the format document for reimport requirements and size limits.
 
