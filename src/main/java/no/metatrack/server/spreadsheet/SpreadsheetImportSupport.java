@@ -10,6 +10,7 @@ import org.apache.commons.csv.DuplicateHeaderMode;
 import org.apache.poi.poifs.filesystem.FileMagic;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.ss.util.NumberToTextConverter;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -19,6 +20,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -32,8 +34,16 @@ public class SpreadsheetImportSupport {
     private static final int MAX_COLUMNS = 512;
     private static final long MAX_FILE_SIZE = 20L * 1024 * 1024;
     private static final long MAX_EXPANDED_FILE_SIZE = 256L * 1024 * 1024;
+    private static final Set<String> SAMPLE_NUMBER_HEADERS = Set.of(
+            "tax_id", "tax id", "host_tax_id", "host tax id", "latitude", "longitude");
 
     public SpreadsheetTable read(File file, boolean sampleTable) {
+        return read(file, sampleTable, Set.of());
+    }
+
+    public SpreadsheetTable read(File file, boolean sampleTable, Set<String> customNumberHeaders) {
+        Set<String> numberHeaders = new HashSet<>(sampleTable ? SAMPLE_NUMBER_HEADERS : Set.of("insert size"));
+        customNumberHeaders.forEach(header -> numberHeaders.add(header.trim().toLowerCase(Locale.ROOT)));
         if (file.length() > MAX_FILE_SIZE) throw new BadRequestException("Excel files must not exceed 20 MiB");
         try {
             // POI may allocate rows from sparse cell references, so inspect OOXML dimensions first.
@@ -90,6 +100,17 @@ public class SpreadsheetImportSupport {
                 for (int i = headerRow + 1; i < cells.size(); i++) {
                     List<String> row = new ArrayList<>(cells.get(i));
                     if (marker && !row.isEmpty()) row.removeFirst();
+                    // Numeric metadata uses stored values, independently of rounding, grouping or date display formats.
+                    // Text identifiers continue to use the displayed value (e.g. a zero-padded sample name).
+                    Row source = sheet.getRow(i);
+                    for (int column = 0; column < Math.min(headers.size(), row.size()); column++) {
+                        if (!numberHeaders.contains(headers.get(column).toLowerCase(Locale.ROOT))) continue;
+                        Cell cell = source == null ? null : source.getCell(column + (marker ? 1 : 0));
+                        if (cell != null && cell.getCellType() == CellType.NUMERIC) {
+                            row.set(column, new BigDecimal(NumberToTextConverter.toText(cell.getNumericCellValue()))
+                                    .stripTrailingZeros().toPlainString());
+                        }
+                    }
                     if (row.stream().allMatch(String::isBlank)) continue;
                     if (row.size() > headers.size() && row.subList(headers.size(), row.size()).stream().anyMatch(v -> !v.isBlank())) {
                         throw new BadRequestException(sheet.getSheetName() + "!row " + (i + 1) + ": value has no column header");

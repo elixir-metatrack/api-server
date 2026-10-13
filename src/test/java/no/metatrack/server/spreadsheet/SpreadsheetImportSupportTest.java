@@ -102,6 +102,48 @@ class SpreadsheetImportSupportTest {
         assertEquals("real-sample", filled.records().getFirst().get(experiment ? "Sample" : "Sample Name"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"xls", "xlsx"})
+    void importsStoredNumbersWithoutDisplayRoundingOrGrouping(String format) throws Exception {
+        try (Workbook workbook = workbook(format)) {
+            Sheet sheet = workbook.createSheet("Samples");
+            row(sheet, 0, "TEMPLATE VERSION:", "1");
+            row(sheet, 1, "METADATA FIELDS:", "name", "Latitude", "tax_id", "host tax id", "longitude");
+            Row data = row(sheet, 2, "", "sample-1");
+            number(workbook, data, 2, 69.649208, "0.00");
+            number(workbook, data, 3, 1234, "#,##0");
+            number(workbook, data, 4, 9606, "0.00E+00");
+            number(workbook, data, 5, 18.955324, "0%");
+
+            var record = reader.read(write(workbook, format).toFile(), true).records().getFirst();
+
+            assertEquals("69.649208", record.get("Latitude"));
+            assertEquals("1234", record.get("tax_id"));
+            assertEquals("9606", record.get("host tax id"));
+            assertEquals("18.955324", record.get("longitude"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"xls", "xlsx"})
+    void importsStoredExperimentInsertSize(String format) throws Exception {
+        try (Workbook workbook = workbook(format)) {
+            Sheet sheet = workbook.createSheet("Experiments");
+            row(sheet, 0, "Sample", "Insert Size");
+            number(workbook, row(sheet, 1, "sample-1"), 1, 1234, "#,##0.00");
+            var record = reader.read(write(workbook, format).toFile(), false).records().getFirst();
+            assertEquals("1234", record.get("Insert Size"));
+        }
+    }
+
+    private void number(Workbook workbook, Row row, int column, double value, String format) {
+        Cell cell = row.createCell(column);
+        cell.setCellValue(value);
+        CellStyle style = workbook.createCellStyle();
+        style.setDataFormat(workbook.createDataFormat().getFormat(format));
+        cell.setCellStyle(style);
+    }
+
     @Test
     void rejectsUnknownVersionBeforeReadingData() throws Exception {
         try (Workbook workbook = new XSSFWorkbook()) {
