@@ -93,6 +93,7 @@ class SubProjectMigrationTest {
                         from sample s cross join assay a;
                     """);
             seedDependencies(connection, 1);
+            seedDefinitions(connection, 1);
         }
         Flyway migration = flyway("lifecycle", "latest");
         assertEquals(1, migration.migrate().migrationsExecuted);
@@ -149,6 +150,41 @@ class SubProjectMigrationTest {
         }
     }
 
+    @Test
+    void rollbackRejectsUnexpectedDefinitionsWithoutDeletingRootMetadata() throws Exception {
+        for (String definition : new String[]{"sample_metadata_field", "sample_vocabulary"}) {
+            for (boolean populated : new boolean[]{false, true}) {
+                String schema = definition + (populated ? "_populated" : "_unused");
+                flyway(schema, "latest").migrate();
+                try (var connection = connect(schema)) {
+                    execute(connection, """
+                            insert into project (id, name, owner) values (1, 'root', gen_random_uuid());
+                            insert into project (id, name, owner, parent_project_id) values (2, 'child', gen_random_uuid(), 1);
+                            insert into sample (id, name, project_id) values (gen_random_uuid(), 'sample', 1);
+                            insert into project_sample select 2, id from sample;
+                            """);
+                    seedDefinitions(connection, 1);
+                    seedDependencies(connection, 2);
+                    if (!populated) {
+                        execute(connection, definition.equals("sample_metadata_field")
+                                ? "delete from sample_metadata_value" : "delete from sample_vocabulary_term");
+                    }
+                    execute(connection, "update " + definition + " set project_id = 2");
+                    SQLException failure = assertThrows(SQLException.class,
+                            () -> script(connection, "rollback_sub_projects"));
+                    assertTrue(failure.getMessage().contains("Unexpected sub-project-owned data"));
+                    assertEquals(2, count(connection, "select count(*) from project"));
+                    assertEquals(1, count(connection, "select count(*) from project_sample"));
+                    assertEquals(1, count(connection, "select count(*) from project_member"));
+                    assertEquals(1, count(connection, "select count(*) from " + definition + " where project_id = 2"));
+                    assertEquals(populated || definition.equals("sample_vocabulary") ? 1 : 0,
+                            count(connection, "select count(*) from sample_metadata_value v join sample s on s.id = v.sample_id where s.project_id = 1 and v.text_value = 'value'"));
+                    assertEquals(1, count(connection, "select count(*) from flyway_schema_history where version = '1.0.13' and success"));
+                }
+            }
+        }
+    }
+
     private void assertMainData(Connection connection) throws SQLException {
         for (String table : new String[]{"project", "sample", "assay", "assay_sample", "file", "project_member",
                 "join_project", "project_invitation", "notification", "sample_metadata_field", "sample_metadata_value",
@@ -170,6 +206,11 @@ class SubProjectMigrationTest {
                 insert into notification (id, recipient_id, type, created_on, title, content, invitation_id)
                     select gen_random_uuid(), gen_random_uuid(), 'PROJECT_INVITATION', now(), 'title', 'content', id
                     from project_invitation where project_id = %1$d;
+                """.formatted(project));
+    }
+
+    private void seedDefinitions(Connection connection, int project) throws SQLException {
+        execute(connection, """
                 insert into sample_metadata_field (id, project_id, field_key, label, type, created_on, modified_on)
                     values (gen_random_uuid(), %1$d, 'custom', 'Custom', 'TEXT', now(), now());
                 insert into sample_metadata_value (id, sample_id, field_id, text_value)
