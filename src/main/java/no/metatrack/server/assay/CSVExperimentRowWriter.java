@@ -20,15 +20,15 @@ public class CSVExperimentRowWriter {
             String librarySource, String librarySelection, String libraryStrategy, String libraryLayout,
             Integer insertSize, String sequencingPlatform, String sequencingLaboratory,
             List<CSVExperimentImportService.PendingFile> pendingFiles) {
-        assayService.updateAssay(assayId, null, null, instrumentModel, libraryName, librarySource,
+        assayService.updateAssay(projectId, assayId, null, null, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout, insertSize);
-        Assay assay = assayService.getAssayById(assayId);
+        Assay assay = assayService.getAssayById(projectId, assayId);
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
         if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;
         if (sequencingLaboratory != null) assay.sequencingLaboratory = sequencingLaboratory;
         assayService.associateSample(assay, sample);
         for (var pendingFile : pendingFiles) {
-            File.importPending(projectId, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
+            File.importPending(assay.project.id, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
                     pendingFile.unencryptedMd5(), pendingFile.readRole()).ifPresent(message -> {
                 throw new FileConflictException(pendingFile.field(), pendingFile.fileName(), message);
             });

@@ -170,7 +170,7 @@ public class AssayService {
     }
 
     public List<Assay> getAllAssaysInSample(Long projectId, UUID sampleId) {
-        if (!Sample.sampleExistsInProject(sampleId, projectId)) throw new NotFoundException();
-        return Sample.getAllAssaysInSample(projectId, sampleId);
+        Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
+        return Sample.getAllAssaysInSample(sample.project.id, sampleId);
     }
 }

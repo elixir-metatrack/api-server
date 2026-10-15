@@ -1,6 +1,7 @@
 package no.metatrack.server.project;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.ForbiddenException;
@@ -108,7 +109,8 @@ class ProjectOwnerRoleTest {
     private void withMembership(long ownerCount, Runnable assertions) {
         try (MockedStatic<PanacheEntityBase> persistence = mockStatic(PanacheEntityBase.class);
              MockedStatic<ProjectMember> members = mockStatic(ProjectMember.class)) {
-            persistence.when(() -> Project.findByIdOptional(projectId, LockModeType.PESSIMISTIC_WRITE)).thenReturn(Optional.of(project));
+            persistence.when(() -> Project.findById(projectId, LockModeType.PESSIMISTIC_WRITE)).thenReturn(project);
+            members.when(ProjectMember::getEntityManager).thenReturn(mock(EntityManager.class));
             members.when(() -> ProjectMember.isMember(memberId, projectId)).thenReturn(true);
             members.when(() -> ProjectMember.findMemberInProjectOptional(memberId, projectId)).thenReturn(Optional.of(member));
             persistence.when(() -> ProjectMember.count("project.id = ?1 and role = ?2", projectId, ProjectRole.OWNER)).thenReturn(ownerCount);
