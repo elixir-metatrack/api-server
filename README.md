@@ -368,7 +368,8 @@ destructive manual operations, **not automatic Flyway undo**.
 Before rolling back an applied migration:
 
 1. Take and verify a restorable database backup. Export sub-project memberships, links, invitations,
-   notifications, and any sub-project metadata/vocabulary definitions if they must be retained.
+   and notifications if they must be retained. Sub-projects inherit metadata and vocabulary definitions
+   from the root; they must not own definitions themselves.
 2. Stop all application instances, import workers, and other database writers. Confirm the database and
    schema/search path explicitly. Revert later migrations in reverse dependency order first; the script
    refuses to proceed unless the exact successful sub-project migration is the latest history entry.
@@ -382,9 +383,11 @@ Before rolling back an applied migration:
    ```
 
    This transaction removes visibility links and membership/join rows before deleting sub-projects.
-   Foreign-key cascades remove their invitations and dependent notifications, metadata fields and values,
-   and vocabularies and terms. Root projects, samples, assays, files, and `file.read_role` remain.
-   Unexpected child-owned samples/assays cause an abort rather than destructive data deletion.
+   Foreign-key cascades remove their invitations and dependent notifications. Root projects, samples,
+   assays, files, metadata fields and values, vocabularies and terms, and `file.read_role` remain.
+   Unexpected child-owned samples, assays, metadata fields, or vocabularies cause an abort rather than
+   destructive data deletion, including unused definitions and definitions with values on root samples.
+   Resolve any such out-of-band ownership inconsistencies before retrying.
    Any SQL/lock failure rolls back the entire operation; investigate before retrying.
 5. Verify the committed result against the backup: root data counts/identifiers and read roles are unchanged,
    `project_sample` and `project.parent_project_id` are absent, and main's successful 1.0.12 history entry remains.
