@@ -1,6 +1,7 @@
 package no.metatrack.server.file;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusMock;
@@ -15,6 +16,8 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.assay.AssayService;
 import no.metatrack.server.assay.CSVExperimentImportService;
+import no.metatrack.server.assay.vocabulary.GlobalAssayVocabulary;
+import no.metatrack.server.assay.vocabulary.GlobalAssayVocabularyTerm;
 import no.metatrack.server.auth.CurrentUser;
 import no.metatrack.server.auth.UserService;
 import no.metatrack.server.project.Project;
@@ -34,6 +37,7 @@ import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.PutSampleVocabularyRequest;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyManagementService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +85,46 @@ class SubProjectScopeTest {
 
     UserService users;
     ObjectStorage storage;
+    Fixture committedFixture;
+    UUID committedVocabulary;
+
+    @AfterEach
+    void cleanCommittedFixture() {
+        if (committedFixture == null) return;
+        Fixture f = committedFixture;
+        QuarkusTransaction.requiringNew().run(() -> {
+            if (committedVocabulary != null) {
+                GlobalAssayVocabulary.deleteById(committedVocabulary);
+            }
+            List<Long> roots = List.of(f.root.id, f.foreign.project.id);
+            entityManager.createNativeQuery("delete from file where assay_id in (select id from assay where project_id in (:roots))")
+                    .setParameter("roots", roots).executeUpdate();
+            entityManager.createNativeQuery("delete from assay_sample where assay_id in (select id from assay where project_id in (:roots))")
+                    .setParameter("roots", roots).executeUpdate();
+            entityManager.createNativeQuery("delete from assay where project_id in (:roots)")
+                    .setParameter("roots", roots).executeUpdate();
+            entityManager.createNativeQuery("delete from sample where project_id in (:roots)")
+                    .setParameter("roots", roots).executeUpdate();
+            List<Long> projects = List.of(f.root.id, f.foreign.project.id, f.sub.id, f.sibling.id);
+            entityManager.createNativeQuery("delete from project_member where project_id in (:projects)")
+                    .setParameter("projects", projects).executeUpdate();
+            entityManager.createNativeQuery("delete from project where parent_project_id in (:roots)")
+                    .setParameter("roots", roots).executeUpdate();
+            entityManager.createNativeQuery("delete from project where id in (:roots)")
+                    .setParameter("roots", roots).executeUpdate();
+            assertEquals(0L, Project.count("id in ?1", projects));
+        });
+    }
+
+    private Fixture committedFixture(boolean metadata) {
+        // Import rows suspend the test transaction and must see committed fixtures.
+        committedFixture = QuarkusTransaction.requiringNew().call(() -> {
+            Fixture f = fixture();
+            if (metadata) configureMetadata(f.root);
+            return f;
+        });
+        return committedFixture;
+    }
 
     @BeforeEach
     void mockExternalServices() {
@@ -333,8 +378,7 @@ class SubProjectScopeTest {
 
     @Test
     void sampleCsvUsesRootMetadataAndOwnershipAndLinksOnlyNewSamples() throws Exception {
-        Fixture f = fixture();
-        configureMetadata(f.root);
+        Fixture f = committedFixture(true);
         Path csv = Files.writeString(directory.resolve("samples.csv"), "name,custom_status\nnew-sample,known\nhidden,known\ninvalid,unknown\n");
         var errors = sampleImport.importNewSamples(f.sub.id, csv.toFile());
         entityManager.flush();
@@ -343,7 +387,8 @@ class SubProjectScopeTest {
         assertEquals(f.root.id, created.project.id);
         assertEquals(Map.of("custom_status", "known"), metadataService.getActiveMetadata(List.of(created)).get(created.id));
         assertTrue(Sample.findBySampleNameInProject("invalid", f.root.id).isEmpty());
-        assertFalse(f.sub.linkedSamples.contains(f.hidden));
+        assertTrue(Sample.findBySampleNameInProject("hidden", f.sub.id).isEmpty());
+        assertTrue(Sample.findBySampleNameInProject("new-sample", f.sibling.id).isEmpty());
         assertEquals(created.id, sampleService.getSampleByName("new-sample", f.root.id).id);
     }
 
@@ -387,21 +432,68 @@ class SubProjectScopeTest {
 
     @Test
     void experimentCsvImportsOnlyVisibleSamplesUsingRootFilePaths() throws Exception {
-        Fixture f = fixture();
+        Fixture f = committedFixture(false);
         Path csv = Files.writeString(directory.resolve("experiments.csv"),
                 "Sample,File Name,File md5,Forward File Name,Forward File md5,Reverse File Name,Reverse File md5\n"
                         + "visible,import.fastq,abc,forward.fastq,def,reverse.fastq,ghi\n"
-                        + "hidden,secret.fastq,abc,secret-forward.fastq,def,secret-reverse.fastq,ghi\n");
+                        + "hidden,secret.fastq,abc,secret-forward.fastq,def,secret-reverse.fastq,ghi\n"
+                        + "visible,import.fastq,abc,duplicate-row.fastq,def,,\n"
+                        + "visible,rollback.fastq,abc,reads.fastq,conflicting,,\n");
         var errors = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
         entityManager.flush();
-        assertEquals(1, errors.size());
+        assertEquals(3, errors.size());
         File imported = File.findByVirtualPathOptional(
                 PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "import.fastq")).orElseThrow();
-        assertEquals(f.visible, imported.sample);
-        assertEquals(f.shared, imported.assay);
+        assertEquals(f.visible.id, imported.sample.id);
+        assertEquals(f.shared.id, imported.assay.id);
         assertEquals("abc", imported.md5);
+        assertEquals(ReadRole.SINGLE, imported.readRole);
+        assertEquals(ReadRole.FORWARD, File.findByVirtualPathOptional(
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "forward.fastq")).orElseThrow().readRole);
+        assertEquals(ReadRole.REVERSE, File.findByVirtualPathOptional(
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "reverse.fastq")).orElseThrow().readRole);
+        for (String rejected : List.of("duplicate-row.fastq", "rollback.fastq")) {
+            assertTrue(File.findByVirtualPathOptional(
+                    PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", rejected)).isEmpty());
+        }
+        assertEquals(List.of(f.hiddenFile.uuid), fileService.getAllFilesInAssay(f.sibling.id, f.shared.id)
+                .stream().map(file -> file.uuid).toList());
         assertTrue(File.findByVirtualPathOptional(
                 PresignUrlService.virtualPath(f.root.id, f.shared.id, "hidden", "secret.fastq")).isEmpty());
+    }
+
+    @Test
+    void experimentCsvVocabularyFailureDoesNotMutateRowAndLaterValidRowCommits() throws Exception {
+        Fixture f = committedFixture(false);
+        committedVocabulary = QuarkusTransaction.requiringNew().call(() -> {
+            GlobalAssayVocabulary vocabulary = new GlobalAssayVocabulary();
+            vocabulary.fieldKey = "sequencing_platform";
+            vocabulary.createdOn = Instant.now();
+            vocabulary.modifiedOn = vocabulary.createdOn;
+            GlobalAssayVocabularyTerm term = new GlobalAssayVocabularyTerm();
+            term.vocabulary = vocabulary;
+            term.value = "known";
+            vocabulary.terms.add(term);
+            vocabulary.persist();
+            return vocabulary.id;
+        });
+        Path csv = Files.writeString(directory.resolve("vocabulary-experiments.csv"),
+                "Sample,Sequencing platform,Insert Size,File Name,File md5\n"
+                        + "visible,unknown,999,rejected.fastq,abc\n"
+                        + "visible,known,100,accepted.fastq,def\n");
+        var errors = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
+        assertEquals(1, errors.size());
+        assertEquals("Row 1", errors.getFirst().row());
+        assertEquals("Sequencing platform", errors.getFirst().field());
+        Assay updated = assayService.getAssayById(f.sub.id, f.shared.id);
+        assertEquals("known", updated.sequencingPlatform);
+        assertEquals(100, updated.insertSize);
+        assertTrue(File.findByVirtualPathOptional(
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "rejected.fastq")).isEmpty());
+        File accepted = File.findByVirtualPathOptional(
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "accepted.fastq")).orElseThrow();
+        assertEquals(ReadRole.SINGLE, accepted.readRole);
+        assertEquals(f.root.id, accepted.sample.project.id);
     }
 
     @Test
