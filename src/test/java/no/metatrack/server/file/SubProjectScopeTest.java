@@ -26,6 +26,8 @@ import no.metatrack.server.sample.CSVSampleSheetImportService;
 import no.metatrack.server.sample.LinkSamplesRequest;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.sample.SampleService;
+import no.metatrack.server.stats.StatisticsService;
+import no.metatrack.server.stats.StorageStatistics;
 import no.metatrack.server.sample.metadata.CreateSampleMetadataFieldRequest;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldService;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
@@ -63,6 +65,7 @@ class SubProjectScopeTest {
     @Inject SampleService sampleService;
     @Inject AssayService assayService;
     @Inject FileService fileService;
+    @Inject StatisticsService statisticsService;
     @Inject FileIngestService fileIngestService;
     @Inject PresignUrlService presignService;
     @Inject CSVSampleSheetImportService sampleImport;
@@ -101,6 +104,36 @@ class SubProjectScopeTest {
         assertEquals(List.of(f.visibleFile), fileService.getFilesInSampleAndAssay(f.sub.id, f.shared.id, f.visible.id));
         assertEquals(List.of(f.hidden), assayService.getAllSamplesInAssay(f.sibling.id, f.shared.id));
         assertEquals(List.of(f.hiddenFile), fileService.getAllFilesInAssay(f.sibling.id, f.shared.id));
+    }
+
+    @Test
+    void sampleAssaysRespectLinkedSampleScope() {
+        Fixture f = fixture();
+        asUser(VIEWER);
+        assertEquals(List.of(f.shared), assayService.getAllAssaysInSample(f.sub.id, f.visible.id));
+        assertThrows(NotFoundException.class, () -> assayService.getAllAssaysInSample(f.sub.id, f.hidden.id));
+        assertThrows(NotFoundException.class, () -> assayService.getAllAssaysInSample(f.sub.id, f.foreign.id));
+        asUser(OWNER);
+        assertEquals(Set.of(f.shared, f.hiddenAssay),
+                Set.copyOf(assayService.getAllAssaysInSample(f.root.id, f.hidden.id)));
+    }
+
+    @Test
+    void storageStatisticsCountOnlyUploadedFilesOfLinkedSamples() {
+        Fixture f = fixture();
+        f.visibleFile.status = UploadStatus.UPLOADED;
+        f.hiddenFile.status = UploadStatus.UPLOADED;
+        f.visibleFile.objectKey = f.root.id + "/visible";
+        f.hiddenFile.objectKey = f.root.id + "/hidden";
+        entityManager.flush();
+        when(storage.listObjects(f.root.id + "/")).thenReturn(List.of(
+                new StorageObjectMetadata(f.visibleFile.objectKey, 10L),
+                new StorageObjectMetadata(f.hiddenFile.objectKey, 20L),
+                new StorageObjectMetadata(f.root.id + "/untracked", 100L)));
+        assertEquals(new StorageStatistics(1L, 10L), statisticsService.getProjectStorageStatistics(f.sub.id));
+        assertEquals(new StorageStatistics(1L, 20L), statisticsService.getProjectStorageStatistics(f.sibling.id));
+        assertEquals(new StorageStatistics(2L, 30L), statisticsService.getProjectStorageStatistics(f.root.id));
+        verify(storage, never()).listObjects(f.sub.id + "/");
     }
 
     @Test

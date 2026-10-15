@@ -1,12 +1,11 @@
 package no.metatrack.server.assay;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
 import no.metatrack.server.csv.CSVImportSupport;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.ReadRole;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,7 +39,11 @@ class CSVExperimentImportServiceTest {
     private List<CSVExperimentRowError> importRows(Map<String, Set<String>> terms, String rows) throws Exception {
         if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
+        assay.project = new Project();
+        assay.project.id = 1L;
         sample.name = "sample";
+        if (sample.id == null) sample.id = UUID.randomUUID();
+        assay.samples.add(sample);
         service.csvImportSupport = new CSVImportSupport();
         service.vocabularyService = mock(AssayVocabularyService.class);
         when(service.vocabularyService.loadRules()).thenReturn(new AssayVocabularyRules(terms));
@@ -52,18 +55,10 @@ class CSVExperimentImportServiceTest {
                 AssayVocabularyService.validate(new AssayVocabularyRules(terms),
                         invocation.getArgument(0), invocation.getArgument(1)));
         Path csv = Files.writeString(directory.resolve("experiments.csv"), HEADER + rows);
-        PanacheQuery<Assay> assays = mock(PanacheQuery.class);
-        PanacheQuery<Sample> samples = mock(PanacheQuery.class);
-        when(assays.firstResultOptional()).thenReturn(Optional.of(assay));
-        when(samples.firstResultOptional()).thenReturn(Optional.of(sample));
-        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
-            entities.when(() -> Assay.find("id = ?1 and project.id = ?2", assay.id, 1L)).thenReturn(assays);
-            entities.when(() -> Assay.findByIdOptional(assay.id)).thenReturn(Optional.of(assay));
-            entities.when(() -> Sample.find("project.id = ?1 and name = ?2", 1L, "sample"))
-                    .thenReturn(samples);
-            entities.when(() -> Sample.find(
-                    "project.id = ?1 and name = ?2 and exists (select 1 from Assay a join a.samples s "
-                            + "where a = ?3 and s = Sample)", 1L, "sample", assay)).thenReturn(samples);
+        try (MockedStatic<Assay> scopedAssays = mockStatic(Assay.class);
+             MockedStatic<Sample> scopedSamples = mockStatic(Sample.class)) {
+            scopedAssays.when(() -> Assay.findByIdInProjectScope(1L, assay.id)).thenReturn(Optional.of(assay));
+            scopedSamples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(Optional.of(sample));
             return service.importIntoAssay(1L, assay.id, csv.toFile());
         }
     }
@@ -71,6 +66,28 @@ class CSVExperimentImportServiceTest {
     private String row(String platform, String laboratory, String insertSize) {
         return "sample,instrument,library,source,selection,strategy,PAIRED," + platform + "," + laboratory + ","
                 + insertSize + ",reads.fastq,md5,forward.fastq,md5,reverse.fastq,md5\n";
+    }
+
+    @Test
+    void subProjectRowUsesScopedLookupAndRootOwnedFiles() {
+        assay.id = UUID.randomUUID();
+        assay.project = new Project();
+        assay.project.id = 1L;
+        CSVExperimentRowWriter writer = new CSVExperimentRowWriter();
+        writer.assayService = mock(AssayService.class);
+        when(writer.assayService.getAssayById(2L, assay.id)).thenReturn(assay);
+        try (MockedStatic<Sample> samples = mockStatic(Sample.class);
+             MockedStatic<File> files = mockStatic(File.class)) {
+            samples.when(() -> Sample.findBySampleNameInProject("sample", 2L)).thenReturn(Optional.of(sample));
+            writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null,
+                    List.of(new CSVExperimentImportService.PendingFile(
+                            "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)));
+            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null);
+            verify(writer.assayService).associateSample(assay, sample);
+            files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE));
+            files.verifyNoMoreInteractions();
+        }
     }
 
     private String singleEndRow() {
@@ -148,7 +165,7 @@ class CSVExperimentImportServiceTest {
             assertNull(assay.libraryLayout);
             assertEquals(50, assay.insertSize);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
-            assertTrue(assay.samples.isEmpty());
+            assertEquals(Set.of(sample), assay.samples);
             assertTrue(sample.assays.isEmpty());
             verify(assay, never()).addSample(any());
             files.verifyNoInteractions();

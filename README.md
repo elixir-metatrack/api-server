@@ -356,6 +356,7 @@ assay affects only that sample's relationship and file metadata; hidden samples 
 Samples created individually or through CSV in a sub-project belong to the root project and are automatically linked
 into that sub-project. Metadata fields and vocabulary rules are inherited from the root; their definitions must be
 managed there. File upload/download paths use the root project ID while access is checked against the requested scope.
+Per-sample assay lists and project storage statistics also respect the linked sample scope.
 
 ## Releases
 

@@ -2,6 +2,7 @@ package no.metatrack.server.sample;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.ws.rs.BadRequestException;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,6 +51,9 @@ class CSVSampleSheetImportServiceTest {
                         + "bad,not-an-integer,male,unknown\n"
                         + "second,288,male,unknown\n");
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
             var errors = service.importNewSamples(1L, csv.toFile());
@@ -76,6 +81,9 @@ class CSVSampleSheetImportServiceTest {
                 "Sample Name,Host Sex\nsample-1,male\n");
 
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
 
