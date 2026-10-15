@@ -358,6 +358,51 @@ into that sub-project. Metadata fields and vocabulary rules are inherited from t
 managed there. File upload/download paths use the root project ID while access is checked against the requested scope.
 Per-sample assay lists and project storage statistics also respect the linked sample scope.
 
+## Sub-project migration and manual rollback
+
+`V1.0.13__add_sub_projects.sql` follows main's unchanged `V1.0.12__add_file_read_role.sql`.
+The branch migration was not previously deployed; no database-history repair is needed for this renumbering.
+Flyway applies forward migrations only. Scripts in `src/main/resources/db/rollback/` are explicit,
+destructive manual operations, **not automatic Flyway undo**.
+
+Before rolling back an applied migration:
+
+1. Take and verify a restorable database backup. Export sub-project memberships, links, invitations,
+   notifications, and any sub-project metadata/vocabulary definitions if they must be retained.
+2. Stop all application instances, import workers, and other database writers. Confirm the database and
+   schema/search path explicitly. Revert later migrations in reverse dependency order first; the script
+   refuses to proceed unless the exact successful sub-project migration is the latest history entry.
+3. Prepare a compatible pre-sub-project application (main through 1.0.12, including read-role support).
+   Do not restart the sub-project application against the rolled-back schema or allow startup migration
+   to silently reapply 1.0.13. Keep writers stopped throughout verification and history reconciliation.
+4. Run with explicitly selected connection parameters (no production defaults):
+
+   ```shell
+   psql -X -v ON_ERROR_STOP=1 "$ROLLBACK_DATABASE_URL" -f src/main/resources/db/rollback/V1.0.13__rollback_sub_projects.sql
+   ```
+
+   This transaction removes visibility links and membership/join rows before deleting sub-projects.
+   Foreign-key cascades remove their invitations and dependent notifications, metadata fields and values,
+   and vocabularies and terms. Root projects, samples, assays, files, and `file.read_role` remain.
+   Unexpected child-owned samples/assays cause an abort rather than destructive data deletion.
+   Any SQL/lock failure rolls back the entire operation; investigate before retrying.
+5. Verify the committed result against the backup: root data counts/identifiers and read roles are unchanged,
+   `project_sample` and `project.parent_project_id` are absent, and main's successful 1.0.12 history entry remains.
+   Only after successful rollback and these checks, reconcile the exact history entry:
+
+   ```shell
+   psql -X -v ON_ERROR_STOP=1 "$ROLLBACK_DATABASE_URL" -f src/main/resources/db/rollback/V1.0.13__reconcile_sub_projects_history.sql
+   ```
+
+   The guarded transaction deletes only the latest successful SQL entry for version `1.0.13` and script
+   `V1.0.13__add_sub_projects.sql`. Never delete main's `1.0.12` entry or use a generic history deletion/repair.
+   Validate Flyway with the compatible main migration set before restarting the compatible application.
+6. To re-enable the feature, stop writers, deploy the sub-project application, migrate and validate normally.
+   Reapplication creates an empty sub-project structure; it does **not** recover deleted sub-project data.
+
+Disposable PostgreSQL lifecycle coverage (fresh install, main upgrade, failure atomicity, rollback and reapplication):
+`./mvnw clean test -Dtest=SubProjectMigrationTest` (Docker required).
+
 ## Releases
 
 Releases are automated from Conventional Commits pushed to `main`. Use these commit types to control the next version:

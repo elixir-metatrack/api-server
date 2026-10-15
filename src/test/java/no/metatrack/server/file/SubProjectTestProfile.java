@@ -10,7 +10,8 @@ public class SubProjectTestProfile implements QuarkusTestProfile {
     public Map<String, String> getConfigOverrides() {
         return Map.ofEntries(
                 Map.entry("quarkus.datasource.devservices.enabled", "false"),
-                Map.entry("quarkus.hibernate-orm.schema-management.strategy", "none"),
+                Map.entry("quarkus.hibernate-orm.database.start-offline", "false"),
+                Map.entry("quarkus.hibernate-orm.schema-management.strategy", "validate"),
                 Map.entry("quarkus.flyway.migrate-at-start", "true"),
                 Map.entry("quarkus.oidc.tenant-enabled", "false"),
                 Map.entry("quarkus.oidc.auth-server-url", "http://localhost:1/realms/test"),
