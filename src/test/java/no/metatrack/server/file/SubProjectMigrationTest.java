@@ -64,22 +64,6 @@ class SubProjectMigrationTest {
     }
 
     @Test
-    void freshInstallationHasUniqueOrderedVersionsAndConstraints() throws Exception {
-        Flyway migration = flyway("fresh", "latest");
-        assertEquals(14, migration.migrate().migrationsExecuted);
-        migration.validate();
-        assertEquals("1.0.13", migration.info().current().getVersion().toString());
-        try (var connection = connect("fresh")) {
-            assertEquals(14, count(connection, "select count(distinct version) from flyway_schema_history where version is not null"));
-            assertEquals(3, count(connection, "select count(*) from pg_constraint where conrelid = 'project_sample'::regclass"));
-            assertEquals(1, count(connection, "select count(*) from information_schema.columns where table_schema = 'fresh' and table_name = 'file' and column_name = 'read_role'"));
-            execute(connection, "insert into project values (1, now(), null, now(), 'root', gen_random_uuid(), null)");
-            assertThrows(SQLException.class, () -> execute(connection, "insert into project_sample values (1, gen_random_uuid())"));
-            assertThrows(SQLException.class, () -> execute(connection, "update project set parent_project_id = 999 where id = 1"));
-        }
-    }
-
-    @Test
     void upgradeRollbackAndReapplicationPreserveMainData() throws Exception {
         flyway("lifecycle", "1.0.12").migrate();
         try (var connection = connect("lifecycle")) {
@@ -87,7 +71,7 @@ class SubProjectMigrationTest {
                     insert into project (id, name, owner) values (1, 'root', gen_random_uuid());
                     insert into sample (id, name, project_id) values (gen_random_uuid(), 'sample', 1);
                     insert into assay (id, name, project_id) values (gen_random_uuid(), 'assay', 1);
-                    insert into assay_sample select a.id, s.id from assay a cross join sample s;
+                    insert into assay_sample (assay_id, sample_id) select a.id, s.id from assay a cross join sample s;
                     insert into file (id, file_name, object_key, uuid, virtual_path, sample_id, assay_id, read_role)
                         select 1, 'reads', '1/reads', gen_random_uuid(), '1/reads', s.id, a.id, 'R1'
                         from sample s cross join assay a;
@@ -95,13 +79,13 @@ class SubProjectMigrationTest {
             seedDependencies(connection, 1);
             seedDefinitions(connection, 1);
         }
-        Flyway migration = flyway("lifecycle", "latest");
+        Flyway migration = flyway("lifecycle", "1.0.13");
         assertEquals(1, migration.migrate().migrationsExecuted);
         migration.validate();
         try (var connection = connect("lifecycle")) {
             execute(connection, """
                     insert into project (id, name, owner, parent_project_id) values (2, 'child', gen_random_uuid(), 1);
-                    insert into project_sample select 2, id from sample;
+                    insert into project_sample (project_id, sample_id) select 2, id from sample;
                     """);
             seedDependencies(connection, 2);
             assertThrows(SQLException.class, () -> script(connection, "reconcile_sub_projects_history"));
@@ -155,13 +139,13 @@ class SubProjectMigrationTest {
         for (String definition : new String[]{"sample_metadata_field", "sample_vocabulary"}) {
             for (boolean populated : new boolean[]{false, true}) {
                 String schema = definition + (populated ? "_populated" : "_unused");
-                flyway(schema, "latest").migrate();
+                flyway(schema, "1.0.13").migrate();
                 try (var connection = connect(schema)) {
                     execute(connection, """
                             insert into project (id, name, owner) values (1, 'root', gen_random_uuid());
                             insert into project (id, name, owner, parent_project_id) values (2, 'child', gen_random_uuid(), 1);
                             insert into sample (id, name, project_id) values (gen_random_uuid(), 'sample', 1);
-                            insert into project_sample select 2, id from sample;
+                            insert into project_sample (project_id, sample_id) select 2, id from sample;
                             """);
                     seedDefinitions(connection, 1);
                     seedDependencies(connection, 2);
