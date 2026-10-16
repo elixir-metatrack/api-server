@@ -217,6 +217,52 @@ mock mail, with SPA entry defaults `http://localhost:3000/login` and `http://loc
 Do not log raw recipient emails, SMTP credentials, access tokens, or Keycloak response bodies. Apply Flyway migrations
 before serving the new endpoints; project deletion cascades to invitation-linked notifications.
 
+## Self-Service Profile
+
+Authenticated clients use `GET /api/whoami` to read their current profile and `PATCH /api/whoami`
+(`Content-Type: application/json`) to edit it. The target is always the validated access-token subject;
+there is no user-ID input. No extra application role or verified email is required for these self-profile operations.
+
+```json
+{"firstName":"Ada","lastName":"Lovelace","country":"NO","institution":"Example University","orcid":"https://orcid.org/0000-0002-1825-0097"}
+```
+
+Only these five fields are editable. Omitted fields remain unchanged; `null`, empty strings, and whitespace-only
+strings clear a field, subject to deployed Keycloak realm policy. `{}` reads the current profile without issuing a write.
+Unknown/protected fields (including IDs, username, email, roles, passwords, and arbitrary attributes) and values other
+than strings or null are rejected. Text is trimmed. Names are limited to 255 characters and institution to 512.
+Country must be a valid **uppercase ISO 3166-1 alpha-2** code (for example `NO`). ORCID accepts a checksum-valid
+hyphenated identifier or canonical `https://orcid.org/` URL and stores the hyphenated identifier; ownership is not verified.
+
+Both methods return `200` with the existing `userId`, `username`, `roles`, `country`, `institution`, and `orcid`
+fields plus nullable `firstName` and `lastName`. Username is read-only. Profile fields now come from an **uncached live
+Keycloak read**, not stale access-token claims; roles still come from the validated token. Successful updates return
+a post-write read to reflect Keycloak normalization. Existing identity caches and project authorization are unchanged.
+
+Errors: `400` malformed/invalid patch or realm profile-validation rejection with sanitized feedback; `401` missing
+authentication; `404` current subject no longer exists; `409` upstream edit conflict; `502` transport, service-account
+authorization, malformed upstream response, or unexpected Keycloak failure. Reads now require Keycloak availability:
+there is no silent fallback to token claims. Saved edits do not rewrite existing access tokens; other token consumers
+need normal token refresh to receive changed claims.
+
+### Profile Deployment Prerequisites
+
+- Reuse the configured `keycloak-admin` confidential client and existing environment-backed credentials in
+  `application.yml`; no new secrets or database migrations are needed.
+- In addition to invitation/search read permissions, grant the minimum supported user-update permission: on realms
+  using built-in roles this is typically `realm-management/manage-users`, or prefer a supported fine-grained equivalent
+  restricted to required user/profile operations. Do not grant `realm-admin`. The built-in role is broader than this API's
+  five-field contract, so protect the service-account credentials and verify effective permissions for the deployed version.
+- Configure the realm user-profile schema to expose and permit admin-service reads/writes of `country`, `institution`,
+  and `orcid`; align name/custom-attribute validation and clearing rules. Required realm fields cannot be cleared by this
+  API. Realm configuration is outside this repository and must be aligned before deployment.
+- Writes preserve unrelated and multivalued attributes from the read snapshot and send only changed names and the
+  merged attributes when necessary. Read-merge-write cannot prevent concurrent edits in Keycloak pages from being
+  overwritten: last-writer-wins remains a limitation without supported conditional updates in the deployed Keycloak.
+- A write timeout or failed post-write read can leave the save outcome uncertain. **Re-read with `GET /api/whoami`
+  before deciding whether to retry**; do not automatically replay writes. No automatic write retry is implemented.
+  Do not log tokens, submitted profile values, or upstream response bodies.
+
 ## Sample Controlled Vocabularies
 
 Projects can optionally restrict values accepted by eligible sample text fields. A project vocabulary applies to one
