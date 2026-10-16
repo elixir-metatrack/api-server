@@ -2,56 +2,44 @@ package no.metatrack.server.file;
 
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
-import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 
-import java.time.Instant;
+import java.util.UUID;
 
-@Path("/api")
+@Path("/api/projects/{projectId}/files")
 public class FileController {
-    @Inject
-    PresignUrlService presignUrlService;
 
     @Inject
     ProjectRoleCheck projectRoleCheck;
 
-    @ConfigProperty(name = "metatrack.file.presign-expiry-seconds")
-    int presignExpirySeconds;
+    @Inject
+    FileIngestService fileIngestService;
 
-    @POST
+
+    @DELETE
     @Authenticated
-    @Path("/files/presign-upload")
-    public PresignResponse presignUpload(@Valid PresignUploadRequest request) throws Exception {
-        Long projectId = request.projectId();
-        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
-            throw new WebApplicationException(Response.Status.FORBIDDEN);
-
-        PresignedUrl presignedUrl = presignUrlService.presignedUploadUrl(
-                request.projectId(), request.assayId(), request.sampleName(), request.fileName(), presignExpirySeconds);
-
-        return new PresignResponse(
-                presignedUrl.url(), presignedUrl.objectKey(), presignExpirySeconds,
-                Instant.now().plusSeconds(presignExpirySeconds));
-    }
-
-    @POST
-    @Authenticated
-    @Path("/files/presign-download")
-    public PresignResponse presignDownload(@Valid PresignDownloadRequest request) throws Exception {
-        Long projectId = request.projectId();
-        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.VIEWER))
-            throw new WebApplicationException(Response.Status.FORBIDDEN);
-
-        PresignedUrl presignedUrl = presignUrlService.presignedDownloadUrl(
-                request.projectId(), request.assayId(), request.sampleName(), request.fileName(), presignExpirySeconds);
-
-        return new PresignResponse(
-                presignedUrl.url(), presignedUrl.objectKey(), presignExpirySeconds,
-                Instant.now().plusSeconds(presignExpirySeconds));
+    @Path("/{fileUuid}")
+    @Operation(summary = "Permanently delete an uploaded file",
+            description = "Requires EDITOR or higher membership in the owning project. Purges all object versions "
+                    + "and delete markers before committing metadata deletion. Linked-subproject membership is insufficient.")
+    @APIResponses({
+            @APIResponse(responseCode = "204", description = "Storage purged and file metadata deletion committed"),
+            @APIResponse(responseCode = "401", description = "Authentication required"),
+            @APIResponse(responseCode = "403", description = "Insufficient project membership"),
+            @APIResponse(responseCode = "404", description = "File not found in the owning project or already deleted"),
+            @APIResponse(responseCode = "409", description = "File is not uploaded"),
+            @APIResponse(responseCode = "502", description = "Storage cleanup failed; metadata retained for retry")
+    })
+    public Response deleteFile(@PathParam("projectId") Long projectId, @PathParam("fileUuid") UUID fileUuid) {
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+        fileIngestService.deleteFile(projectId, fileUuid);
+        return Response.noContent().build();
     }
 
 }
