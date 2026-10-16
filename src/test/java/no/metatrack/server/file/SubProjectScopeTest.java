@@ -486,7 +486,7 @@ class SubProjectScopeTest {
         assertEquals(vocabularyService.list(f.root.id), vocabularyService.list(f.sub.id));
         assertEquals(vocabularyService.get(f.root.id, "custom_status"), vocabularyService.get(f.sub.id, "custom_status"));
         assertThrows(ForbiddenException.class, () -> fieldService.create(f.sub.id,
-                new CreateSampleMetadataFieldRequest("new_field", "New", SampleMetadataFieldType.TEXT)));
+                new CreateSampleMetadataFieldRequest("new_field", "New", SampleMetadataFieldType.TEXT, null)));
         assertThrows(ForbiddenException.class, () -> vocabularyService.replace(f.sub.id, "custom_status",
                 new PutSampleVocabularyRequest(List.of("changed"))));
     }
@@ -675,7 +675,7 @@ class SubProjectScopeTest {
 
     private void configureMetadata(Project root) {
         fieldService.create(root.id,
-                new CreateSampleMetadataFieldRequest("custom_status", "Status", SampleMetadataFieldType.TEXT));
+                new CreateSampleMetadataFieldRequest("custom_status", "Status", SampleMetadataFieldType.TEXT, null));
         vocabularyService.replace(root.id, "custom_status", new PutSampleVocabularyRequest(List.of("known")));
         entityManager.flush();
     }
