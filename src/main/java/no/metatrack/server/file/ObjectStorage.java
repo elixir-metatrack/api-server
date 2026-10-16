@@ -13,4 +13,6 @@ public interface ObjectStorage {
     List<StorageObjectMetadata> listObjects(String prefix);
 
     void delete(String objectKey);
+
+    void purgeAllVersions(String objectKey);
 }
