@@ -1,7 +1,6 @@
 package no.metatrack.server.sample;
 
 import jakarta.ws.rs.ForbiddenException;
-import no.metatrack.server.file.FileIngestService;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRoleCheck;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,6 @@ class SampleControllerAccessTest {
         SampleController controller = new SampleController();
         controller.projectRoleCheck = mock(ProjectRoleCheck.class);
         controller.sampleService = mock(SampleService.class);
-        controller.fileIngestService = mock(FileIngestService.class);
         controller.csvSampleSheetImportService = mock(CSVSampleSheetImportService.class);
         UUID sampleId = UUID.randomUUID();
 
@@ -29,8 +27,7 @@ class SampleControllerAccessTest {
             assertThrows(ForbiddenException.class, () -> controller.deleteSample(2L, sampleId));
             assertThrows(ForbiddenException.class, () -> controller.batchUpdateSamples(2L, null));
             assertThrows(ForbiddenException.class, () -> controller.importCSV(2L, null));
-            assertThrows(ForbiddenException.class, () -> controller.deleteFile(2L, sampleId, UUID.randomUUID()));
-            verifyNoInteractions(controller.sampleService, controller.fileIngestService, controller.csvSampleSheetImportService);
+            verifyNoInteractions(controller.sampleService, controller.csvSampleSheetImportService);
         }
     }
 }
