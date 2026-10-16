@@ -51,6 +51,7 @@ public class SampleMetadataFieldService {
         field.project = project;
         field.key = key;
         field.label = label;
+        field.tooltip = validateTooltip(request.tooltip());
         field.type = request.type();
         field.createdOn = now;
         field.modifiedOn = now;
@@ -62,6 +63,7 @@ public class SampleMetadataFieldService {
     public SampleMetadataField patch(Long projectId, UUID fieldId, PatchSampleMetadataFieldRequest request) {
         SampleMetadataField field = find(projectId, fieldId);
         if (request.label() != null) field.label = validateLabel(request.label());
+        if (request.tooltip() != null) field.tooltip = validateTooltip(request.tooltip());
         if (request.archived() != null) {
             field.archivedOn = request.archived() ? Instant.now() : null;
         }
@@ -100,6 +102,12 @@ public class SampleMetadataFieldService {
         String label = rawLabel.trim();
         if (label.length() > 255) throw new BadRequestException("Metadata field label must not exceed 255 characters");
         return label;
+    }
+
+    static String validateTooltip(String tooltip) {
+        if (tooltip == null) return null;
+        if (tooltip.length() > 2000) throw new BadRequestException("Metadata field tooltip must not exceed 2000 characters");
+        return tooltip.isBlank() ? null : tooltip;
     }
 
     private Project requireProject(Long projectId) {
