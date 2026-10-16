@@ -317,19 +317,80 @@ class SubProjectScopeTest {
     void fileDeleteChecksSampleScopeBeforeTouchingStorage() {
         Fixture f = fixture();
         assertThrows(NotFoundException.class,
-                () -> fileIngestService.deleteFile(f.sub.id, f.hiddenFile.uuid, f.hidden.id));
+                () -> fileIngestService.deleteFile(f.sub.id, f.hiddenFile.uuid));
         assertThrows(NotFoundException.class,
-                () -> fileIngestService.deleteFile(f.sub.id, f.hiddenFile.uuid, f.visible.id));
+                () -> fileIngestService.deleteFile(f.sub.id, f.visibleFile.uuid));
+        assertThrows(NotFoundException.class,
+                () -> fileIngestService.deleteFile(f.foreign.project.id, f.visibleFile.uuid));
+        assertThrows(NotFoundException.class,
+                () -> fileIngestService.deleteFile(f.root.id, UUID.randomUUID()));
         verifyNoInteractions(storage);
     }
 
     @Test
     void visibleFileCanBeDeletedWithoutDeletingHiddenFiles() {
         Fixture f = fixture();
-        fileIngestService.deleteFile(f.sub.id, f.visibleFile.uuid, f.visible.id);
-        verify(storage).delete(f.visibleFile.objectKey);
+        f.visibleFile.status = UploadStatus.UPLOADED;
+        assertTrue(f.visible.files.contains(f.visibleFile));
+        fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid);
+        verify(storage).purgeAllVersions(f.visibleFile.objectKey);
         verifyNoMoreInteractions(storage);
+        assertFalse(f.visible.files.contains(f.visibleFile));
+        entityManager.flush();
+        entityManager.clear();
+        assertTrue(File.findByUuidOptional(f.visibleFile.uuid).isEmpty());
         assertTrue(File.findByUuidOptional(f.hiddenFile.uuid).isPresent());
+        Sample sample = Sample.findById(f.visible.id);
+        assertTrue(sample.files.isEmpty());
+        Assay assay = Assay.findById(f.shared.id);
+        assertEquals(Set.of(f.visible.id, f.hidden.id), assay.samples.stream().map(s -> s.id).collect(java.util.stream.Collectors.toSet()));
+        assertThrows(NotFoundException.class, () -> fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid));
+    }
+
+    @Test
+    void pendingFileCannotBeDeleted() {
+        Fixture f = fixture();
+        assertStatus(409, () -> fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid));
+        verifyNoInteractions(storage);
+        assertTrue(File.findByUuidOptional(f.visibleFile.uuid).isPresent());
+    }
+
+    @Test
+    void bothSampleAndAssayMustBelongToRequestedProject() {
+        Fixture f = fixture();
+        f.foreignAssay.addSample(f.visible);
+        entityManager.flush();
+        f.visibleFile.assay = f.foreignAssay;
+        entityManager.flush();
+        assertThrows(NotFoundException.class, () -> fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid));
+        assertThrows(NotFoundException.class, () -> fileIngestService.deleteFile(f.foreign.project.id, f.visibleFile.uuid));
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void storageFailureRollsBackAndClientRetryCommitsDeletion() {
+        Fixture f = committedFixture(false);
+        QuarkusTransaction.requiringNew().run(() -> {
+            File file = File.findByUuidOptional(f.visibleFile.uuid).orElseThrow();
+            file.status = UploadStatus.UPLOADED;
+        });
+        doThrow(new IllegalStateException("sensitive storage details"))
+                .doNothing().when(storage).purgeAllVersions(f.visibleFile.objectKey);
+        QuarkusTransaction.suspendingExisting().run(() ->
+                assertStatus(502, () -> fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid)));
+        QuarkusTransaction.requiringNew().run(() -> {
+            assertTrue(File.findByUuidOptional(f.visibleFile.uuid).isPresent());
+            Sample sample = Sample.findById(f.visible.id);
+            assertEquals(1, sample.files.size());
+        });
+        QuarkusTransaction.suspendingExisting().run(() -> fileIngestService.deleteFile(f.root.id, f.visibleFile.uuid));
+        QuarkusTransaction.requiringNew().run(() -> {
+            assertTrue(File.findByUuidOptional(f.visibleFile.uuid).isEmpty());
+            Sample sample = Sample.findById(f.visible.id);
+            assertTrue(sample.files.isEmpty());
+            assertTrue(Assay.findByIdOptional(f.shared.id).isPresent());
+        });
+        verify(storage, times(2)).purgeAllVersions(f.visibleFile.objectKey);
     }
 
     @Test
