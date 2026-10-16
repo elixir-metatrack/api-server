@@ -25,6 +25,9 @@ public class SampleMetadataField extends PanacheEntityBase {
     @Column(nullable = false)
     public String label;
 
+    @Column(length = 2000)
+    public String tooltip;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     public SampleMetadataFieldType type;

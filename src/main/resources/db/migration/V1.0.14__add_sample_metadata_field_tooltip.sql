@@ -1,0 +1,1 @@
+ALTER TABLE sample_metadata_field ADD COLUMN tooltip varchar(2000);
