@@ -7,6 +7,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -21,6 +22,7 @@ import java.util.List;
 
 @ApplicationScoped
 public class S3ObjectStorage implements ObjectStorage {
+    private static final int MAX_PURGE_PASSES = 5;
     @Inject
     S3Client s3Client;
 
@@ -79,5 +81,57 @@ public class S3ObjectStorage implements ObjectStorage {
     @Override
     public void delete(String objectKey) {
         s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucketName).key(objectKey).build());
+    }
+
+    @Override
+    public void purgeAllVersions(String objectKey) {
+        var versions = listExactVersions(objectKey);
+        if (versions.isEmpty()) {
+            delete(objectKey);
+            versions = listExactVersions(objectKey);
+        }
+        for (int pass = 0; pass < MAX_PURGE_PASSES; pass++) {
+            if (versions.isEmpty()) return;
+            for (String versionId : versions) {
+                s3Client.deleteObject(DeleteObjectRequest.builder()
+                        .bucket(bucketName).key(objectKey).versionId(versionId).build());
+            }
+            versions = listExactVersions(objectKey);
+        }
+        if (!versions.isEmpty()) {
+            throw new IllegalStateException("Object version purge did not converge");
+        }
+    }
+
+    private List<String> listExactVersions(String objectKey) {
+        var versions = new ArrayList<String>();
+        String keyMarker = null;
+        String versionIdMarker = null;
+        do {
+            var page = s3Client.listObjectVersions(ListObjectVersionsRequest.builder()
+                    .bucket(bucketName).prefix(objectKey)
+                    .keyMarker(keyMarker).versionIdMarker(versionIdMarker).build());
+            for (var version : page.versions()) {
+                if (objectKey.equals(version.key())) versions.add(requireVersionId(version.versionId()));
+            }
+            for (var marker : page.deleteMarkers()) {
+                if (objectKey.equals(marker.key())) versions.add(requireVersionId(marker.versionId()));
+            }
+            if (!Boolean.TRUE.equals(page.isTruncated())) return versions;
+            if (page.nextKeyMarker() == null ||
+                    (java.util.Objects.equals(keyMarker, page.nextKeyMarker()) &&
+                            java.util.Objects.equals(versionIdMarker, page.nextVersionIdMarker()))) {
+                throw new IllegalStateException("Object version listing did not advance");
+            }
+            keyMarker = page.nextKeyMarker();
+            versionIdMarker = page.nextVersionIdMarker();
+        } while (true);
+    }
+
+    private String requireVersionId(String versionId) {
+        if (versionId == null || versionId.isBlank()) {
+            throw new IllegalStateException("Object version listing omitted a version ID");
+        }
+        return versionId;
     }
 }
