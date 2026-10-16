@@ -6,4 +6,5 @@ import jakarta.validation.constraints.NotNull;
 public record CreateSampleMetadataFieldRequest(
         @NotBlank String key,
         @NotBlank String label,
-        @NotNull SampleMetadataFieldType type) {}
+        @NotNull SampleMetadataFieldType type,
+        String tooltip) {}
