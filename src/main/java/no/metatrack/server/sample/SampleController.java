@@ -10,7 +10,6 @@ import no.metatrack.server.assay.Assay;
 import no.metatrack.server.assay.AssayResponse;
 import no.metatrack.server.assay.AssayService;
 import no.metatrack.server.file.File;
-import no.metatrack.server.file.FileIngestService;
 import no.metatrack.server.file.FileResponse;
 import no.metatrack.server.file.FileService;
 import no.metatrack.server.project.Project;
@@ -47,8 +46,6 @@ public class SampleController {
     @Inject
     CSVSampleSheetImportService csvSampleSheetImportService;
 
-    @Inject
-    FileIngestService fileIngestService;
 
     @Inject
     SampleMetadataService metadataService;
@@ -269,19 +266,6 @@ public class SampleController {
         return files.stream().map(FileResponse::fromEntity).toList();
     }
 
-    @DELETE
-    @Authenticated
-    @Path("/{sampleId}/files/{fileUuid}")
-    public Response deleteFile(
-            @PathParam("projectId") Long projectId,
-            @PathParam("sampleId") UUID sampleId,
-            @PathParam("fileUuid") UUID fileUuid) {
-        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
-        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
-
-        fileIngestService.deleteFile(projectId, fileUuid, sampleId);
-        return Response.noContent().build();
-    }
 
     @GET
     @Authenticated
