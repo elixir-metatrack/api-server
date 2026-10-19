@@ -23,6 +23,14 @@ public class Sample extends PanacheEntityBase {
 
     public String alias;
 
+    public String projectAccession;
+
+    public String studyAccession;
+
+    public String sampleAccession;
+
+    public String secondaryAccession;
+
     public Integer taxId;
 
     public Integer hostTaxId;
