@@ -478,3 +478,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 *This project was generated using Quarkus.*
+
+## ISA-JSON exploration
+
+An experimental project export and a separate synthetic demo seed are available.
+See [the mapping, local setup and validation notes](docs/isa-json-exploration.md).
