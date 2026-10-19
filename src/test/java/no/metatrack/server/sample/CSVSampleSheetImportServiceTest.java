@@ -34,6 +34,89 @@ class CSVSampleSheetImportServiceTest {
     Path directory;
 
     @Test
+    void forwardsSnakeCaseAccessionsInCreationOrder() throws Exception {
+        assertAccessionImport("name,project_accession,study_accession,sample_accession,secondary_accession\n"
+                + "sample-1,PRJNA000001,ERP000001,SAMN000001,0000123\n",
+                List.of("PRJNA000001", "ERP000001", "SAMN000001", "0000123"));
+    }
+
+    @Test
+    void forwardsTitleSpaceAccessionsFromTemplateTsv() throws Exception {
+        assertAccessionImport("REQUIREMENTS:\tMandatory\tOptional\tOptional\tOptional\tOptional\n"
+                + "METADATA FIELDS:\tSample Name\tProject Accession\tStudy Accession\tSample Accession"
+                + "\tSecondary Accession\n"
+                + "alignment\tsample-1\tPRJNA000001\tERP000001\tSAMN000001\t0000123\n",
+                List.of("PRJNA000001", "ERP000001", "SAMN000001", "0000123"));
+    }
+
+    @Test
+    void acceptsOmittedAccessionColumns() throws Exception {
+        assertAccessionImport("Sample Name\nsample-1\n", java.util.Arrays.asList(null, null, null, null));
+    }
+
+    @Test
+    void acceptsBlankAccessionValues() throws Exception {
+        assertAccessionImport("Sample Name,Project Accession,Study Accession,Sample Accession,Secondary Accession\n"
+                + "sample-1, ,,, \n", List.of("", "", "", ""));
+    }
+
+    @Test
+    void reservesAccessionAliasesFromCustomMetadataLabels() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        for (String header : List.of("project_accession", "Project Accession", "study_accession", "Study Accession",
+                "sample_accession", "Sample Accession", "secondary_accession", "Secondary Accession")) {
+            CSVRecord record = service.prepareRecords(new StringReader(header + "\naccession-value\n"), ',')
+                    .getFirst();
+            assertEquals(null, service.getCustomMetadataValue(record, metadataField("custom_status", header)));
+        }
+    }
+
+    @Test
+    void includesAccessionsInBuiltInValidationValues() {
+        Sample sample = new Sample();
+        sample.projectAccession = "PRJNA000001";
+        sample.studyAccession = "ERP000001";
+        sample.sampleAccession = "SAMN000001";
+        sample.secondaryAccession = "0000123";
+
+        Map<String, String> values = CSVSampleSheetImportService.builtInValues(sample);
+
+        assertEquals("PRJNA000001", values.get("project_accession"));
+        assertEquals("ERP000001", values.get("study_accession"));
+        assertEquals("SAMN000001", values.get("sample_accession"));
+        assertEquals("0000123", values.get("secondary_accession"));
+    }
+
+    private void assertAccessionImport(String content, List<String> expectedAccessions) throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        Path csv = Files.writeString(directory.resolve("accessions.csv"), content);
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+
+            assertTrue(service.importNewSamples(1L, csv.toFile()).isEmpty());
+
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                    .toList();
+            assertEquals(1, calls.size());
+            Object[] arguments = calls.getFirst().getArguments();
+            assertEquals(46, arguments.length);
+            for (int i = 0; i < expectedAccessions.size(); i++) {
+                assertEquals(expectedAccessions.get(i), arguments[41 + i]);
+            }
+            assertEquals(Map.of(), arguments[45]);
+        }
+    }
+
+    @Test
     void validRowsUseApiCreationWhileInvalidRowsRemainIsolated() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
         service.vocabularyService = mock(SampleVocabularyService.class);

@@ -605,7 +605,7 @@ class SubProjectScopeTest {
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, Map.of("custom_status", "known"));
+                null, null, null, null, null, Map.of("custom_status", "known"));
     }
 
     private void updateSampleWithMetadata(Long projectId, UUID sampleId) {
@@ -615,7 +615,7 @@ class SubProjectScopeTest {
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null, Map.of("custom_status", "known"));
+                null, null, null, null, null, null, Map.of("custom_status", "known"));
     }
 
     private Fixture fixture() {
