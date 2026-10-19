@@ -9,6 +9,10 @@ import java.util.stream.Collectors;
 public final class SampleVocabularyBuiltInCatalog {
     private static final List<SampleVocabularyColumn> COLUMNS = List.of(
             column("alias", "Alias"),
+            column("project_accession", "Project accession"),
+            column("study_accession", "Study accession"),
+            column("sample_accession", "Sample accession"),
+            column("secondary_accession", "Secondary accession"),
             column("mlst", "MLST"),
             column("project_title", "Project title"),
             column("description", "Description"),
