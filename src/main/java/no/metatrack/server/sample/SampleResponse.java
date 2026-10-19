@@ -49,6 +49,10 @@ public record SampleResponse(
         String hospitalHealthInstitution,
         Instant createdOn,
         Instant modifiedOn,
+        String projectAccession,
+        String studyAccession,
+        String sampleAccession,
+        String secondaryAccession,
         Map<String, Object> customMetadata) {
     public static SampleResponse fromEntity(Sample sample, Map<String, Object> customMetadata) {
         return new SampleResponse(
@@ -95,6 +99,10 @@ public record SampleResponse(
                 sample.hospitalHealthInstitution,
                 sample.createdOn,
                 sample.modifiedOn,
+                sample.projectAccession,
+                sample.studyAccession,
+                sample.sampleAccession,
+                sample.secondaryAccession,
                 customMetadata);
     }
 }

@@ -46,4 +46,8 @@ public record CreateSampleRequest(
         String county,
         String commune,
         String hospitalHealthInstitution,
+        String projectAccession,
+        String studyAccession,
+        String sampleAccession,
+        String secondaryAccession,
         Map<String, Object> customMetadata) {}

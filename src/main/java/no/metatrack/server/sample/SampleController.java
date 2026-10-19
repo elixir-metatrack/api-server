@@ -132,6 +132,10 @@ public class SampleController {
                 request.county(),
                 request.commune(),
                 request.hospitalHealthInstitution(),
+                request.projectAccession(),
+                request.studyAccession(),
+                request.sampleAccession(),
+                request.secondaryAccession(),
                 request.customMetadata());
 
         return SampleResponse.fromEntity(sample, metadataService.getActiveMetadata(sample));
@@ -190,6 +194,10 @@ public class SampleController {
                 request.county(),
                 request.commune(),
                 request.hospitalHealthInstitution(),
+                request.projectAccession(),
+                request.studyAccession(),
+                request.sampleAccession(),
+                request.secondaryAccession(),
                 request.customMetadata());
 
         return Response.noContent().build();

@@ -62,7 +62,9 @@ public class CSVSampleSheetImportService {
             "host behaviour", "isolation_source_non_host_associated", "isolation source non-host-associated",
             "influenza_virus_type", "influenza virus type", "influenza_sub_type", "influenza sub type", "serovar",
             "strain", "host_age", "host age", "county", "commune", "hospital_health_institution",
-            "hospital/health institution", "collecting_institution");
+            "hospital/health institution", "collecting_institution", "project_accession", "project accession",
+            "study_accession", "study accession", "sample_accession", "sample accession",
+            "secondary_accession", "secondary accession");
 
     @Inject
     SampleMetadataService metadataService;
@@ -200,6 +202,10 @@ public class CSVSampleSheetImportService {
             sample.commune = getMappedValue(rec, "commune", "Commune");
             sample.hospitalHealthInstitution =
                     getMappedValue(rec, "hospital_health_institution", "Hospital/Health institution");
+            sample.projectAccession = getMappedValue(rec, "project_accession", "Project Accession");
+            sample.studyAccession = getMappedValue(rec, "study_accession", "Study Accession");
+            sample.sampleAccession = getMappedValue(rec, "sample_accession", "Sample Accession");
+            sample.secondaryAccession = getMappedValue(rec, "secondary_accession", "Secondary Accession");
 
             Map<String, Object> customMetadata = new LinkedHashMap<>();
             for (SampleMetadataField field : customFields) {
@@ -231,7 +237,9 @@ public class CSVSampleSheetImportService {
                             sample.isolationSourceHostAssociated, sample.hostBehaviour,
                             sample.isolationSourceNonHostAssociated, sample.influenzaVirusType,
                             sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
-                            sample.county, sample.commune, sample.hospitalHealthInstitution, customMetadata);
+                            sample.county, sample.commune, sample.hospitalHealthInstitution,
+                            sample.projectAccession, sample.studyAccession, sample.sampleAccession,
+                            sample.secondaryAccession, customMetadata);
                 } catch (SampleVocabularyValidationException e) {
                     for (SampleValidationViolation violation : e.violations()) {
                         errors.add(new SampleValidationViolation(
@@ -512,6 +520,10 @@ public class CSVSampleSheetImportService {
         values.put("sequencing_lab", sample.sequencingLab);
         values.put("institution", sample.institution);
         values.put("host_health_state", sample.hostHealthState);
+        values.put("project_accession", sample.projectAccession);
+        values.put("study_accession", sample.studyAccession);
+        values.put("sample_accession", sample.sampleAccession);
+        values.put("secondary_accession", sample.secondaryAccession);
         return values;
     }
 }
