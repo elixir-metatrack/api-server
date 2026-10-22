@@ -3,6 +3,12 @@
 First step: export existing project metadata and inspect the result using synthetic seed data.
 Import, repository submission and service-to-service authentication are follow-up work.
 
+The [mapping review of 2026-10-22](isa-json-mapping-review.md) adds a field inventory,
+review decisions, current-versus-proposed process graphs and concrete gaps found in
+the pinned MARS ENA adapter. Its [mapping catalog](isa-json-mapping-review.json) also
+drives the interactive review shown in the exploration conversation. The exporter
+still implements `exploration-v1`; the proposed changes are not implemented yet.
+
 ## Try it locally
 
 Start the existing local infrastructure and API (`make infra`, `make api` from the workspace root).

@@ -1,0 +1,235 @@
+{
+  "reviewDate": "2026-10-22",
+  "apiCommit": "a389cf4",
+  "implementedProfile": "exploration-v1",
+  "isaSchemaCommit": "ed80675acb5ff98249e9821067eff83740d809d6",
+  "marsCommit": "8cc6fca592ff1695bd795144d7816bef984712df",
+  "scope": "Review snapshot; proposed mappings are not implemented. Paths with [] are schematic selectors, not JSON Pointers.",
+  "groups": [
+    {"id": "project", "label": "Projekt", "source": "Project / Subproject", "target": "Investigation + Study"},
+    {"id": "sample", "label": "Samples", "source": "SampleResponse", "target": "Sample + Characteristics"},
+    {"id": "custom", "label": "Eigene Felder", "source": "Field + Value + Vocabulary", "target": "Categories + Characteristics"},
+    {"id": "assay", "label": "Assays", "source": "Assay", "target": "Assay + Protocol parameters"},
+    {"id": "process", "label": "Prozesskette", "source": "Sample × Assay", "target": "Process + inputs / outputs"},
+    {"id": "file", "label": "Dateien", "source": "File", "target": "Data files + Comments"},
+    {"id": "gap", "label": "MARS-Lücken", "source": "Noch zu erfassen", "target": "Repository-Profil"}
+  ],
+  "kinds": {
+    "direct": "Direkt",
+    "convention": "Konvention",
+    "partial": "Teilweise",
+    "absent": "Fehlt",
+    "excluded": "Ausgelassen"
+  },
+  "rules": [
+    {
+      "id": "project-shape", "group": "project", "label": "Projektstruktur", "kind": "convention",
+      "source": ["Project.id", "Project.name", "Project.description"],
+      "target": ["$.@id / identifier / title / description", "$.studies[0].@id / identifier / title / description"],
+      "current": "Ein Projekt erzeugt eine Investigation und genau eine Study; Titel und Beschreibung werden dupliziert.",
+      "proposal": "Für das erste Metadatenprofil beibehalten; IDs um eine stabile Instanzkennung ergänzen.",
+      "decision": "D1 / D2 · Fachliche Study-Grenze und installationsübergreifende Identität bestätigen.",
+      "examplePointer": "/studies/0/title"
+    },
+    {
+      "id": "project-scope", "group": "project", "label": "Unterprojekt", "kind": "convention",
+      "source": ["Project.parentProject", "Project.linkedSamples"],
+      "target": ["Eigene Investigation + Study mit sichtbarer Sample-Teilmenge"],
+      "current": "Eigener Export; Assays folgen sichtbaren Samples, Dateien werden separat auf die Teilmenge begrenzt.",
+      "proposal": "Berechtigungsgrenze erhalten; keine automatische weitere wissenschaftliche Study erzeugen.",
+      "decision": "D1 · Subproject als Zugriffsumfang behandeln.",
+      "examplePointer": "/studies/0/materials/samples"
+    },
+    {
+      "id": "project-admin", "group": "project", "label": "Verwaltung", "kind": "excluded",
+      "source": ["Project.owner", "Project.projectMembers", "Project.createdOn", "Project.modifiedOn"],
+      "target": [],
+      "current": "Nicht exportiert; Projektmitglieder werden nicht zu ISA people, Auditdaten nicht zu Publikationsdaten.",
+      "proposal": "Beibehalten; wissenschaftliche Kontakte und Publikationsdaten bei Bedarf getrennt erfassen.",
+      "decision": "D3 · Rollen und wissenschaftliche Urheberschaft getrennt modellieren."
+    },
+    {
+      "id": "sample-id", "group": "sample", "label": "Identität", "kind": "direct",
+      "source": ["SampleResponse.id", "SampleResponse.name"],
+      "target": ["$.studies[].materials.samples[].@id", "$.studies[].materials.samples[].name"],
+      "current": "UUID-basierte URN und Name; Assay und Prozesse referenzieren dasselbe Sample.",
+      "proposal": "Beibehalten; ID-Regeln mit dem Installationsnamespace vereinheitlichen.",
+      "decision": "D2 · Identität bleibt auch im Teilmengenexport gleich.",
+      "examplePointer": "/studies/0/materials/samples/0/name"
+    },
+    {
+      "id": "sample-text", "group": "sample", "label": "34 Textmerkmale", "kind": "partial",
+      "source": ["SampleResponse.alias", "SampleResponse.mlst", "SampleResponse.isolationSource", "SampleResponse.location", "SampleResponse.sequencingLab", "SampleResponse.institution", "SampleResponse.hostHealthState", "SampleResponse.projectTitle", "SampleResponse.description", "SampleResponse.isolate", "SampleResponse.collectedBy", "SampleResponse.environmentalSample", "SampleResponse.hostAssociated", "SampleResponse.hostCommonName", "SampleResponse.hostSubjectId", "SampleResponse.collectorName", "SampleResponse.collectingInstitution", "SampleResponse.hostSex", "SampleResponse.influenzaTestMethod", "SampleResponse.influenzaTestResult", "SampleResponse.otherPathogensTested", "SampleResponse.otherPathogensTestResult", "SampleResponse.hostHabitat", "SampleResponse.isolationSourceHostAssociated", "SampleResponse.hostBehaviour", "SampleResponse.isolationSourceNonHostAssociated", "SampleResponse.influenzaVirusType", "SampleResponse.influenzaSubType", "SampleResponse.serovar", "SampleResponse.strain", "SampleResponse.hostAge", "SampleResponse.county", "SampleResponse.commune", "SampleResponse.hospitalHealthInstitution"],
+      "target": ["$.studies[].characteristicCategories[].characteristicType.annotationValue = snake_case(field)", "$.studies[].materials.samples[].characteristics[].value = String"],
+      "current": "Nicht-null Werte bleiben unverändert. Lokale Feldnamen sind noch keine geprüften semantischen Begriffe.",
+      "proposal": "Explizites Feldregister statt automatischer Übernahme jedes neuen DTO-Felds; Rohwerte erhalten.",
+      "decision": "D3 · Semantische Prioritäten festlegen; hostAge bleibt vorerst Text.",
+      "exampleCategory": "location"
+    },
+    {
+      "id": "sample-taxon", "group": "sample", "label": "Organismus / Host", "kind": "partial",
+      "source": ["SampleResponse.taxId", "SampleResponse.hostTaxId"],
+      "target": ["Sample.characteristics[tax_id / host_tax_id].value = Zahl"],
+      "current": "Numerische Taxonomie-IDs; keine Ontologieannotation. Beide Werte fehlen in der Demo-Fixture.",
+      "proposal": "Nach Auflösung gegen die zuständige Taxonomie Organismus und Host getrennt annotieren; Original-ID erhalten.",
+      "decision": "D3 · Termquelle, Kategorien und Verhalten bei unbekannten IDs bestimmen.",
+      "exampleCategory": "tax_id"
+    },
+    {
+      "id": "sample-date", "group": "sample", "label": "Sammlungsdatum", "kind": "direct",
+      "source": ["SampleResponse.collectionDate"],
+      "target": ["Sample.characteristics[collection_date].value = ISO-Datumsstring"],
+      "current": "LocalDate wird als YYYY-MM-DD exportiert; es entsteht kein Entnahmeprozess.",
+      "proposal": "Als Merkmal beibehalten; Prozessdatum erst bei explizit erfasster Probenentnahme verwenden.",
+      "decision": "D3 · Datum und Prozessbeleg unterscheiden.",
+      "exampleCategory": "collection_date"
+    },
+    {
+      "id": "sample-coordinates", "group": "sample", "label": "Koordinaten", "kind": "partial",
+      "source": ["SampleResponse.latitude", "SampleResponse.longitude"],
+      "target": ["Sample.characteristics[latitude / longitude].value = Zahl"],
+      "current": "Werte ohne exportierte Einheit oder Koordinatenreferenzsystem; im Demo nicht belegt.",
+      "proposal": "Einheiten und Referenzsystem fachlich bestätigen und im Profil festlegen.",
+      "decision": "D3 · Semantik vor einer standardisierten Annotation klären.",
+      "exampleCategory": "latitude"
+    },
+    {
+      "id": "sample-audit", "group": "sample", "label": "Sample-Audit", "kind": "excluded",
+      "source": ["SampleResponse.createdOn", "SampleResponse.modifiedOn"],
+      "target": [],
+      "current": "Auditzeitpunkte werden ausgelassen.",
+      "proposal": "Beibehalten; nicht als wissenschaftliche Ereignisdaten verwenden.",
+      "decision": "D3 · Technische und fachliche Zeitpunkte getrennt halten."
+    },
+    {
+      "id": "custom-definition", "group": "custom", "label": "Felddefinition", "kind": "convention",
+      "source": ["SampleMetadataField.id", "SampleMetadataField.key", "SampleMetadataField.label", "SampleMetadataField.type", "SampleMetadataField.tooltip"],
+      "target": ["$.studies[].characteristicCategories[].@id", "characteristicType.annotationValue / comments[metatrack:fieldKey, metatrack:fieldType, metatrack:tooltip]"],
+      "current": "Aktive Definitionen besitzen eigene UUIDs, auch bei gleichem Label. Typ und Schlüssel stehen in lokalen Kommentaren.",
+      "proposal": "Konvention versionieren und dokumentieren; archivierte Definitionen bleiben außerhalb des Profils.",
+      "decision": "D2 / D3 · Fremde Consumer müssen diese Kommentare nicht verstehen.",
+      "examplePointer": "/studies/0/characteristicCategories/0"
+    },
+    {
+      "id": "custom-value", "group": "custom", "label": "TEXT / NUMBER", "kind": "direct",
+      "source": ["SampleResponse.customMetadata", "SampleMetadataValue.textValue", "SampleMetadataValue.numberValue"],
+      "target": ["Sample.characteristics[].value = String oder Zahl"],
+      "current": "NUMBER bleibt JSON-Zahl mit API-Dezimalpräzision; TEXT bleibt String. Keine Einheit gespeichert.",
+      "proposal": "Beibehalten; Einheit als eigenes fachliches Merkmal der Felddefinition ergänzen, falls erforderlich.",
+      "decision": "D3 · concentration hat aktuell keine bekannte Einheit.",
+      "exampleCategory": "Concentration"
+    },
+    {
+      "id": "custom-types", "group": "custom", "label": "BOOLEAN / DATE", "kind": "convention",
+      "source": ["SampleMetadataValue.booleanValue", "SampleMetadataValue.dateValue"],
+      "target": ["Sample.characteristics[].value = String", "Kategorie.characteristicType.comments[metatrack:fieldType]"],
+      "current": "BOOLEAN wird zu true/false als String, DATE zum ISO-String; Ursprungstyp steht an der Kategorie.",
+      "proposal": "Explizite Konvention behalten; ohne Typkommentar ist der Ursprungstyp nicht zuverlässig rekonstruierbar.",
+      "decision": "D3 · Typkonvention als Teil des Metatrack-Profils akzeptieren.",
+      "exampleCategory": "Quality checked"
+    },
+    {
+      "id": "custom-vocabulary", "group": "custom", "label": "Vokabular / Faktor", "kind": "partial",
+      "source": ["SampleVocabulary", "GlobalSampleVocabulary", "GlobalAssayVocabulary", "customMetadata.treatment_group"],
+      "target": ["Ausgewählter Wert in Characteristic oder Parameter"],
+      "current": "Erlaubte Wertelisten und Ontologiebezüge werden nicht exportiert. treatment_group bleibt Characteristic.",
+      "proposal": "Wertlisten getrennt dokumentieren; nur bestätigte experimentelle Einflussgrößen als Study factors abbilden.",
+      "decision": "D3 · Ist treatment_group ein experimenteller Faktor oder nur eine Klassifikation?",
+      "exampleCategory": "Treatment group"
+    },
+    {
+      "id": "assay-identity", "group": "assay", "label": "Assay-Identität", "kind": "convention",
+      "source": ["Assay.id", "Assay.name"],
+      "target": ["$.studies[].assays[].@id / filename", "Assay.comments[metatrack:assayName]", "Protocol.name / Process.name"],
+      "current": "UUID als URN; Name als Kommentar. Der generierte a_UUID.txt-Name bezeichnet keine mitgelieferte Datei.",
+      "proposal": "Beibehalten; Assay-Granularität im Profil definieren.",
+      "decision": "D4 · Assay als Methode, Batch oder Experiment präzisieren.",
+      "examplePointer": "/studies/0/assays/0/comments"
+    },
+    {
+      "id": "assay-instrument", "group": "assay", "label": "Instrument / Plattform", "kind": "partial",
+      "source": ["Assay.instrumentModel", "Assay.sequencingPlatform", "Assay.sequencingLaboratory"],
+      "target": ["Assay.technologyPlatform", "Process.parameterValues[INSTRUMENT_MODEL / PLATFORM / SEQUENCING_LABORATORY]"],
+      "current": "Instrument wird direkt und als Parameter exportiert; PLATFORM fehlt im Demo. Keine measurementType/technologyType-Annotation.",
+      "proposal": "Plattform/Modell gegen Zielvokabular prüfen; Technologiebegriffe nur nach fachlicher Zuordnung ergänzen.",
+      "decision": "D3 / D5 · Plattform nicht aus dem Modellnamen ableiten.",
+      "examplePointer": "/studies/0/assays/0/technologyPlatform"
+    },
+    {
+      "id": "assay-library", "group": "assay", "label": "Library-Metadaten", "kind": "partial",
+      "source": ["Assay.libraryName", "Assay.librarySource", "Assay.librarySelection", "Assay.libraryStrategy", "Assay.libraryLayout", "Assay.insertSize"],
+      "target": ["Protocol.parameters[].parameterName.annotationValue", "Process.parameterValues[LIBRARY_NAME / LIBRARY_SOURCE / LIBRARY_SELECTION / LIBRARY_STRATEGY / LIBRARY_LAYOUT / NOMINAL_LENGTH]"],
+      "current": "Gemeinsame Assay-Werte werden in jeden Sample-Prozess kopiert; keine eigenständige Library.",
+      "proposal": "Library-Instanzen und passende Vorbereitungsschritte explizit erfassen; Einheit/Bedeutung von insertSize prüfen.",
+      "decision": "D4 · Mehrere Libraries pro Sample müssen unterscheidbar sein.",
+      "examplePointer": "/studies/0/assays/0/processSequence/0/parameterValues"
+    },
+    {
+      "id": "assay-accession", "group": "assay", "label": "Study-Accession", "kind": "convention",
+      "source": ["Assay.studyAccession"],
+      "target": ["Assay.comments[metatrack:studyAccession]"],
+      "current": "Wert nur als lokaler Kommentar; im Demo nicht gesetzt. Keine zugesicherte Verwendung durch MARS.",
+      "proposal": "Repository und Geltungsbereich bestimmen; bestehende Study und neue Submission gesondert behandeln.",
+      "decision": "D5 · Gepinnter Adapter erzeugt eine ENA Study pro ISA Assay."
+    },
+    {
+      "id": "process-association", "group": "process", "label": "Heutige Zuordnung", "kind": "partial",
+      "source": ["Assay.samples", "File.sample", "File.assay"],
+      "target": ["Assay.materials.samples[].@id", "Assay.processSequence[].inputs / outputs / executesProtocol"],
+      "current": "Ein Prozess pro Sample × Assay; passende Dateien als Outputs. Mehrere Runs werden nicht getrennt.",
+      "proposal": "Metadatenprofil als vereinfachten Zuordnungsgraph kennzeichnen; unverbundene Dateien in Vorprüfung melden.",
+      "decision": "D4 · Zuordnung ist kein Beleg für eine tatsächliche Laborprozesskette.",
+      "examplePointer": "/studies/0/assays/0/processSequence/0/outputs"
+    },
+    {
+      "id": "process-lineage", "group": "process", "label": "Libraries / Runs", "kind": "absent",
+      "source": ["Keine Library- oder Run-Entity im aktuellen Metatrack-Modell"],
+      "target": ["Vorschlag: Assay.materials.otherMaterials[]", "Vorschlag: getrennte preparation-/sequencing-Prozesse + derivesFrom"],
+      "current": "Source, Extrakte, Libraries, Laborprotokolle und echte Run-Identitäten fehlen als explizite Prozessstruktur.",
+      "proposal": "Sample → Preparation → Library → Sequencing → Dateien; ausschließlich bekannte Schritte erfassen.",
+      "decision": "D4 · Erste Fixture auf eine Library und einen Run pro Sample begrenzen; keine allgemeine 1:1-Annahme."
+    },
+    {
+      "id": "file-identity", "group": "file", "label": "Datei-Identität", "kind": "direct",
+      "source": ["File.uuid", "File.fileName"],
+      "target": ["Assay.dataFiles[].@id / name", "Process.outputs[].@id"],
+      "current": "UUID und Dateiname erhalten; nur Dateien sichtbarer Assays. Andere Dateizuordnungen werden nicht geladen.",
+      "proposal": "Beibehalten; Namenskollisionen und unverbundene Dateien vor Transfer prüfen.",
+      "decision": "D5 · Portablen Dateinamensraum festlegen.",
+      "examplePointer": "/studies/0/assays/0/dataFiles/0/name"
+    },
+    {
+      "id": "file-metadata", "group": "file", "label": "Typ / Prüfsumme / Reads", "kind": "convention",
+      "source": ["File.fileName", "File.md5", "File.unencryptedMd5", "File.readRole", "File.status"],
+      "target": ["DataFile.type = Raw Data File bei FASTQ", "DataFile.comments[file type / file checksum / metatrack:unencryptedMd5 / metatrack:readRole / metatrack:uploadStatus]"],
+      "current": "FASTQ-Erkennung über Endung; MARS-Dateikommentare und lokale Metatrack-Kommentare. Demo ist PENDING.",
+      "proposal": "Vor Submission Dateiinhalt, Checksummenbezug, Uploadstatus und Read-Paare prüfen.",
+      "decision": "D5 · PENDING ist beschreibbar, aber kein Beleg für verfügbare Dateien.",
+      "examplePointer": "/studies/0/assays/0/dataFiles/0/comments"
+    },
+    {
+      "id": "file-storage", "group": "file", "label": "Speicher / Transfer", "kind": "excluded",
+      "source": ["File.id", "File.objectKey", "File.virtualPath", "File.uploadedBy"],
+      "target": [],
+      "current": "Interne DB-/Storage-Schlüssel und Uploader werden nicht exportiert; keine Dateiübertragung.",
+      "proposal": "Getrenntes Transfermanifest mit portablen Dateipfaden und passenden Prüfsummen vorsehen.",
+      "decision": "D5 · Bereitstellung der tatsächlichen Bytes separat entscheiden."
+    },
+    {
+      "id": "gap-required", "group": "gap", "label": "ENA-Pflichtmetadaten", "kind": "absent",
+      "source": ["STUDY_TYPE: kein explizites Quellfeld", "DESIGN_DESCRIPTION: kein explizites Assay-Quellfeld", "Assay.sequencingPlatform: vorhanden, im Demo leer"],
+      "target": ["Assay.comments[STUDY_TYPE oder existing_study_type]", "Process.parameterValues[DESIGN_DESCRIPTION / PLATFORM]"],
+      "current": "Diese Werte fehlen im Demo; die gepinnte ENA-XML-Erzeugung benötigt sie zusätzlich zur Library-Struktur.",
+      "proposal": "Repository-Profil mit expliziter Ergänzung und Vorprüfung; keinen Titel als Designbeschreibung einsetzen.",
+      "decision": "D5 · Fachliche Pflichtmetadaten und Study-Granularität bestätigen."
+    },
+    {
+      "id": "gap-repository", "group": "gap", "label": "Accessions / Ziel / Semantik", "kind": "absent",
+      "source": ["Keine BioSamples-Accession im Sample-Modell", "Keine Zielrepository-Konfiguration im Export", "Keine expliziten Ontologie-/Einheitenzuordnungen"],
+      "target": ["Repository-Profil: Sample-Accessions oder Receipt-Zuordnung", "MARS target_repository-Konvention", "Geprüfte Ontologieannotationen und Einheiten"],
+      "current": "JSON-Schema und interne Referenzen bestehen; Parser-, Adapter- und ENA-Validierung sind damit nicht belegt.",
+      "proposal": "Mit gepinnter Parser-/Adapter-Fixture offline prüfen; Anzahl und Inhalt von Study/Experiment/Run kontrollieren.",
+      "decision": "D3 / D5 · MARS-Konventionen getrennt vom ISA-Kernvertrag versionieren."
+    }
+  ]
+}
