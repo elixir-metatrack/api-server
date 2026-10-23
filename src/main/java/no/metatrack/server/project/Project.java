@@ -20,6 +20,17 @@ public class Project extends PanacheEntity {
 
     public String description;
 
+    public String dataOwningOrganization;
+
+    @Column(columnDefinition = "text")
+    public String detailedDescription;
+
+    @Column(columnDefinition = "text")
+    public String comments;
+
+    @OneToMany(mappedBy = "project", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    public Set<ProjectPublication> publications = new HashSet<>();
+
     @Column(nullable = false)
     public UUID owner; // keycloak ID
 
