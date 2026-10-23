@@ -75,6 +75,8 @@ class SpreadsheetExportWriterTest {
         Assay assay = new Assay();
         assay.id = UUID.randomUUID();
         assay.studyAccession = "PRJ0001";
+        assay.experimentAccession = "000123";
+        assay.runAccession = "=run-text";
         assay.sequencingPlatform = "ILLUMINA";
         assay.insertSize = 1234;
         Sample sample = sample("00012");
@@ -93,6 +95,8 @@ class SpreadsheetExportWriterTest {
             assertEquals("md5", record.get(prefix + "File md5"));
             assertEquals("plain-md5", record.get(prefix + "File Unencrypted md5"));
             assertEquals("PRJ0001", record.get("Study Accession"));
+            assertEquals("000123", record.get("Experiment Accession"));
+            assertEquals("=run-text", record.get("Run Accession"));
             assertEquals("ILLUMINA", record.get("Sequencing platform"));
             assertEquals("1234", record.get("Insert Size"));
         }
