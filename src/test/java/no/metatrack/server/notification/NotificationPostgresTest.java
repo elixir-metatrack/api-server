@@ -62,7 +62,7 @@ class NotificationPostgresTest {
         owner = UUID.randomUUID();
         recipient = UUID.randomUUID();
         email = UUID.randomUUID() + "@example.org";
-        projectId = projects.createProject(UUID.randomUUID().toString(), "Test", owner.toString()).id;
+        projectId = projects.createProject(new no.metatrack.server.project.CreateProjectRequest(UUID.randomUUID().toString(), "Test", "Test organization", null, null), owner.toString()).id;
     }
 
     @AfterAll
@@ -287,7 +287,7 @@ class NotificationPostgresTest {
         String adminToken = token(admin, "admin@example.org", true);
         assertEquals(invitation.id().toString(), json(request("GET", root, adminToken, null)).get(0).get("id").asText());
         assertEquals(0, json(request("GET", root + "?page=1&size=1", ownerToken, null)).size());
-        Long otherProject = projects.createProject(UUID.randomUUID().toString(), "Other", owner.toString()).id;
+        Long otherProject = projects.createProject(new no.metatrack.server.project.CreateProjectRequest(UUID.randomUUID().toString(), "Other", "Test organization", null, null), owner.toString()).id;
         for (String suffix : List.of("", "/resend")) {
             String method = suffix.isEmpty() ? "DELETE" : "POST";
             assertEquals(404, request(method, "/api/projects/" + otherProject + "/invitations/" + invitation.id() + suffix, ownerToken, null).statusCode());

@@ -12,6 +12,9 @@ public record ProjectResponse(
         long sampleCount,
         Instant createdOn,
         Instant modifiedOn,
-        Long parentProjectId
+        Long parentProjectId,
+        String dataOwningOrganization,
+        String detailedDescription,
+        String comments
 ) {
 }
