@@ -482,34 +482,41 @@ class CSVExperimentImportServiceTest {
     @Test
     void generatedExperimentTemplatesImportOptionalAccessions() throws Exception {
         for (String type : List.of("experiment_PE", "experiment_SE")) {
-            byte[] template = new SpreadsheetTemplateService().create(type);
-            Path path = directory.resolve(type + ".xlsx");
-            try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(template))) {
-                var sheet = workbook.getSheetAt(0);
-                for (var header : sheet) {
-                    if (header.getCell(0) == null
-                            || !"METADATA FIELDS:".equals(header.getCell(0).getStringCellValue())) continue;
-                    var data = sheet.createRow(header.getRowNum() + 1);
-                    for (var cell : header) {
-                        String value = switch (cell.getStringCellValue()) {
-                            case "Sample" -> "sample";
-                            case "experiment_accession" -> "000123";
-                            case "run_accession" -> "ERR123";
-                            default -> null;
-                        };
-                        if (value != null) data.createCell(cell.getColumnIndex()).setCellValue(value);
+            for (boolean includeAccessions : List.of(false, true)) {
+                byte[] template = new SpreadsheetTemplateService().create(type);
+                Path path = directory.resolve(type + ".xlsx");
+                try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(template))) {
+                    var sheet = workbook.getSheetAt(0);
+                    for (var header : sheet) {
+                        if (header.getCell(0) == null
+                                || !"METADATA FIELDS:".equals(header.getCell(0).getStringCellValue())) continue;
+                        if (includeAccessions) {
+                            int column = header.getLastCellNum();
+                            header.createCell(column).setCellValue("experiment_accession");
+                            header.createCell(column + 1).setCellValue("run_accession");
+                        }
+                        var data = sheet.createRow(header.getRowNum() + 1);
+                        for (var cell : header) {
+                            String value = switch (cell.getStringCellValue()) {
+                                case "Sample" -> "sample";
+                                case "experiment_accession" -> "000123";
+                                case "run_accession" -> "ERR123";
+                                default -> null;
+                            };
+                            if (value != null) data.createCell(cell.getColumnIndex()).setCellValue(value);
+                        }
+                        break;
                     }
-                    break;
+                    try (var output = Files.newOutputStream(path)) {
+                        workbook.write(output);
+                    }
                 }
-                try (var output = Files.newOutputStream(path)) {
-                    workbook.write(output);
-                }
+                assay.experimentAccession = null;
+                assay.runAccession = null;
+                assertTrue(importFile(Map.of(), path).isEmpty(), type);
+                assertEquals(includeAccessions ? "000123" : null, assay.experimentAccession, type);
+                assertEquals(includeAccessions ? "ERR123" : null, assay.runAccession, type);
             }
-            assay.experimentAccession = null;
-            assay.runAccession = null;
-            assertTrue(importFile(Map.of(), path).isEmpty(), type);
-            assertEquals("000123", assay.experimentAccession, type);
-            assertEquals("ERR123", assay.runAccession, type);
         }
     }
 
