@@ -32,6 +32,12 @@ public class Assay extends PanacheEntityBase {
 
     public String studyAccession;
 
+    @Column(name = "experiment_accession", length = 255)
+    public String experimentAccession;
+
+    @Column(name = "run_accession", length = 255)
+    public String runAccession;
+
     public String instrumentModel;
 
     public String sequencingPlatform;
