@@ -64,7 +64,11 @@ public class SpreadsheetExportWriter {
             new SampleColumn("host_age", s -> s.hostAge),
             new SampleColumn("county", s -> s.county),
             new SampleColumn("commune", s -> s.commune),
-            new SampleColumn("hospital_health_institution", s -> s.hospitalHealthInstitution));
+            new SampleColumn("hospital_health_institution", s -> s.hospitalHealthInstitution),
+            new SampleColumn("project_accession", s -> s.projectAccession),
+            new SampleColumn("study_accession", s -> s.studyAccession),
+            new SampleColumn("sample_accession", s -> s.sampleAccession),
+            new SampleColumn("secondary_accession", s -> s.secondaryAccession));
 
     private static final List<String> EXPERIMENT_HEADERS = List.of(
             "Sample", "Study Accession", "Sequencing instrument", "Library Name", "Library Source",
