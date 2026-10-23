@@ -88,6 +88,62 @@ class SubProjectScopeTest {
     Fixture committedFixture;
     UUID committedVocabulary;
 
+    @Inject no.metatrack.server.project.ProjectPublicationService publicationService;
+
+    @Test
+    void publicationsRoundTripAndCascadeWithProjectDeletion() {
+        Project project = projectService.createProject(new no.metatrack.server.project.CreateProjectRequest(
+                "publications", null, "Organization", "Detailed", "Notes"), OWNER.toString());
+        Long projectId = project.id;
+        var created = publicationService.create(projectId, new no.metatrack.server.project.PublicationRequest(
+                "Title", List.of("https://example.org/one", "https://example.org/two"),
+                List.of("urn:example:one", "urn:example:two"), "10.1234/example"));
+        entityManager.flush();
+        entityManager.clear();
+        var stored = publicationService.get(projectId, created.id());
+        assertEquals(created, stored);
+        assertThrows(NotFoundException.class, () -> publicationService.get(-1L, created.id()));
+        publicationService.replace(projectId, created.id(), new no.metatrack.server.project.PublicationRequest(
+                "Updated", null, null, null));
+        entityManager.flush();
+        entityManager.clear();
+        var updated = publicationService.get(projectId, created.id());
+        assertEquals("Updated", updated.title());
+        assertTrue(updated.links().isEmpty());
+        assertTrue(updated.pids().isEmpty());
+        assertNull(updated.doi());
+        publicationService.delete(projectId, created.id());
+        entityManager.flush();
+        assertTrue(publicationService.list(projectId).isEmpty());
+        var remaining = publicationService.create(projectId, new no.metatrack.server.project.PublicationRequest(
+                "Remaining", List.of("https://example.org"), List.of("urn:example:remaining"), null));
+        entityManager.flush();
+        entityManager.clear();
+        projectService.deleteProject(projectId);
+        entityManager.flush();
+        entityManager.clear();
+        assertThrows(NotFoundException.class, () -> publicationService.get(projectId, remaining.id()));
+        assertEquals(0L, ((Number) entityManager.createNativeQuery(
+                "select count(*) from project_publication_link where publication_id = :id")
+                .setParameter("id", remaining.id()).getSingleResult()).longValue());
+        assertEquals(0L, ((Number) entityManager.createNativeQuery(
+                "select count(*) from project_publication_pid where publication_id = :id")
+                .setParameter("id", remaining.id()).getSingleResult()).longValue());
+    }
+
+    @Test
+    void subProjectsInheritOrganizationAndCanOverrideIt() {
+        Fixture f = fixture();
+        assertEquals("Test organization", f.sub.dataOwningOrganization);
+        Project child = projectService.createSubProject(f.root.id,
+                new no.metatrack.server.project.CreateSubProjectRequest(
+                        "override", null, List.of(), "Another organization", "Details", "Notes"), OWNER.toString());
+        assertEquals("Another organization", child.dataOwningOrganization);
+        assertEquals("Details", child.detailedDescription);
+        assertEquals("Notes", child.comments);
+        assertEquals("Test organization", f.root.dataOwningOrganization);
+    }
+
     @AfterEach
     void cleanCommittedFixture() {
         if (committedFixture == null) return;
@@ -619,8 +675,8 @@ class SubProjectScopeTest {
     }
 
     private Fixture fixture() {
-        Project root = projectService.createProject("root", "test", OWNER.toString());
-        Project other = projectService.createProject("other", "test", OWNER.toString());
+        Project root = projectService.createProject(new no.metatrack.server.project.CreateProjectRequest("root", "test", "Test organization", null, null), OWNER.toString());
+        Project other = projectService.createProject(new no.metatrack.server.project.CreateProjectRequest("other", "test", "Test organization", null, null), OWNER.toString());
         Sample visible = sample(root, "visible");
         Sample hidden = sample(root, "hidden");
         Sample foreign = sample(other, "foreign");

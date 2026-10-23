@@ -52,11 +52,11 @@ public class ProjectController {
     @POST
     @Authenticated
     @Produces("application/json")
-    public ProjectResponse createNewProject(CreateProjectRequest request) {
+    public ProjectResponse createNewProject(@Valid CreateProjectRequest request) {
         CurrentUser currentUser = userService.requireCurrentUser();
         String currentUserId = currentUser.id();
 
-        Project project = projectService.createProject(request.name(), request.description(), currentUserId);
+        Project project = projectService.createProject(request, currentUserId);
         return projectService.toResponse(project);
     }
 
@@ -64,11 +64,11 @@ public class ProjectController {
     @Authenticated
     @Path("/{projectId}")
     @Produces("application/json")
-    public Response updateProject(@PathParam("projectId") Long projectId, UpdateProjectRequest request) {
+    public Response updateProject(@PathParam("projectId") Long projectId, @Valid UpdateProjectRequest request) {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.OWNER))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        projectService.updateProject(projectId, request.name(), request.description());
+        projectService.updateProject(projectId, request);
 
         return Response.noContent().build();
     }
@@ -185,7 +185,7 @@ public class ProjectController {
 
         CurrentUser currentUser = userService.requireCurrentUser();
         Project subProject = projectService.createSubProject(
-                projectId, request.name(), request.description(), request.sampleIds(), currentUser.id());
+                projectId, request, currentUser.id());
         return projectService.toResponse(subProject);
     }
 

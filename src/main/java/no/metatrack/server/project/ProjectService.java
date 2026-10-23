@@ -1,5 +1,6 @@
 package no.metatrack.server.project;
 
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.LockModeType;
@@ -9,6 +10,7 @@ import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
 import no.metatrack.server.sample.Sample;
 
@@ -25,6 +27,12 @@ public class ProjectService {
     @Inject
     ProjectRoleCheck projectRoleCheck;
 
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    UserService userService;
+
     public ProjectService(IdentityLookupService identityLookupService) {
         this.identityLookupService = identityLookupService;
     }
@@ -34,7 +42,9 @@ public class ProjectService {
     }
 
     @Transactional
-    public Project createProject(String name, String description, String currentUserId) throws WebApplicationException {
+    public Project createProject(CreateProjectRequest request, String currentUserId) throws WebApplicationException {
+        String organization = requireOrganization(request.dataOwningOrganization());
+        String name = request.name();
 
         if (Project.projectExistsByName(name)) {
             throw new WebApplicationException("Project already exists", Response.Status.CONFLICT);
@@ -42,7 +52,10 @@ public class ProjectService {
 
         Project project = new Project();
         project.name = name;
-        project.description = description;
+        project.description = request.description();
+        project.dataOwningOrganization = organization;
+        project.detailedDescription = request.detailedDescription();
+        project.comments = request.comments();
         project.owner = UUID.fromString(currentUserId);
         project.createdOn = Instant.now();
         project.modifiedOn = Instant.now();
@@ -59,14 +72,23 @@ public class ProjectService {
     }
 
     @Transactional
-    public void updateProject(Long projectId, String name, String description) throws NotFoundException {
+    public void updateProject(Long projectId, UpdateProjectRequest request) throws NotFoundException {
         Project project = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
 
-        if (name != null) {
-            project.name = name;
+        if (request.dataOwningOrganization() != null) {
+            project.dataOwningOrganization = requireOrganization(request.dataOwningOrganization());
         }
-        if (description != null) {
-            project.description = description;
+        if (request.name() != null) {
+            project.name = request.name();
+        }
+        if (request.description() != null) {
+            project.description = request.description();
+        }
+        if (request.detailedDescription() != null) {
+            project.detailedDescription = request.detailedDescription();
+        }
+        if (request.comments() != null) {
+            project.comments = request.comments();
         }
         project.modifiedOn = Instant.now();
     }
@@ -200,14 +222,27 @@ public class ProjectService {
                 sampleCount,
                 project.createdOn,
                 project.modifiedOn,
-                project.parentProject != null ? project.parentProject.id : null
+                project.parentProject != null ? project.parentProject.id : null,
+                project.dataOwningOrganization,
+                project.detailedDescription,
+                visibleComments(project)
         );
     }
 
     @Transactional
     public Project createSubProject(
             Long parentProjectId, String name, String description, List<UUID> sampleIds, String currentUserId) {
+        return createSubProject(parentProjectId,
+                new CreateSubProjectRequest(name, description, sampleIds, null, null, null), currentUserId);
+    }
+
+    @Transactional
+    public Project createSubProject(Long parentProjectId, CreateSubProjectRequest request, String currentUserId) {
         Project parent = (Project) Project.findByIdOptional(parentProjectId).orElseThrow(NotFoundException::new);
+        String name = request.name();
+        List<UUID> sampleIds = request.sampleIds();
+        String organization = requireOrganization(request.dataOwningOrganization() != null
+                ? request.dataOwningOrganization() : parent.dataOwningOrganization);
         if (parent.isSubProject()) {
             throw new WebApplicationException(
                     "Cannot create a sub-project of a sub-project", Response.Status.BAD_REQUEST);
@@ -218,7 +253,10 @@ public class ProjectService {
 
         Project subProject = new Project();
         subProject.name = name;
-        subProject.description = description;
+        subProject.description = request.description();
+        subProject.dataOwningOrganization = organization;
+        subProject.detailedDescription = request.detailedDescription();
+        subProject.comments = request.comments();
         subProject.owner = UUID.fromString(currentUserId);
         subProject.parentProject = parent;
         subProject.createdOn = Instant.now();
@@ -250,5 +288,21 @@ public class ProjectService {
 
     public List<ProjectResponse> getSubProjects(Long parentProjectId) {
         return toResponses(Project.findSubProjects(parentProjectId));
+    }
+
+    private String requireOrganization(String organization) {
+        if (organization == null || organization.isBlank() || organization.length() > 255) {
+            throw new BadRequestException("Data-owning organization is required and must not exceed 255 characters");
+        }
+        return organization;
+    }
+
+    private String visibleComments(Project project) {
+        if (project.comments == null || identity.isAnonymous()) {
+            return null;
+        }
+        UUID userId = UUID.fromString(userService.requireCurrentUser().id());
+        return project.projectMembers.stream().anyMatch(member -> userId.equals(member.memberId))
+                ? project.comments : null;
     }
 }
