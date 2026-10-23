@@ -1,6 +1,6 @@
 package no.metatrack.server.spreadsheet;
 
-import io.quarkus.test.TestTransaction;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.security.TestSecurity;
 import io.quarkus.test.junit.QuarkusMock;
@@ -27,6 +27,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -53,7 +54,6 @@ import static org.mockito.Mockito.*;
 @QuarkusTest
 @TestProfile(SpreadsheetPostgresProfile.class)
 @EnabledIfEnvironmentVariable(named = "INVITATION_TEST_JDBC_URL", matches = ".+")
-@TestTransaction
 @TestSecurity(user = "spreadsheet-importer")
 class SpreadsheetImportPostgresTest {
     @Inject ProjectService projects;
@@ -82,11 +82,30 @@ class SpreadsheetImportPostgresTest {
     }
 
     void seed() {
-        project = projects.createProject("xlsx-" + UUID.randomUUID(), "test", owner.toString());
-        projects.addMember(project.id, editor, ProjectRole.EDITOR);
-        projects.addMember(project.id, viewer, ProjectRole.VIEWER);
-        fields.create(project.id, new CreateSampleMetadataFieldRequest("group", "Group", SampleMetadataFieldType.TEXT, null));
-        em.flush();
+        // Imports suspend transactions, so all fixtures must be committed before calling them.
+        QuarkusTransaction.requiringNew().run(() -> {
+            project = projects.createProject("xlsx-" + UUID.randomUUID(), "test", owner.toString());
+            projects.addMember(project.id, editor, ProjectRole.EDITOR);
+            projects.addMember(project.id, viewer, ProjectRole.VIEWER);
+            fields.create(project.id, new CreateSampleMetadataFieldRequest("group", "Group", SampleMetadataFieldType.TEXT, null));
+        });
+    }
+
+    @AfterEach
+    void cleanCommittedFixtures() {
+        if (project == null) return;
+        QuarkusTransaction.requiringNew().run(() -> {
+            em.createNativeQuery("delete from {h-schema}file where assay_id in (select id from {h-schema}assay where project_id = :project)")
+                    .setParameter("project", project.id).executeUpdate();
+            em.createNativeQuery("delete from {h-schema}assay_sample where assay_id in (select id from {h-schema}assay where project_id = :project)")
+                    .setParameter("project", project.id).executeUpdate();
+            Assay.delete("project.id", project.id);
+            Sample.delete("project.id", project.id);
+            em.createNativeQuery("delete from {h-schema}project_member where project_id = :project")
+                    .setParameter("project", project.id).executeUpdate();
+            Project.deleteById(project.id);
+            GlobalSampleVocabulary.delete("fieldKey", "host_sex");
+        });
     }
 
     @Test
@@ -119,7 +138,6 @@ class SpreadsheetImportPostgresTest {
             row(data, 2, "invalid", "other");
             vocabulary(workbook, "group", "control");
             var errors = samples.importNewSamples(project.id, write(workbook, format).toFile());
-            em.flush();
             assertEquals(1, errors.size(), errors.toString());
             assertTrue(errors.getFirst().sample().contains("Samples!row 3"));
             assertEquals("group", errors.getFirst().fieldKey());
@@ -226,7 +244,6 @@ class SpreadsheetImportPostgresTest {
         }
         FileUpload upload = upload(path, format);
         assertEquals(400, sampleController.importCSV(project.id, upload).getStatus());
-        em.flush();
         assertTrue(Sample.findBySampleNameInProject("valid", project.id).isPresent());
         assertTrue(Sample.findBySampleNameInProject("invalid", project.id).isEmpty());
         assertEquals(List.of("female"), globals.get("host_sex").terms());
@@ -250,16 +267,18 @@ class SpreadsheetImportPostgresTest {
     @ValueSource(strings = {"xls", "xlsx", "csv", "tsv"})
     void importsExperimentRowsIntoExistingAssayAndRejectsUnlinkedSamples(String format) throws Exception {
         seed();
-        Sample sample = new Sample();
-        sample.name = "linked";
-        sample.project = project;
-        sample.persist();
-        Assay assay = new Assay();
-        assay.name = "experiment";
-        assay.project = project;
-        assay.addSample(sample);
-        assay.persist();
-        em.flush();
+        Assay assay = QuarkusTransaction.requiringNew().call(() -> {
+            Sample sample = new Sample();
+            sample.name = "linked";
+            sample.project = Project.findById(project.id);
+            sample.persist();
+            Assay created = new Assay();
+            created.name = "experiment";
+            created.project = sample.project;
+            created.addSample(sample);
+            created.persist();
+            return created;
+        });
         as(editor);
         try (Workbook workbook = workbook(format)) {
             Sheet sheet = workbook.createSheet("Experiments");
@@ -279,7 +298,6 @@ class SpreadsheetImportPostgresTest {
                 path = write(workbook, format);
             }
             var errors = experiments.importIntoAssay(project.id, assay.id, path.toFile());
-            em.flush();
             assertEquals(1, errors.size(), errors.toString());
             assertEquals(format.equals("csv") || format.equals("tsv") ? "Row 1" : "Experiments!row 2", errors.getFirst().row());
             assertEquals(3, no.metatrack.server.file.File.count("assay.id", assay.id));
