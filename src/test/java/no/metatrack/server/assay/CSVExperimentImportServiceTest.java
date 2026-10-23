@@ -148,7 +148,7 @@ class CSVExperimentImportServiceTest {
             writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null, null,
                     List.of(new CSVExperimentImportService.PendingFile(
                             "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)));
-            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null, null);
+            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null);
             verify(writer.assayService).associateSample(assay, sample);
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));

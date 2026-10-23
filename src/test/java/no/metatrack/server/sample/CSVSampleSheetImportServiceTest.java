@@ -70,6 +70,9 @@ class CSVSampleSheetImportServiceTest {
                 Map.of(source.id, values), List.of());
         Path path = Files.write(directory.resolve("export.xlsx"), bytes);
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
             assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
@@ -247,6 +250,9 @@ class CSVSampleSheetImportServiceTest {
         Path csv = Files.writeString(directory.resolve("dates.csv"),
                 "name,collection_date\nsample-1," + input + "\n");
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
             var errors = service.importNewSamples(1L, csv.toFile());
@@ -293,6 +299,9 @@ class CSVSampleSheetImportServiceTest {
             try (var output = Files.newOutputStream(path)) { workbook.write(output); }
         }
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
             assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
