@@ -13,11 +13,14 @@ import no.metatrack.server.sample.Sample;
 import no.metatrack.server.spreadsheet.SpreadsheetTable;
 import no.metatrack.server.spreadsheet.SpreadsheetExportWriter;
 import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.spreadsheet.SpreadsheetTemplateService;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
+import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,6 +83,8 @@ class CSVExperimentImportServiceTest {
         Assay source = new Assay();
         source.id = UUID.randomUUID();
         source.studyAccession = "PRJ1234";
+        source.experimentAccession = "000012";
+        source.runAccession = "ERR1234";
         source.libraryName = "00012";
         source.sequencingPlatform = "ILLUMINA";
         source.sequencingLaboratory = "Lab";
@@ -100,6 +105,8 @@ class CSVExperimentImportServiceTest {
                         file.md5(), file.unencryptedMd5(), file.readRole()));
             }
             assertEquals(source.studyAccession, assay.studyAccession);
+            assertEquals(source.experimentAccession, assay.experimentAccession);
+            assertEquals(source.runAccession, assay.runAccession);
             assertEquals(source.libraryName, assay.libraryName);
             assertEquals(source.sequencingPlatform, assay.sequencingPlatform);
             assertEquals(source.sequencingLaboratory, assay.sequencingLaboratory);
@@ -147,8 +154,9 @@ class CSVExperimentImportServiceTest {
             samples.when(() -> Sample.findBySampleNameInProject("sample", 2L)).thenReturn(Optional.of(sample));
             writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null, null,
                     List.of(new CSVExperimentImportService.PendingFile(
-                            "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)));
-            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null);
+                            "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)), null, null);
+            verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null,
+                    null, null);
             verify(writer.assayService).associateSample(assay, sample);
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));
@@ -441,6 +449,68 @@ class CSVExperimentImportServiceTest {
         BadRequestException error = assertThrows(
                 BadRequestException.class, () -> service.validateSpreadsheet(empty));
         assertTrue(error.getMessage().contains("no data rows"));
+    }
+
+    @Test
+    void accessionImportsBackfillPreserveBlanksAndRejectConflictsPerRow() throws Exception {
+        Path path = Files.writeString(directory.resolve("accessions.csv"),
+                "Sample,experiment_accession,run_accession\n"
+                        + "sample,  ERX123  , ERR123 \n"
+                        + "sample,,\n"
+                        + "sample,ERX999,ERR999\n"
+                        + "sample,ERX123,ERR123\n");
+        var errors = importFile(Map.of(), path);
+        assertEquals(2, errors.size());
+        assertTrue(errors.stream().allMatch(error -> error.row().equals("Row 3")));
+        assertEquals(Set.of("Experiment Accession", "Run Accession"),
+                errors.stream().map(CSVExperimentRowError::field).collect(Collectors.toSet()));
+        assertEquals("ERX123", assay.experimentAccession);
+        assertEquals("ERR123", assay.runAccession);
+        verify(assay, times(3)).addSample(sample);
+    }
+
+    @Test
+    void omittedAccessionColumnsPreserveExistingValues() throws Exception {
+        assay.experimentAccession = "ERX123";
+        assay.runAccession = "ERR123";
+        assertTrue(importFile(Map.of(), Files.writeString(directory.resolve("old.csv"),
+                "Sample\nsample\n")).isEmpty());
+        assertEquals("ERX123", assay.experimentAccession);
+        assertEquals("ERR123", assay.runAccession);
+    }
+
+    @Test
+    void generatedExperimentTemplatesImportOptionalAccessions() throws Exception {
+        for (String type : List.of("experiment_PE", "experiment_SE")) {
+            byte[] template = new SpreadsheetTemplateService().create(type);
+            Path path = directory.resolve(type + ".xlsx");
+            try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(template))) {
+                var sheet = workbook.getSheetAt(0);
+                for (var header : sheet) {
+                    if (header.getCell(0) == null
+                            || !"METADATA FIELDS:".equals(header.getCell(0).getStringCellValue())) continue;
+                    var data = sheet.createRow(header.getRowNum() + 1);
+                    for (var cell : header) {
+                        String value = switch (cell.getStringCellValue()) {
+                            case "Sample" -> "sample";
+                            case "experiment_accession" -> "000123";
+                            case "run_accession" -> "ERR123";
+                            default -> null;
+                        };
+                        if (value != null) data.createCell(cell.getColumnIndex()).setCellValue(value);
+                    }
+                    break;
+                }
+                try (var output = Files.newOutputStream(path)) {
+                    workbook.write(output);
+                }
+            }
+            assay.experimentAccession = null;
+            assay.runAccession = null;
+            assertTrue(importFile(Map.of(), path).isEmpty(), type);
+            assertEquals("000123", assay.experimentAccession, type);
+            assertEquals("ERR123", assay.runAccession, type);
+        }
     }
 
     private SpreadsheetTable spreadsheet(String contents) throws Exception {
