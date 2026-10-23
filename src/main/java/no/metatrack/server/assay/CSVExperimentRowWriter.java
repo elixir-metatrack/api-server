@@ -19,9 +19,10 @@ public class CSVExperimentRowWriter {
     public void write(Long projectId, UUID assayId, String sampleName, String studyAccession, String instrumentModel, String libraryName,
             String librarySource, String librarySelection, String libraryStrategy, String libraryLayout,
             Integer insertSize, String sequencingPlatform, String sequencingLaboratory,
-            List<CSVExperimentImportService.PendingFile> pendingFiles) {
+            List<CSVExperimentImportService.PendingFile> pendingFiles,
+            String experimentAccession, String runAccession) {
         assayService.updateAssay(projectId, assayId, null, studyAccession, instrumentModel, libraryName, librarySource,
-                librarySelection, libraryStrategy, libraryLayout, insertSize);
+                librarySelection, libraryStrategy, libraryLayout, insertSize, experimentAccession, runAccession);
         Assay assay = assayService.getAssayById(projectId, assayId);
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
         if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;

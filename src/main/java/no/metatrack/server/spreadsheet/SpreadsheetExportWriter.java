@@ -71,7 +71,7 @@ public class SpreadsheetExportWriter {
             new SampleColumn("secondary_accession", s -> s.secondaryAccession));
 
     private static final List<String> EXPERIMENT_HEADERS = List.of(
-            "Sample", "Study Accession", "Sequencing instrument", "Library Name", "Library Source",
+            "Sample", "Study Accession", "Experiment Accession", "Run Accession", "Sequencing instrument", "Library Name", "Library Source",
             "Library Selection", "Library Strategy", "Library Layout", "Insert Size", "Sequencing platform",
             "Sequencing Laboratory", "File Name", "File md5", "File Unencrypted md5",
             "Forward File Name", "Forward File md5", "Forward File Unencrypted md5",
@@ -135,7 +135,8 @@ public class SpreadsheetExportWriter {
     }
 
     private List<Object> experimentValues(Assay assay, Sample sample, FileResponse file) {
-        List<Object> values = new ArrayList<>(Arrays.asList(sample.name, assay.studyAccession, assay.instrumentModel,
+        List<Object> values = new ArrayList<>(Arrays.asList(sample.name, assay.studyAccession,
+                assay.experimentAccession, assay.runAccession, assay.instrumentModel,
                 assay.libraryName, assay.librarySource, assay.librarySelection, assay.libraryStrategy, assay.libraryLayout,
                 assay.insertSize, assay.sequencingPlatform, assay.sequencingLaboratory));
         values.addAll(Collections.nCopies(EXPERIMENT_HEADERS.size() - values.size(), null));

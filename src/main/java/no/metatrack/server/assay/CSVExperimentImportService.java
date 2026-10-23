@@ -44,6 +44,7 @@ public class CSVExperimentImportService {
             "sequencing_platform", "Sequencing platform",
             "sequencing_laboratory", "Sequencing Laboratory");
     private static final Set<String> IMPORT_HEADERS = Set.of(
+            "experiment accession", "experiment_accession", "run accession", "run_accession",
             "sample", "study accession", "file md5", "file name", "file unencrypted md5",
             "forward file md5", "forward file name", "forward file unencrypted md5",
             "insert size", "reverse file md5", "reverse file name", "reverse file unencrypted md5",
@@ -140,7 +141,11 @@ public class CSVExperimentImportService {
         }
 
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
-        if (hasMetadataConflict(assay, metadata, insertSize, row, errors)) return;
+        boolean accessionConflict = hasAccessionConflict(assay.experimentAccession,
+                value(record, "Experiment Accession"), "Experiment Accession", row, errors);
+        accessionConflict |= hasAccessionConflict(assay.runAccession,
+                value(record, "Run Accession"), "Run Accession", row, errors);
+        if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return;
         int rowErrorCount = errors.size();
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
@@ -162,7 +167,8 @@ public class CSVExperimentImportService {
                     patchValue(record, "Sequencing instrument"), patchValue(record, "Library Name"),
                     patchValue(record, "Library Source"), patchValue(record, "Library Selection"),
                     patchValue(record, "Library Strategy"), patchValue(record, "Library Layout"), insertSize,
-                    patchValue(record, "Sequencing platform"), patchValue(record, "Sequencing Laboratory"), pendingFiles);
+                    patchValue(record, "Sequencing platform"), patchValue(record, "Sequencing Laboratory"), pendingFiles,
+                    patchValue(record, "Experiment Accession"), patchValue(record, "Run Accession"));
         } catch (AssayVocabularyValidationException e) {
             e.violations().forEach(violation -> errors.add(new CSVExperimentRowError(row,
                     VOCABULARY_HEADERS.getOrDefault(violation.field(), violation.field()),
@@ -249,6 +255,15 @@ public class CSVExperimentImportService {
         return hasConflict;
     }
 
+    private boolean hasAccessionConflict(String existing, String incoming, String field,
+            String row, List<CSVExperimentRowError> errors) {
+        if (incoming == null || incoming.isBlank() || existing == null || existing.isBlank()
+                || existing.equals(incoming)) return false;
+        errors.add(new CSVExperimentRowError(row, field, incoming,
+                "Cannot replace existing value '" + existing + "' with '" + incoming + "'"));
+        return true;
+    }
+
     private boolean hasError(List<CSVExperimentRowError> errors, String row, String field) {
         return errors.stream().anyMatch(error -> error.row().equals(row) && error.field().equals(field));
     }
@@ -257,7 +272,11 @@ public class CSVExperimentImportService {
     }
 
     private String value(CSVRecord record, String header) {
-        String value = csvImportSupport.getMappedValue(record, header);
+        String value = switch (header) {
+            case "Experiment Accession" -> csvImportSupport.getMappedValue(record, header, "experiment_accession");
+            case "Run Accession" -> csvImportSupport.getMappedValue(record, header, "run_accession");
+            default -> csvImportSupport.getMappedValue(record, header);
+        };
         return value == null ? null : value.trim();
     }
 
