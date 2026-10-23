@@ -45,6 +45,24 @@ public class AssayService {
             String librarySelection,
             String libraryLayout,
             Integer insertSize) {
+        return createAssay(projectId, name, studyAccession, instrumentModel, libraryName, librarySource,
+                libraryStrategy, librarySelection, libraryLayout, insertSize, null, null);
+    }
+
+    @Transactional
+    public Assay createAssay(
+            Long projectId,
+            String name,
+            String studyAccession,
+            String instrumentModel,
+            String libraryName,
+            String librarySource,
+            String libraryStrategy,
+            String librarySelection,
+            String libraryLayout,
+            Integer insertSize,
+            String experimentAccession,
+            String runAccession) {
         Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
         if (targetProject.isSubProject()) {
             throw new ForbiddenException("Create experiments in the parent project");
@@ -55,6 +73,8 @@ public class AssayService {
         Assay assay = new Assay();
         assay.name = name;
         assay.studyAccession = studyAccession;
+        assay.experimentAccession = experimentAccession;
+        assay.runAccession = runAccession;
         assay.instrumentModel = instrumentModel;
         assay.libraryName = libraryName;
         assay.librarySource = librarySource;
@@ -83,11 +103,32 @@ public class AssayService {
             String libraryStrategy,
             String libraryLayout,
             Integer insertSize) {
+        updateAssay(projectId, assayId, name, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout, insertSize, null, null);
+    }
+
+    @Transactional
+    public void updateAssay(
+            Long projectId,
+            UUID assayId,
+            String name,
+            String studyAccession,
+            String instrumentModel,
+            String libraryName,
+            String librarySource,
+            String librarySelection,
+            String libraryStrategy,
+            String libraryLayout,
+            Integer insertSize,
+            String experimentAccession,
+            String runAccession) {
         Assay assay = getAssayById(projectId, assayId);
         validate(name != null ? name : assay.name, studyAccession, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout);
         if (name != null) assay.name = name;
         if (studyAccession != null) assay.studyAccession = studyAccession;
+        if (experimentAccession != null) assay.experimentAccession = experimentAccession;
+        if (runAccession != null) assay.runAccession = runAccession;
         if (instrumentModel != null) assay.instrumentModel = instrumentModel;
         if (libraryName != null) assay.libraryName = libraryName;
         if (librarySource != null) assay.librarySource = librarySource;

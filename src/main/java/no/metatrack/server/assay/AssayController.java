@@ -80,7 +80,9 @@ public class AssayController {
                 request.libraryStrategy(),
                 request.librarySelection(),
                 request.libraryLayout(),
-                request.insertSize());
+                request.insertSize(),
+                request.experimentAccession(),
+                request.runAccession());
 
         return AssayResponse.fromEntity(assay);
     }
@@ -105,7 +107,9 @@ public class AssayController {
                 request.librarySelection(),
                 request.libraryStrategy(),
                 request.libraryLayout(),
-                request.insertSize());
+                request.insertSize(),
+                request.experimentAccession(),
+                request.runAccession());
 
         return Response.noContent().build();
     }
