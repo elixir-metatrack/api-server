@@ -84,7 +84,8 @@ class SpreadsheetImportPostgresTest {
     void seed() {
         // Imports suspend transactions, so all fixtures must be committed before calling them.
         QuarkusTransaction.requiringNew().run(() -> {
-            project = projects.createProject("xlsx-" + UUID.randomUUID(), "test", owner.toString());
+            project = projects.createProject(new no.metatrack.server.project.CreateProjectRequest(
+                    "xlsx-" + UUID.randomUUID(), "test", "Test organization", null, null), owner.toString());
             projects.addMember(project.id, editor, ProjectRole.EDITOR);
             projects.addMember(project.id, viewer, ProjectRole.VIEWER);
             fields.create(project.id, new CreateSampleMetadataFieldRequest("group", "Group", SampleMetadataFieldType.TEXT, null));

@@ -2,6 +2,7 @@ package no.metatrack.server.project;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,4 +16,7 @@ public record CreateSubProjectRequest(
 
         String description,
 
-        List<UUID> sampleIds) {}
+        List<UUID> sampleIds,
+        @Size(max = 255) String dataOwningOrganization,
+        String detailedDescription,
+        String comments) {}
