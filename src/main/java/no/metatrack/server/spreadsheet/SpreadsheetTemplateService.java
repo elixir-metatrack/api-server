@@ -51,25 +51,28 @@ public class SpreadsheetTemplateService {
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 2, 6));
             try (CSVParser parser = CSVFormat.DEFAULT.builder().setDelimiter(';').get()
                     .parse(new InputStreamReader(source, StandardCharsets.UTF_8))) {
-                int index = 1;
-                for (var record : parser) {
-                    Row row = sheet.createRow(index++);
-                    boolean headers = record.get(0).replace("\uFEFF", "").equals("METADATA FIELDS:");
-                    for (int col = 0; col < record.size(); col++) {
-                        Cell cell = row.createCell(col);
-                        cell.setCellValue(record.get(col).replace("\uFEFF", ""));
-                        cell.setCellStyle(headers || col == 0 ? heading : wrapped);
-                        sheet.setColumnWidth(col, (col == 0 ? 30 : 24) * 256);
-                        sheet.setDefaultColumnStyle(col, text);
-                    }
-                    row.setHeightInPoints(headers ? 36 : record.get(0).equals("DESCRIPTIONS:") ? 100 : 46);
-                    if (headers) {
-                        sheet.createFreezePane(1, index);
-                        Row data = sheet.createRow(index);
-                        data.createCell(0).setCellValue("FILL TEMPLATE FROM THIS ROW:");
-                        break;
-                    }
+                var records = parser.getRecords();
+                if (records.isEmpty()) throw new IllegalStateException("Template has no header record");
+                var record = records.getFirst();
+                Row headers = sheet.createRow(1);
+                Cell marker = headers.createCell(0);
+                marker.setCellValue("METADATA FIELDS:");
+                marker.setCellStyle(heading);
+                sheet.setColumnWidth(0, 30 * 256);
+                sheet.setDefaultColumnStyle(0, text);
+                for (int col = 0; col < record.size(); col++) {
+                    Cell cell = headers.createCell(col + 1);
+                    String value = record.get(col);
+                    if (col == 0 && value.startsWith("\uFEFF")) value = value.substring(1);
+                    cell.setCellValue(value);
+                    cell.setCellStyle(heading);
+                    sheet.setColumnWidth(col + 1, 24 * 256);
+                    sheet.setDefaultColumnStyle(col + 1, text);
                 }
+                headers.setHeightInPoints(36);
+                sheet.createFreezePane(1, 2);
+                Row data = sheet.createRow(2);
+                data.createCell(0).setCellValue("FILL TEMPLATE FROM THIS ROW:");
             }
             if (!experiment) {
                 Sheet vocabularies = workbook.createSheet("Vocabularies");

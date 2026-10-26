@@ -484,45 +484,25 @@ public class CSVSampleSheetImportService {
             allRecords = parser.getRecords();
         }
 
-        int markerIndex = -1;
-        for (int i = 0; i < allRecords.size(); i++) {
-            CSVRecord record = allRecords.get(i);
-            if (record.size() > 0 && "METADATA FIELDS:".equalsIgnoreCase(record.get(0).trim())) {
-                markerIndex = i;
-                break;
-            }
-        }
+        if (allRecords.isEmpty()) throw new BadRequestException("CSV file has no header record");
 
-        if (markerIndex < 0) {
-            if (allRecords.isEmpty()) {
-                throw new BadRequestException("CSV file has no header record");
-            }
-            return parseMappedRecords(
-                    allRecords.get(0).toList(), allRecords.subList(1, allRecords.size()), delimiter, false);
+        List<String> headers = new ArrayList<>(allRecords.getFirst().toList());
+        if (!headers.isEmpty() && headers.getFirst().startsWith("\uFEFF")) {
+            headers.set(0, headers.getFirst().substring(1));
         }
-
-        CSVRecord marker = allRecords.get(markerIndex);
-        List<String> headers = withoutFirstField(marker);
         if (headers.stream().allMatch(String::isBlank)) {
-            throw new BadRequestException("METADATA FIELDS: record has no usable headers");
+            throw new BadRequestException("CSV file has no usable headers");
         }
-
-        return parseMappedRecords(headers, allRecords.subList(markerIndex + 1, allRecords.size()), delimiter);
+        return parseMappedRecords(headers, allRecords.subList(1, allRecords.size()), delimiter);
     }
 
     private ParsedRecords parseMappedRecords(
             List<String> headers, List<CSVRecord> dataRecords, char delimiter) throws IOException {
-        return parseMappedRecords(headers, dataRecords, delimiter, true);
-    }
-
-    private ParsedRecords parseMappedRecords(
-            List<String> headers, List<CSVRecord> dataRecords, char delimiter, boolean removeFirstField)
-            throws IOException {
         StringWriter content = new StringWriter();
         try (CSVPrinter printer = new CSVPrinter(content, CSVFormat.DEFAULT.builder().setDelimiter(delimiter).get())) {
             printer.printRecord(headers);
             for (CSVRecord dataRecord : dataRecords) {
-                printer.printRecord(removeFirstField ? withoutFirstField(dataRecord) : dataRecord.toList());
+                printer.printRecord(dataRecord.toList());
             }
         }
 
@@ -540,10 +520,6 @@ public class CSVSampleSheetImportService {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("CSV file contains duplicate headers", e);
         }
-    }
-
-    private List<String> withoutFirstField(CSVRecord record) {
-        return record.size() <= 1 ? List.of() : record.toList().subList(1, record.size());
     }
 
     private char detectDelimiter(File file) throws IOException {
