@@ -72,6 +72,36 @@ class UserProfileServiceTest {
     }
 
     @Test
+    void includesSafeUpstreamHttpStatusForReturnedAndThrownFailures() {
+        when(client.getProfile("realm", "subject")).thenReturn(RestResponse.ok(profile()));
+        when(client.updateProfile(eq("realm"), eq("subject"), any())).thenReturn(RestResponse.status(403));
+        var returnedFailure = assertThrows(KeycloakIdentityException.class,
+                () -> service.updateProfile(user, new UserProfilePatch(Map.of("firstName", "Ada"))));
+        assertTrue(returnedFailure.getMessage().contains("category=upstream_http, status=403"));
+
+        reset(client);
+        when(client.getProfile("realm", "subject")).thenReturn(RestResponse.ok(profile()));
+        when(client.updateProfile(eq("realm"), eq("subject"), any()))
+                .thenThrow(new WebApplicationException("private upstream message", 401));
+        var thrownFailure = assertThrows(KeycloakIdentityException.class,
+                () -> service.updateProfile(user, new UserProfilePatch(Map.of("firstName", "Ada"))));
+        assertTrue(thrownFailure.getMessage().contains("category=upstream_http, status=401"));
+        assertFalse(thrownFailure.getMessage().contains("private upstream message"));
+
+        reset(client);
+        when(client.getProfile("realm", "subject")).thenReturn(RestResponse.status(503));
+        var readFailure = assertThrows(KeycloakIdentityException.class, () -> service.getProfile(user));
+        assertTrue(readFailure.getMessage().contains("category=upstream_http, status=503"));
+
+        reset(client);
+        when(client.getProfile("realm", "subject"))
+                .thenThrow(new WebApplicationException("private read message", 502));
+        var thrownReadFailure = assertThrows(KeycloakIdentityException.class, () -> service.getProfile(user));
+        assertTrue(thrownReadFailure.getMessage().contains("category=upstream_http, status=502"));
+        assertFalse(thrownReadFailure.getMessage().contains("private read message"));
+    }
+
+    @Test
     void reportsUncertainTimeoutAndFailedPostWriteReadWithoutRetry() {
         when(client.getProfile("realm", "subject")).thenReturn(RestResponse.ok(profile()));
         when(client.updateProfile(eq("realm"), eq("subject"), any())).thenThrow(new jakarta.ws.rs.ProcessingException("timeout"));
