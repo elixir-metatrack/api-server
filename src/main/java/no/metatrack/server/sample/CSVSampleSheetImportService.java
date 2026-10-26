@@ -7,7 +7,9 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.sample.metadata.CreateSampleMetadataFieldRequest;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
+import no.metatrack.server.sample.metadata.SampleMetadataFieldService;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
@@ -39,7 +41,6 @@ import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -70,6 +71,9 @@ public class CSVSampleSheetImportService {
     SampleMetadataService metadataService;
 
     @Inject
+    SampleMetadataFieldService metadataFieldService;
+
+    @Inject
     SampleService sampleService;
 
     @Inject
@@ -89,6 +93,10 @@ public class CSVSampleSheetImportService {
             DateTimeFormatter.ofPattern("M/d/uuuu").withResolverStyle(ResolverStyle.STRICT),
             DateTimeFormatter.ofPattern("M/d/uu").withResolverStyle(ResolverStyle.STRICT));
 
+    private record ParsedRecords(List<String> headers, List<CSVRecord> records) {}
+
+    private record MetadataColumn(String header, int index, SampleMetadataField field, String generatedKey) {}
+
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
         List<SampleValidationViolation> errors = new ArrayList<>();
@@ -96,6 +104,8 @@ public class CSVSampleSheetImportService {
         Project project = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
         List<SampleMetadataField> customFields = SampleMetadataField.list(
                 "project.id = ?1 and archivedOn is null order by key", project.id);
+        List<SampleMetadataField> archivedFields = SampleMetadataField.list(
+                "project.id = ?1 and archivedOn is not null order by key", project.id);
         Set<String> customNumberHeaders = new HashSet<>();
         for (SampleMetadataField field : customFields) {
             if (field.type == SampleMetadataFieldType.NUMBER) {
@@ -105,14 +115,22 @@ public class CSVSampleSheetImportService {
         }
         SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file)
                 ? spreadsheetSupport.read(file, true, customNumberHeaders) : null;
+        List<CSVRecord> records;
+        List<String> headers;
         if (spreadsheet != null) {
-            // Vocabulary imports can write data, so reject an invalid data sheet first.
             validateSpreadsheet(spreadsheet, customFields);
-            spreadsheetVocabularies.apply(project.id, spreadsheet, customFields);
+            records = spreadsheet.records();
+            headers = spreadsheet.headers();
+        } else {
+            ParsedRecords parsed = readCsvRecords(file);
+            records = parsed.records();
+            headers = parsed.headers();
         }
+        List<MetadataColumn> metadataColumns = resolveMetadataColumns(headers, customFields, archivedFields);
+        if (spreadsheet != null) spreadsheetVocabularies.apply(project.id, spreadsheet, customFields);
         SampleVocabularyRules vocabularyRules = vocabularyService.loadRules(project.id);
-        List<CSVRecord> records = spreadsheet == null ? readCsvRecords(file) : spreadsheet.records();
         Set<String> namesInFile = new HashSet<>();
+        Set<String> createdMetadataFields = new HashSet<>();
 
         for (CSVRecord rec : records) {
             String name = getMappedValue(rec, "name", "Sample Name");
@@ -208,13 +226,20 @@ public class CSVSampleSheetImportService {
             sample.secondaryAccession = getMappedValue(rec, "secondary_accession", "Secondary Accession");
 
             Map<String, Object> customMetadata = new LinkedHashMap<>();
-            for (SampleMetadataField field : customFields) {
-                String rawValue = getCustomMetadataValue(rec, field, customFields);
+            for (MetadataColumn column : metadataColumns) {
+                String rawValue = valueAt(rec, column.index());
                 if (rawValue == null || rawValue.isBlank()) continue;
                 try {
-                    customMetadata.put(field.key, metadataService.parseCsvValue(field.type, rawValue));
+                    if (column.field() != null) {
+                        customMetadata.put(column.field().key,
+                                metadataService.parseCsvValue(column.field().type, rawValue));
+                    } else {
+                        customMetadata.put(column.generatedKey(),
+                                metadataService.parseCsvValue(SampleMetadataFieldType.TEXT, rawValue));
+                    }
                 } catch (BadRequestException e) {
-                    rowErrors.add(new SampleValidationViolation(rowLabel, field.key, rawValue, e.getMessage()));
+                    String key = column.field() == null ? column.generatedKey() : column.field().key;
+                    rowErrors.add(new SampleValidationViolation(rowLabel, key, rawValue, e.getMessage()));
                 }
             }
 
@@ -224,6 +249,28 @@ public class CSVSampleSheetImportService {
             }
 
             if (rowErrors.isEmpty()) {
+                boolean metadataCreationFailed = false;
+                for (MetadataColumn column : metadataColumns) {
+                    String key = column.generatedKey();
+                    if (key == null || !customMetadata.containsKey(key) || createdMetadataFields.contains(key)) {
+                        continue;
+                    }
+                    try {
+                        metadataFieldService.create(project.id,
+                                new CreateSampleMetadataFieldRequest(
+                                        key, column.header().trim(), SampleMetadataFieldType.TEXT, null));
+                        createdMetadataFields.add(key);
+                    } catch (WebApplicationException e) {
+                        if (e.getResponse().getStatus() < 400 || e.getResponse().getStatus() >= 500) throw e;
+                        errors.add(new SampleValidationViolation(rowLabel, key,
+                                customMetadata.get(key).toString(),
+                                "Unable to create custom metadata field for column '" + column.header()
+                                        + "': " + e.getMessage()));
+                        metadataCreationFailed = true;
+                        break;
+                    }
+                }
+                if (metadataCreationFailed) continue;
                 try {
                     sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
                             sample.hostTaxId, sample.mlst, sample.location, sample.sequencingLab,
@@ -269,11 +316,11 @@ public class CSVSampleSheetImportService {
         throw new DateTimeParseException("Invalid collection date", value, 0);
     }
 
-    private List<CSVRecord> readCsvRecords(File file) {
+    private ParsedRecords readCsvRecords(File file) {
         try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
             reader.mark(1);
             if (reader.read() != 0xFEFF) reader.reset();
-            return prepareRecords(reader, detectDelimiter(file));
+            return prepareRecordsWithHeaders(reader, detectDelimiter(file));
         } catch (IOException e) {
             throw new BadRequestException("Unable to read CSV file", e);
         }
@@ -286,22 +333,134 @@ public class CSVSampleSheetImportService {
         if (table.records().isEmpty()) {
             throw new BadRequestException("Samples worksheet contains no data rows");
         }
+    }
 
-        Set<String> acceptedHeaders = new LinkedHashSet<>(BUILT_IN_HEADERS);
-        for (SampleMetadataField field : customFields) {
-            acceptedHeaders.add(normalizeHeader(field.key));
-            if (!isAmbiguousLabel(field, customFields)) {
-                acceptedHeaders.add(normalizeHeader(field.label));
+    private List<MetadataColumn> resolveMetadataColumns(
+            List<String> headers,
+            List<SampleMetadataField> activeFields,
+            List<SampleMetadataField> archivedFields) {
+        List<SampleMetadataField> allFields = new ArrayList<>(activeFields);
+        allFields.addAll(archivedFields);
+        List<MetadataColumn> columns = new ArrayList<>();
+        Map<String, String> generatedKeys = new LinkedHashMap<>();
+        Map<String, String> normalizedHeaders = new LinkedHashMap<>();
+
+        for (int index = 0; index < headers.size(); index++) {
+            String header = headers.get(index);
+            String normalizedHeader = normalizeHeader(header);
+            if (normalizedHeader.isEmpty()) continue;
+            String previousHeader = normalizedHeaders.putIfAbsent(normalizedHeader, header);
+            if (previousHeader != null) {
+                throw new BadRequestException("Columns '" + previousHeader + "' and '" + header
+                        + "' are identical after trimming and case normalization. Keep only one of these columns.");
+            }
+            if (BUILT_IN_HEADERS.contains(normalizedHeader)) continue;
+
+            SampleMetadataField keyMatch = findFieldByKey(activeFields, normalizedHeader);
+            if (keyMatch != null) {
+                if (findHeaderIndex(headers, keyMatch.key) == index) {
+                    columns.add(new MetadataColumn(header, index, keyMatch, null));
+                }
+                continue;
+            }
+
+            SampleMetadataField archivedKeyMatch = findFieldByKey(archivedFields, normalizedHeader);
+            if (archivedKeyMatch != null) throw archivedFieldError(header, archivedKeyMatch);
+
+            List<SampleMetadataField> labelMatches = allFields.stream()
+                    .filter(field -> normalizeHeader(field.label).equals(normalizedHeader))
+                    .toList();
+            if (labelMatches.size() > 1) {
+                String matches = labelMatches.stream()
+                        .map(field -> "'" + field.label + "' (key '" + field.key + "')")
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new BadRequestException("Column '" + header
+                        + "' matches multiple custom metadata labels: " + matches
+                        + ". Use a unique field key or label.");
+            }
+            if (!labelMatches.isEmpty()) {
+                SampleMetadataField field = labelMatches.getFirst();
+                if (field.archivedOn != null) throw archivedFieldError(header, field);
+                if (findHeaderIndex(headers, field.key) == null) {
+                    columns.add(new MetadataColumn(header, index, field, null));
+                }
+                continue;
+            }
+
+            String label = header.trim();
+            if (label.length() > 255) {
+                throw new BadRequestException("Column '" + header
+                        + "' cannot be imported as custom metadata because its label exceeds 255 characters."
+                        + " Shorten the column header.");
+            }
+            String key = generateMetadataKey(header);
+            try {
+                SampleMetadataFieldService.validateKey(key);
+            } catch (BadRequestException e) {
+                String guidance = e.getMessage().contains("reserved")
+                        ? "Rename it so the generated key is not reserved."
+                        : "Rename it to use an ASCII letter first, followed by ASCII letters, numbers, or spaces.";
+                throw new BadRequestException("Column '" + header
+                        + "' cannot be imported as custom metadata: " + e.getMessage()
+                        + ". " + guidance, e);
+            }
+
+            SampleMetadataField keyCollision = findFieldByKey(allFields, key);
+            if (keyCollision != null) {
+                String action = keyCollision.archivedOn == null
+                        ? "Use the existing field key or a unique label."
+                        : "Restore this field or rename the column.";
+                throw new BadRequestException("Column '" + header + "' would generate metadata key '" + key
+                        + "', which already belongs to " + (keyCollision.archivedOn == null ? "active" : "archived")
+                        + " field '" + keyCollision.label + "'. " + action);
+            }
+            String previousGeneratedHeader = generatedKeys.putIfAbsent(key, header);
+            if (previousGeneratedHeader != null) {
+                throw new BadRequestException("Columns '" + previousGeneratedHeader + "' and '" + header
+                        + "' both generate metadata key '" + key + "'. Rename one column so each has a unique key.");
+            }
+            columns.add(new MetadataColumn(header, index, null, key));
+        }
+
+        return columns;
+    }
+
+    private SampleMetadataField findFieldByKey(List<SampleMetadataField> fields, String normalizedKey) {
+        return fields.stream()
+                .filter(field -> normalizeHeader(field.key).equals(normalizedKey))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private BadRequestException archivedFieldError(String header, SampleMetadataField field) {
+        return new BadRequestException("Column '" + header + "' matches archived custom metadata field '"
+                + field.key + "' ('" + field.label + "'). Restore this field or rename the column.");
+    }
+
+    private String generateMetadataKey(String header) {
+        StringBuilder key = new StringBuilder();
+        boolean underscorePending = false;
+        for (int i = 0; i < header.length(); i++) {
+            char character = header.charAt(i);
+            if (character > 0x7f) {
+                throw new BadRequestException("Column '" + header
+                        + "' contains non-ASCII characters and cannot be converted to a metadata key."
+                        + " Rename it using ASCII letters and numbers.");
+            }
+            char lower = Character.toLowerCase(character);
+            if ((lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9')) {
+                if (underscorePending && key.length() > 0) key.append('_');
+                key.append(lower);
+                underscorePending = false;
+            } else {
+                underscorePending = true;
             }
         }
-
-        List<String> unknownHeaders = table.headers().stream()
-                .filter(header -> !acceptedHeaders.contains(normalizeHeader(header)))
-                .toList();
-        if (!unknownHeaders.isEmpty()) {
-            throw new BadRequestException("Samples worksheet contains unknown columns: "
-                    + String.join(", ", unknownHeaders));
+        if (key.length() > 0 && key.length() > 64) {
+            throw new BadRequestException("Column '" + header
+                    + "' generates a metadata key longer than 64 characters. Shorten the column header.");
         }
+        return key.toString();
     }
 
     private boolean hasHeader(List<String> headers, String... expectedHeaders) {
@@ -311,6 +470,10 @@ public class CSVSampleSheetImportService {
     }
 
     List<CSVRecord> prepareRecords(Reader reader, char delimiter) throws IOException {
+        return prepareRecordsWithHeaders(reader, delimiter).records();
+    }
+
+    private ParsedRecords prepareRecordsWithHeaders(Reader reader, char delimiter) throws IOException {
         CSVFormat inputFormat = CSVFormat.DEFAULT.builder()
                 .setDelimiter(delimiter)
                 .setTrim(true)
@@ -347,12 +510,12 @@ public class CSVSampleSheetImportService {
         return parseMappedRecords(headers, allRecords.subList(markerIndex + 1, allRecords.size()), delimiter);
     }
 
-    private List<CSVRecord> parseMappedRecords(
+    private ParsedRecords parseMappedRecords(
             List<String> headers, List<CSVRecord> dataRecords, char delimiter) throws IOException {
         return parseMappedRecords(headers, dataRecords, delimiter, true);
     }
 
-    private List<CSVRecord> parseMappedRecords(
+    private ParsedRecords parseMappedRecords(
             List<String> headers, List<CSVRecord> dataRecords, char delimiter, boolean removeFirstField)
             throws IOException {
         StringWriter content = new StringWriter();
@@ -373,7 +536,7 @@ public class CSVSampleSheetImportService {
                 .setDuplicateHeaderMode(DuplicateHeaderMode.DISALLOW)
                 .get();
         try (CSVParser parser = mappedFormat.parse(new StringReader(content.toString()))) {
-            return parser.getRecords();
+            return new ParsedRecords(headers, parser.getRecords());
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("CSV file contains duplicate headers", e);
         }
@@ -474,6 +637,14 @@ public class CSVSampleSheetImportService {
             }
         }
         return match;
+    }
+
+    private Integer findHeaderIndex(List<String> headers, String expectedHeader) {
+        String normalizedExpectedHeader = normalizeHeader(expectedHeader);
+        for (int i = 0; i < headers.size(); i++) {
+            if (normalizeHeader(headers.get(i)).equals(normalizedExpectedHeader)) return i;
+        }
+        return null;
     }
 
     private String valueAt(CSVRecord rec, int index) {

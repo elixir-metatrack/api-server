@@ -88,7 +88,7 @@ public class SampleMetadataFieldService {
                 .orElseThrow(NotFoundException::new);
     }
 
-    static String validateKey(String rawKey) {
+    public static String validateKey(String rawKey) {
         if (rawKey == null) throw new BadRequestException("Metadata field key is required");
         String key = rawKey.trim().toLowerCase(Locale.ROOT);
         if (!KEY_PATTERN.matcher(key).matches()) {
