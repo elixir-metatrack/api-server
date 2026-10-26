@@ -64,7 +64,7 @@ public class UserProfileService {
                 case 400 -> throw UserProfilePatch.invalid("profile", "Keycloak rejected the profile; check supplied fields and realm policy");
                 case 404 -> throw new WebApplicationException("Current user not found", 404);
                 case 409 -> throw new WebApplicationException("Profile update conflict", 409);
-                default -> throw new KeycloakIdentityException("Keycloak profile update failed");
+                default -> throw upstreamHttpFailure("update", result.getStatus(), null);
             }
         } catch (KeycloakIdentityException exception) {
             throw exception;
@@ -76,7 +76,7 @@ public class UserProfileService {
             if (status == 404 || status == 409) {
                 throw new WebApplicationException(status == 404 ? "Current user not found" : "Profile update conflict", status);
             }
-            throw new KeycloakIdentityException("Keycloak profile update failed", exception);
+            throw upstreamHttpFailure("update", status, exception);
         } catch (RuntimeException exception) {
             throw new KeycloakIdentityException("Keycloak profile update outcome uncertain", exception);
         }
@@ -92,7 +92,7 @@ public class UserProfileService {
                 throw new WebApplicationException("Current user not found", 404);
             }
             if (result.getStatus() != 200) {
-                throw new KeycloakIdentityException("Keycloak profile read failed");
+                throw upstreamHttpFailure("read", result.getStatus(), null);
             }
             var profile = result.getEntity();
             if (profile == null || !user.id().equals(profile.id()) || profile.username() == null) {
@@ -105,7 +105,7 @@ public class UserProfileService {
             if (exception.getResponse().getStatus() == 404) {
                 throw new WebApplicationException("Current user not found", 404);
             }
-            throw new KeycloakIdentityException("Keycloak profile read failed", exception);
+            throw upstreamHttpFailure("read", exception.getResponse().getStatus(), exception);
         } catch (RuntimeException exception) {
             throw new KeycloakIdentityException("Keycloak profile read failed", exception);
         }
@@ -114,6 +114,13 @@ public class UserProfileService {
     private UserResponse response(CurrentUser user, KeycloakProfileRepresentation profile) {
         return new UserResponse(user.id(), profile.username(), user.roles(), attribute(profile, "country"),
                 attribute(profile, "institution"), attribute(profile, "orcid"), profile.firstName(), profile.lastName());
+    }
+
+    private KeycloakIdentityException upstreamHttpFailure(String operation, int status, Throwable cause) {
+        String message = "Keycloak profile " + operation + " failed (category=upstream_http, status=" + status + ")";
+        return cause == null
+                ? new KeycloakIdentityException(message)
+                : new KeycloakIdentityException(message, cause);
     }
 
     private String attribute(KeycloakProfileRepresentation profile, String field) {
