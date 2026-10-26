@@ -26,9 +26,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.MockedStatic;
 
-import java.io.BufferedReader;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -39,7 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -105,11 +104,10 @@ class CSVSampleSheetImportServiceTest {
     }
 
     @Test
-    void forwardsTitleSpaceAccessionsFromTemplateTsv() throws Exception {
-        assertAccessionImport("REQUIREMENTS:\tMandatory\tOptional\tOptional\tOptional\tOptional\n"
-                + "METADATA FIELDS:\tSample Name\tProject Accession\tStudy Accession\tSample Accession"
+    void forwardsTitleSpaceAccessionsFromHeaderFirstTsv() throws Exception {
+        assertAccessionImport("Sample Name\tProject Accession\tStudy Accession\tSample Accession"
                 + "\tSecondary Accession\n"
-                + "alignment\tsample-1\tPRJNA000001\tERP000001\tSAMN000001\t0000123\n",
+                + "sample-1\tPRJNA000001\tERP000001\tSAMN000001\t0000123\n",
                 List.of("PRJNA000001", "ERP000001", "SAMN000001", "0000123"));
     }
 
@@ -589,45 +587,56 @@ class CSVSampleSheetImportServiceTest {
     }
 
     @Test
-    void ignoresTemplatePreambleAndAlignmentColumn() throws Exception {
+    void parsesHeaderFirstRowsWithoutRemovingColumns() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
 
         List<CSVRecord> records = service.prepareRecords(new StringReader(
-                "REQUIREMENTS:;Mandatory;Mandatory\n"
-                        + "NOTES:;\"quoted; instruction\"\n"
-                        + "METADATA FIELDS:;Tax ID;Sample Name\n"
-                        + "alignment;287;NorPa_0001\n"), ';');
+                "Tax ID;Sample Name\n287;NorPa_0001\n"), ';');
 
         assertEquals(1, records.size());
         assertEquals("287", records.get(0).get("Tax ID"));
         assertEquals("NorPa_0001", records.get(0).get("Sample Name"));
-        assertFalse(records.get(0).isMapped("METADATA FIELDS:"));
-        assertFalse(records.get(0).isMapped("alignment"));
+        assertEquals(List.of("Tax ID", "Sample Name"), records.getFirst().getParser().getHeaderNames());
     }
 
     @Test
-    void supportsBomPrefixedTemplate() throws Exception {
+    void supportsBomAtBeginningOfHeaderFromReader() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
-        BufferedReader reader = new BufferedReader(new StringReader(
-                "\uFEFFREQUIREMENTS:;Mandatory\nMETADATA FIELDS:;Sample Name\nalignment;NorPa_0001\n"));
-        reader.read();
+        StringReader reader = new StringReader("\uFEFFSample Name;Tax ID\nNorPa_0001;287\n");
 
         List<CSVRecord> records = service.prepareRecords(reader, ';');
 
         assertEquals("NorPa_0001", records.get(0).get("Sample Name"));
+        assertEquals("Sample Name", records.getFirst().getParser().getHeaderNames().getFirst());
     }
 
     @Test
-    void supportsTemplateTsv() throws Exception {
+    void supportsHeaderFirstTsv() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
 
         List<CSVRecord> records = service.prepareRecords(new StringReader(
-                "REQUIREMENTS:\tMandatory\n"
-                        + "METADATA FIELDS:\tTax ID\tSample Name\n"
-                        + "alignment\t287\tNorPa_0001\n"), '\t');
+                "Tax ID\tSample Name\n287\tNorPa_0001\n"), '\t');
 
         assertEquals("287", records.get(0).get("Tax ID"));
         assertEquals("NorPa_0001", records.get(0).get("Sample Name"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"sample.csv", "sample_extended.csv", "sample_virus.csv"})
+    void parsesShippedSampleTemplateHeadersWithData(String filename) throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        String template;
+        try (var input = getClass().getResourceAsStream(
+                "/META-INF/resources/templates/samples/" + filename)) {
+            template = new String(input.readAllBytes(), StandardCharsets.UTF_8).stripTrailing();
+        }
+        String[] headers = template.split(";", -1);
+        String row = "sample-1" + ";".repeat(headers.length - 1);
+
+        List<CSVRecord> records = service.prepareRecords(new StringReader(template + "\n" + row), ';');
+
+        assertEquals(headers.length, records.getFirst().size());
+        assertEquals("sample-1", records.getFirst().get("Sample Name"));
     }
 
     @Test
@@ -635,10 +644,9 @@ class CSVSampleSheetImportServiceTest {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
 
         List<CSVRecord> records = service.prepareRecords(new StringReader(
-                "REQUIREMENTS:;Mandatory;Optional;Optional\n"
-                        + "METADATA FIELDS:;Sample Name;custom_status;Unknown\n"
-                        + "alignment;sample-1;known;ignored\n"
-                        + "alignment;sample-2\n"), ';');
+                "Sample Name;custom_status;Unknown\n"
+                        + "sample-1;known;ignored\n"
+                        + "sample-2\n"), ';');
 
         assertEquals("known", records.get(0).get("custom_status"));
         assertEquals("ignored", records.get(0).get("Unknown"));
@@ -706,11 +714,11 @@ class CSVSampleSheetImportServiceTest {
     }
 
     @Test
-    void rejectsMarkerWithoutUsableHeaders() {
+    void rejectsHeaderWithoutUsableNames() {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
 
         assertThrows(BadRequestException.class, () -> service.prepareRecords(
-                new StringReader("REQUIREMENTS:;Mandatory\nMETADATA FIELDS:\n"), ';'));
+                new StringReader(";\n"), ';'));
     }
 
     @Test
