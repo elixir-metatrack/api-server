@@ -88,13 +88,14 @@ class SpreadsheetImportSupportTest {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
             assertEquals(experiment ? 1 : 2, workbook.getNumberOfSheets());
             Sheet data = workbook.getSheetAt(0);
-            Row header = data.getRow(4);
+            Row header = data.getRow(1);
+            assertEquals("METADATA FIELDS:", header.getCell(0).getStringCellValue());
             int sampleColumn = -1;
             for (Cell cell : header) {
                 if (List.of("Sample", "Sample Name").contains(cell.getStringCellValue())) sampleColumn = cell.getColumnIndex();
             }
             assertTrue(sampleColumn > 0);
-            data.getRow(5).createCell(sampleColumn).setCellValue("real-sample");
+            data.getRow(2).createCell(sampleColumn).setCellValue("real-sample");
             try (var output = Files.newOutputStream(file)) { workbook.write(output); }
         }
         var filled = reader.read(file.toFile(), !experiment);
