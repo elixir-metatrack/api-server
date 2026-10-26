@@ -3,7 +3,9 @@ package no.metatrack.server.sample;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.project.Project;
+import no.metatrack.server.sample.metadata.CreateSampleMetadataFieldRequest;
 import no.metatrack.server.sample.metadata.SampleMetadataField;
+import no.metatrack.server.sample.metadata.SampleMetadataFieldService;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
@@ -29,6 +31,7 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +78,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
             assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
@@ -159,6 +164,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
             assertTrue(service.importNewSamples(1L, csv.toFile()).isEmpty());
 
@@ -180,6 +187,13 @@ class CSVSampleSheetImportServiceTest {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
         service.vocabularyService = mock(SampleVocabularyService.class);
         when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.metadataService = new SampleMetadataService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        when(service.metadataFieldService.create(eq(1L), any(CreateSampleMetadataFieldRequest.class)))
+                .thenAnswer(invocation -> {
+                    CreateSampleMetadataFieldRequest request = invocation.getArgument(1);
+                    return metadataField(request.key(), request.label());
+                });
         service.sampleService = mock(SampleService.class, invocation -> {
             if ("second".equals(invocation.getArgument(1))) {
                 throw new SampleVocabularyValidationException(List.of(new SampleValidationViolation(
@@ -198,6 +212,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
             var errors = service.importNewSamples(1L, csv.toFile());
             assertEquals(2, errors.size());
             assertEquals("tax_id", errors.get(0).fieldKey());
@@ -209,6 +225,259 @@ class CSVSampleSheetImportServiceTest {
                     .map(invocation -> (String) invocation.getArgument(1)).toList());
             assertEquals(Integer.valueOf(287), calls.getFirst().getArgument(3));
             assertEquals("female", calls.getFirst().getArgument(24));
+        }
+    }
+
+    @Test
+    void importsUnknownCsvColumnsAsTextMetadata() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        service.metadataService = new SampleMetadataService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        when(service.metadataFieldService.create(eq(1L), any(CreateSampleMetadataFieldRequest.class)))
+                .thenAnswer(invocation -> {
+                    CreateSampleMetadataFieldRequest request = invocation.getArgument(1);
+                    return metadataField(request.key(), request.label());
+                });
+        Path csv = Files.writeString(directory.resolve("custom-columns.csv"),
+                "Sample Name,Instrument Code,Empty Extra,Invalid Only,Tax ID\n"
+                        + "sample-1,00123,,,287\n"
+                        + "bad,00456,not-used,not-saved,not-an-integer\n"
+                        + "sample-2,,,,288\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            assertEquals(1, service.importNewSamples(1L, csv.toFile()).size());
+
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                    .toList();
+            assertEquals(List.of("sample-1", "sample-2"), calls.stream()
+                    .map(invocation -> (String) invocation.getArgument(1)).toList());
+            assertEquals(Map.of("instrument_code", "00123"),
+                    calls.getFirst().getArguments()[45]);
+            assertEquals(Map.of(), calls.get(1).getArguments()[45]);
+            verify(service.metadataFieldService, times(1)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
+            var request = mockingDetails(service.metadataFieldService).getInvocations().stream().findFirst().orElseThrow()
+                    .getArgument(1, CreateSampleMetadataFieldRequest.class);
+            assertEquals("instrument_code", request.key());
+            assertEquals("Instrument Code", request.label());
+            assertEquals(SampleMetadataFieldType.TEXT, request.type());
+        }
+    }
+
+    @Test
+    void discoversUnknownColumnsInTsvAndSemicolonDelimitedFiles() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        service.metadataService = new SampleMetadataService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        when(service.metadataFieldService.create(eq(1L), any(CreateSampleMetadataFieldRequest.class)))
+                .thenAnswer(invocation -> {
+                    CreateSampleMetadataFieldRequest request = invocation.getArgument(1);
+                    return metadataField(request.key(), request.label());
+                });
+        Path tsv = Files.writeString(directory.resolve("custom-columns.tsv"),
+                "Sample Name\tGenome Build\nsample-tsv\t00123\n");
+        Path semicolon = Files.writeString(directory.resolve("custom-columns-semicolon.csv"),
+                "Sample Name;Sequencing Platform\nsample-semicolon;00123\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            assertTrue(service.importNewSamples(1L, tsv.toFile()).isEmpty());
+            assertTrue(service.importNewSamples(1L, semicolon.toFile()).isEmpty());
+
+            var calls = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                    .toList();
+            assertEquals(Map.of("genome_build", "00123"), calls.getFirst().getArguments()[45]);
+            assertEquals(Map.of("sequencing_platform", "00123"), calls.get(1).getArguments()[45]);
+            verify(service.metadataFieldService, times(2)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
+        }
+    }
+
+    @Test
+    void rejectsGeneratedKeyCollisionsBeforeCreatingFieldsOrSamples() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        service.sampleService = mock(SampleService.class);
+        Path csv = Files.writeString(directory.resolve("colliding-columns.csv"),
+                "name,Field Name,Field-Name\nsample-1,first,second\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            BadRequestException error = assertThrows(
+                    BadRequestException.class, () -> service.importNewSamples(1L, csv.toFile()));
+
+            assertTrue(error.getMessage().contains("Field Name"));
+            assertTrue(error.getMessage().contains("Field-Name"));
+            assertTrue(error.getMessage().contains("field_name"));
+            verifyNoInteractions(service.metadataFieldService, service.sampleService);
+        }
+    }
+
+    @Test
+    void invalidGeneratedKeyExplainsHeaderRequirementsBeforeWrites() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        service.sampleService = mock(SampleService.class);
+        Path csv = Files.writeString(directory.resolve("invalid-key.csv"),
+                "name,123 Identifier\nsample-1,value\n");
+        Path reservedKeyCsv = Files.writeString(directory.resolve("reserved-key.csv"),
+                "name,Created On\nsample-1,value\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            BadRequestException error = assertThrows(
+                    BadRequestException.class, () -> service.importNewSamples(1L, csv.toFile()));
+
+            assertTrue(error.getMessage().contains("123 Identifier"));
+            assertTrue(error.getMessage().contains("start with a letter"));
+            BadRequestException reservedKeyError = assertThrows(
+                    BadRequestException.class, () -> service.importNewSamples(1L, reservedKeyCsv.toFile()));
+            assertTrue(reservedKeyError.getMessage().contains("reserved"));
+            assertTrue(reservedKeyError.getMessage().contains("not reserved"));
+            verifyNoInteractions(service.metadataFieldService, service.sampleService);
+        }
+    }
+
+    @Test
+    void ambiguousCustomLabelsExplainConflictingFieldsBeforeWrites() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        service.sampleService = mock(SampleService.class);
+        SampleMetadataField first = metadataField("first_status", "Status");
+        SampleMetadataField second = metadataField("second_status", "Status");
+        Path csv = Files.writeString(directory.resolve("ambiguous-label.csv"),
+                "name,Status\nsample-1,ready\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(first, second));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            BadRequestException error = assertThrows(
+                    BadRequestException.class, () -> service.importNewSamples(1L, csv.toFile()));
+
+            assertTrue(error.getMessage().contains("multiple custom metadata labels"));
+            assertTrue(error.getMessage().contains("first_status"));
+            assertTrue(error.getMessage().contains("second_status"));
+            verifyNoInteractions(service.metadataFieldService, service.sampleService);
+        }
+    }
+
+    @Test
+    void archivedFieldHeaderExplainsHowToResolveIt() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        service.sampleService = mock(SampleService.class);
+        SampleMetadataField archivedField = metadataField("old_status", "Old Status");
+        archivedField.archivedOn = Instant.now();
+        Path csv = Files.writeString(directory.resolve("archived-field.csv"),
+                "name,Old Status\nsample-1,ready\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L))
+                    .thenReturn(List.of(archivedField));
+
+            BadRequestException error = assertThrows(
+                    BadRequestException.class, () -> service.importNewSamples(1L, csv.toFile()));
+
+            assertTrue(error.getMessage().contains("old_status"));
+            assertTrue(error.getMessage().contains("Restore this field or rename the column"));
+            verifyNoInteractions(service.metadataFieldService, service.sampleService);
+        }
+    }
+
+    @Test
+    void importsUnknownWorkbookColumnsAsTextMetadata() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        service.sampleService = mock(SampleService.class);
+        service.metadataService = new SampleMetadataService();
+        service.metadataFieldService = mock(SampleMetadataFieldService.class);
+        when(service.metadataFieldService.create(eq(1L), any(CreateSampleMetadataFieldRequest.class)))
+                .thenAnswer(invocation -> {
+                    CreateSampleMetadataFieldRequest request = invocation.getArgument(1);
+                    return metadataField(request.key(), request.label());
+                });
+        service.spreadsheetSupport = new SpreadsheetImportSupport();
+        service.spreadsheetVocabularies = mock(SpreadsheetVocabularyImportService.class);
+        Path path = directory.resolve("custom-columns.xlsx");
+        try (Workbook workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Samples");
+            var headers = sheet.createRow(0);
+            headers.createCell(0).setCellValue("name");
+            headers.createCell(1).setCellValue("Sequencing Platform");
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("sample-1");
+            row.createCell(1).setCellValue("00123");
+            try (var output = Files.newOutputStream(path)) { workbook.write(output); }
+        }
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+
+            var call = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                    .findFirst().orElseThrow();
+            Object[] arguments = call.getArguments();
+            assertEquals(Map.of("sequencing_platform", "00123"), arguments[45]);
+            var request = mockingDetails(service.metadataFieldService).getInvocations().stream().findFirst().orElseThrow()
+                    .getArgument(1, CreateSampleMetadataFieldRequest.class);
+            assertEquals("Sequencing Platform", request.label());
+            assertEquals(SampleMetadataFieldType.TEXT, request.type());
         }
     }
 
@@ -228,6 +497,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
             List<SampleValidationViolation> errors = service.importNewSamples(1L, csv.toFile());
 
@@ -255,6 +526,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
             var errors = service.importNewSamples(1L, csv.toFile());
             if (expected == null) {
                 assertEquals(1, errors.size());
@@ -304,6 +577,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
             assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
@@ -473,8 +748,8 @@ class CSVSampleSheetImportServiceTest {
 
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
                 spreadsheet(service, "alias\nvalue\n"), List.of(customField)));
-        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
-                spreadsheet(service, "name,typo\nsample,value\n"), List.of(customField)));
+        service.validateSpreadsheet(
+                spreadsheet(service, "name,typo\nsample,value\n"), List.of(customField));
         service.validateSpreadsheet(
                 spreadsheet(service, "name,custom_status\nsample,ready\n"), List.of(customField));
     }
