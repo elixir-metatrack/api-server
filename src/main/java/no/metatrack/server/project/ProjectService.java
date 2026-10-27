@@ -12,9 +12,12 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
+import no.metatrack.server.auth.keycloak.KeycloakIdentityException;
 import no.metatrack.server.sample.Sample;
+import org.jboss.logging.Logger;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +25,8 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class ProjectService {
+    private static final Logger LOG = Logger.getLogger(ProjectService.class);
+
     private final IdentityLookupService identityLookupService;
 
     @Inject
@@ -195,17 +200,27 @@ public class ProjectService {
     }
 
     public ProjectResponse toResponse(Project project) {
-        String ownerUsername = identityLookupService.username(project.owner).orElse(null);
+        String ownerUsername = ownerUsername(project.owner).orElse(null);
         return response(project, ownerUsername);
     }
 
     List<ProjectResponse> toResponses(List<Project> projects) {
-        Map<UUID, Optional<String>> usernames = identityLookupService.usernames(
-                projects.stream().map(project -> project.owner).toList()
-        );
+        Map<UUID, Optional<String>> usernames = new LinkedHashMap<>();
+        for (Project project : projects) {
+            usernames.computeIfAbsent(project.owner, this::ownerUsername);
+        }
         return projects.stream()
                 .map(project -> response(project, usernames.get(project.owner).orElse(null)))
                 .toList();
+    }
+
+    private Optional<String> ownerUsername(UUID ownerId) {
+        try {
+            return identityLookupService.username(ownerId);
+        } catch (KeycloakIdentityException exception) {
+            LOG.warn("Project owner username lookup failed; returning null");
+            return Optional.empty();
+        }
     }
 
     private ProjectResponse response(Project project, String ownerUsername) {
