@@ -5,5 +5,5 @@ import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record KeycloakProfileRepresentation(String id, String username, String firstName, String lastName,
+public record KeycloakProfileRepresentation(String id, String username, String email, String firstName, String lastName,
                                              Map<String, List<String>> attributes) {}

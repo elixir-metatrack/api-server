@@ -18,11 +18,20 @@ import java.util.Objects;
 public class UserProfileService {
     private final KeycloakAdminClient client;
     private final String realm;
+    private final String countryAttribute;
+    private final String institutionAttribute;
+    private final String orcidAttribute;
 
     public UserProfileService(@RestClient KeycloakAdminClient client,
-                              @ConfigProperty(name = "keycloak.realm") String realm) {
+                              @ConfigProperty(name = "keycloak.realm") String realm,
+                              @ConfigProperty(name = "keycloak.profile.attributes.country", defaultValue = "country") String countryAttribute,
+                              @ConfigProperty(name = "keycloak.profile.attributes.institution", defaultValue = "institution") String institutionAttribute,
+                              @ConfigProperty(name = "keycloak.profile.attributes.orcid", defaultValue = "orcid") String orcidAttribute) {
         this.client = client;
         this.realm = realm;
+        this.countryAttribute = countryAttribute;
+        this.institutionAttribute = institutionAttribute;
+        this.orcidAttribute = orcidAttribute;
     }
 
     public UserResponse getProfile(CurrentUser user) {
@@ -45,14 +54,19 @@ public class UserProfileService {
                     changes.put(field, value == null ? "" : value);
                 }
             } else {
+                String attribute = attributeKey(field);
                 List<String> replacement = value == null ? List.of() : List.of(value);
-                if (!Objects.equals(attributes.get(field), replacement)) {
-                    attributes.put(field, replacement);
+                if (!Objects.equals(attributes.get(attribute), replacement)) {
+                    attributes.put(attribute, replacement);
                     attributesChanged = true;
                 }
             }
         }
         if (attributesChanged) {
+            changes.putIfAbsent("username", current.username());
+            changes.putIfAbsent("email", current.email());
+            changes.putIfAbsent("firstName", current.firstName());
+            changes.putIfAbsent("lastName", current.lastName());
             changes.put("attributes", attributes);
         }
         if (changes.isEmpty()) {
@@ -112,8 +126,8 @@ public class UserProfileService {
     }
 
     private UserResponse response(CurrentUser user, KeycloakProfileRepresentation profile) {
-        return new UserResponse(user.id(), profile.username(), user.roles(), attribute(profile, "country"),
-                attribute(profile, "institution"), attribute(profile, "orcid"), profile.firstName(), profile.lastName());
+        return new UserResponse(user.id(), profile.username(), user.roles(), attribute(profile, countryAttribute),
+                attribute(profile, institutionAttribute), attribute(profile, orcidAttribute), profile.firstName(), profile.lastName());
     }
 
     private KeycloakIdentityException upstreamHttpFailure(String operation, int status, Throwable cause) {
@@ -126,5 +140,14 @@ public class UserProfileService {
     private String attribute(KeycloakProfileRepresentation profile, String field) {
         var values = profile.attributes() == null ? null : profile.attributes().get(field);
         return values == null || values.isEmpty() ? null : values.getFirst();
+    }
+
+    private String attributeKey(String field) {
+        return switch (field) {
+            case "country" -> countryAttribute;
+            case "institution" -> institutionAttribute;
+            case "orcid" -> orcidAttribute;
+            default -> throw new IllegalArgumentException("Unsupported profile attribute");
+        };
     }
 }
