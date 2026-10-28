@@ -119,8 +119,10 @@ When the application is running, the OpenAPI UI (scalar) is available at:
 
 `GET /api/public/samples?page=0` is available without authentication and returns samples across all projects in
 zero-based pages of 100. The response contains `items`, `page`, `size`, `totalElements`, and `totalPages`; each item
-contains only the sample UUID (`id`), `taxId`, taxonomy-derived `scientificName`, and `dataOwningOrganization` from the
-sample's owning project. A missing tax ID, unknown taxon, or taxonomy service failure returns a `null` scientific name
+contains only the sample UUID (`id`), `taxId`, taxonomy-derived `scientificName`, `dataOwningOrganization` from the
+sample's owning project, `hostTaxId`, taxonomy-derived `hostScientificName`, `collectionYear`, and `isolationSource`.
+The collection year is derived from the collection date; the full date is not exposed. Missing metadata returns `null`.
+A missing tax ID, unknown taxon, or taxonomy service failure returns a `null` scientific name for the sample or host
 without omitting the sample. Samples are ordered by UUID, and subproject visibility links do not create duplicate items.
 
 `GET /api/public/samples/species` returns a sorted array of unique sample `taxId` values (not host tax IDs), and
