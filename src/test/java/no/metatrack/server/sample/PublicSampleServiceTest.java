@@ -127,6 +127,48 @@ class PublicSampleServiceTest {
         verifyNoInteractions(entityManager);
     }
 
+    @Test
+    void returnsDistinctSampleTaxIdsWithoutLookingUpHostTaxIdsOrTaxonomy() {
+        TypedQuery<Integer> speciesQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Integer.class))).thenReturn(speciesQuery);
+        when(speciesQuery.getResultList()).thenReturn(List.of(42, 73));
+
+        assertEquals(List.of(42, 73), service.getSpecies());
+        verify(entityManager).createQuery(
+                "select distinct s.taxId from Sample s where s.taxId is not null order by s.taxId", Integer.class);
+        verifyNoInteractions(taxonomyService);
+    }
+
+    @Test
+    void returnsDistinctNonBlankOwningOrganizationsWithoutTaxonomyLookups() {
+        TypedQuery<String> organizationsQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(String.class))).thenReturn(organizationsQuery);
+        when(organizationsQuery.getResultList()).thenReturn(List.of("Org A", "Org B"));
+
+        assertEquals(List.of("Org A", "Org B"), service.getOrganizations());
+        verify(entityManager).createQuery(
+                "select distinct p.dataOwningOrganization from Sample s join s.project p "
+                        + "where p.dataOwningOrganization is not null "
+                        + "and trim(p.dataOwningOrganization) <> '' "
+                        + "order by p.dataOwningOrganization",
+                String.class);
+        verifyNoInteractions(taxonomyService);
+    }
+
+    @Test
+    void returnsEmptyFilterListsWhenThereAreNoMatchingValues() {
+        TypedQuery<Integer> speciesQuery = mock(TypedQuery.class);
+        TypedQuery<String> organizationsQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Integer.class))).thenReturn(speciesQuery);
+        when(entityManager.createQuery(anyString(), eq(String.class))).thenReturn(organizationsQuery);
+        when(speciesQuery.getResultList()).thenReturn(List.of());
+        when(organizationsQuery.getResultList()).thenReturn(List.of());
+
+        assertTrue(service.getSpecies().isEmpty());
+        assertTrue(service.getOrganizations().isEmpty());
+        verifyNoInteractions(taxonomyService);
+    }
+
     @SuppressWarnings("unchecked")
     private void setRows(long total, List<Object[]> rows) {
         TypedQuery<Long> countQuery = (TypedQuery<Long>) mock(TypedQuery.class);

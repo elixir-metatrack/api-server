@@ -53,6 +53,23 @@ public class PublicSampleService {
         return new PublicSamplePage(items, page, PAGE_SIZE, totalElements, totalPages);
     }
 
+    public List<Integer> getSpecies() {
+        return entityManager.createQuery(
+                        "select distinct s.taxId from Sample s where s.taxId is not null order by s.taxId",
+                        Integer.class)
+                .getResultList();
+    }
+
+    public List<String> getOrganizations() {
+        return entityManager.createQuery(
+                        "select distinct p.dataOwningOrganization from Sample s join s.project p "
+                                + "where p.dataOwningOrganization is not null "
+                                + "and trim(p.dataOwningOrganization) <> '' "
+                                + "order by p.dataOwningOrganization",
+                        String.class)
+                .getResultList();
+    }
+
     private PublicSampleResponse toPublicSample(Object[] row, Map<Integer, String> scientificNamesByTaxId) {
         UUID id = (UUID) row[0];
         Integer taxId = (Integer) row[1];
