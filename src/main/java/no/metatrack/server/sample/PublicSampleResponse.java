@@ -6,4 +6,8 @@ public record PublicSampleResponse(
         UUID id,
         Integer taxId,
         String scientificName,
-        String dataOwningOrganization) {}
+        String dataOwningOrganization,
+        Integer hostTaxId,
+        String hostScientificName,
+        Integer collectionYear,
+        String isolationSource) {}

@@ -10,6 +10,7 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.taxon.TaxonResponse;
 import no.metatrack.server.taxon.TaxonomyService;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,8 @@ import java.util.UUID;
 public class PublicSampleService {
     private static final int PAGE_SIZE = 100;
     private static final String COUNT_QUERY = "select count(s) from Sample s";
-    private static final String SAMPLE_PAGE_QUERY = "select s.id, s.taxId, p.dataOwningOrganization "
+    private static final String SAMPLE_PAGE_QUERY = "select s.id, s.taxId, p.dataOwningOrganization, "
+            + "s.hostTaxId, s.collectionDate, s.isolationSource "
             + "from Sample s left join s.project p order by s.id";
 
     @Inject
@@ -74,8 +76,16 @@ public class PublicSampleService {
         UUID id = (UUID) row[0];
         Integer taxId = (Integer) row[1];
         String organization = (String) row[2];
-        String scientificName = null;
+        Integer hostTaxId = (Integer) row[3];
+        LocalDate collectionDate = (LocalDate) row[4];
+        String isolationSource = (String) row[5];
 
+        return new PublicSampleResponse(id, taxId, resolveScientificName(taxId, scientificNamesByTaxId), organization,
+                hostTaxId, resolveScientificName(hostTaxId, scientificNamesByTaxId),
+                collectionDate == null ? null : collectionDate.getYear(), isolationSource);
+    }
+
+    private String resolveScientificName(Integer taxId, Map<Integer, String> scientificNamesByTaxId) {
         if (taxId != null) {
             if (!scientificNamesByTaxId.containsKey(taxId)) {
                 String name = null;
@@ -87,9 +97,9 @@ public class PublicSampleService {
                 }
                 scientificNamesByTaxId.put(taxId, name);
             }
-            scientificName = scientificNamesByTaxId.get(taxId);
+            return scientificNamesByTaxId.get(taxId);
         }
 
-        return new PublicSampleResponse(id, taxId, scientificName, organization);
+        return null;
     }
 }

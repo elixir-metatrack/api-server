@@ -1,16 +1,40 @@
 package no.metatrack.server.sample;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.BadRequestException;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PublicSampleControllerTest {
+    @Test
+    void serializesOnlyPublicMetadataWithYearRatherThanFullCollectionDate() throws Exception {
+        PublicSampleResponse sample = new PublicSampleResponse(new UUID(0, 1), 42, "Bacillus subtilis", "Org",
+                9606, "Homo sapiens", 2024, "Blood");
+
+        JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(sample));
+
+        Set<String> fields = new HashSet<>();
+        json.fieldNames().forEachRemaining(fields::add);
+        assertEquals(Set.of("id", "taxId", "scientificName", "dataOwningOrganization", "hostTaxId",
+                "hostScientificName", "collectionYear", "isolationSource"), fields);
+        assertEquals(9606, json.get("hostTaxId").intValue());
+        assertEquals("Homo sapiens", json.get("hostScientificName").textValue());
+        assertTrue(json.get("collectionYear").isInt());
+        assertEquals(2024, json.get("collectionYear").intValue());
+        assertEquals("Blood", json.get("isolationSource").textValue());
+        assertFalse(json.has("collectionDate"));
+    }
+
     @Test
     void delegatesRequestedPageAndExplicitlyPermitsAnonymousAccess() throws Exception {
         PublicSampleController controller = new PublicSampleController();
