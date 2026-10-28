@@ -5,7 +5,7 @@ for biological and genomic data. It provides robust management of projects, samp
 
 ## Tech Stack
 
-- **Language:** Java 21
+- **Language:** Java 25
 - **Framework:** [Quarkus](https://quarkus.io/) (with virtual threads enabled)
 - **Database:** PostgreSQL
 - **ORM:** Hibernate ORM with Panache (Active Record pattern)
@@ -17,7 +17,7 @@ for biological and genomic data. It provides robust management of projects, samp
 
 ## Requirements
 
-- **Java:** JDK 21+
+- **Java:** JDK 25+
 - **Database:** PostgreSQL 16+ (recommended)
 - **Storage:** Access to an S3-compatible object store and an existing bucket
 - **Auth:** Access to Metatrack Keycloak realm
