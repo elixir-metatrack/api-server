@@ -2,7 +2,7 @@
 
 ## Project
 
-This repository is a Java 21 REST API built with Quarkus 3, Maven, Hibernate ORM with Panache, PostgreSQL, and Flyway. The application configuration is in `src/main/resources/application.yml`; database migrations are in `src/main/resources/db/migration/`. Use the Maven wrapper (`./mvnw`) so the project’s pinned Maven setup is respected.
+This repository is a Java 25 REST API built with Quarkus 3, Maven, Hibernate ORM with Panache, PostgreSQL, and Flyway. The application configuration is in `src/main/resources/application.yml`; database migrations are in `src/main/resources/db/migration/`. Use the Maven wrapper (`./mvnw`) so the project’s pinned Maven setup is respected.
 
 ## Build and run
 
