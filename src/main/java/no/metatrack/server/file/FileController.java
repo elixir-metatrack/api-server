@@ -9,10 +9,14 @@ import no.metatrack.server.project.ProjectRoleCheck;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.UUID;
 
 @Path("/api/projects/{projectId}/files")
+@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "Files", description = "File metadata and permanent file deletion")
 public class FileController {
 
     @Inject

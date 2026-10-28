@@ -15,8 +15,12 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/api")
+@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "User profile", description = "Read and update the authenticated caller's own profile")
 @APIResponses({
         @APIResponse(responseCode = "401", description = "Authentication required"),
         @APIResponse(responseCode = "404", description = "Current subject no longer exists in Keycloak"),

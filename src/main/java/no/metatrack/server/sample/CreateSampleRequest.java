@@ -1,11 +1,14 @@
 package no.metatrack.server.sample;
 
 import jakarta.validation.constraints.NotBlank;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.util.Map;
 
+@Schema(description = "Sample fields to create. Optional fields may be omitted; custom metadata must conform to active custom fields and project vocabulary rules. Custom field values use strings for TEXT and DATE, numbers for NUMBER, and booleans for BOOLEAN.")
 public record CreateSampleRequest(
+        @Schema(description = "Sample name, unique within the project")
         @NotBlank String name,
         String alias,
         Integer taxId,
@@ -50,4 +53,5 @@ public record CreateSampleRequest(
         String studyAccession,
         String sampleAccession,
         String secondaryAccession,
+        @Schema(description = "Custom values keyed by project metadata-field key")
         Map<String, Object> customMetadata) {}

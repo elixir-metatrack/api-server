@@ -1,8 +1,11 @@
 package no.metatrack.server.sample.metadata;
 
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Schema(description = "Project metadata-field definition. A non-null archivedOn value means the field is archived.")
 public record SampleMetadataFieldResponse(
         UUID id,
         String key,

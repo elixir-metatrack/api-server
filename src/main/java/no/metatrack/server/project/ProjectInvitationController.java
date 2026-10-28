@@ -8,16 +8,23 @@ import jakarta.ws.rs.core.Response;
 import no.metatrack.server.invitation.InvitationCoordinator;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.ExampleObject;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.UUID;
 
 @Path("/api/projects/{projectId}/invitations")
 @Authenticated
+@SecurityRequirement(name = "bearerAuth")
 @Produces("application/json")
 @Consumes("application/json")
+@Tag(name = "Project invitations", description = "Administrative invitation creation, delivery, listing, and revocation")
 public class ProjectInvitationController {
     @Inject
     ProjectInvitationService invitationService;
@@ -33,7 +40,12 @@ public class ProjectInvitationController {
     @APIResponse(responseCode = "403", description = "Project ADMIN or OWNER required")
     @APIResponse(responseCode = "409", description = "Active invitation or existing membership")
     @APIResponse(responseCode = "502", description = "Identity lookup failed before persistence")
-    public Response create(@PathParam("projectId") Long projectId, @Valid CreateProjectInvitationRequest request) {
+    public Response create(
+            @PathParam("projectId") Long projectId,
+            @RequestBody(description = "Invitation email and role", content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = CreateProjectInvitationRequest.class),
+                    examples = @ExampleObject(value = "{\"email\":\"person@example.org\",\"role\":\"VIEWER\"}")))
+            @Valid CreateProjectInvitationRequest request) {
         return Response.status(Response.Status.CREATED).entity(invitationCoordinator.create(projectId, request)).build();
     }
 
@@ -58,7 +70,10 @@ public class ProjectInvitationController {
     @APIResponse(responseCode = "401", description = "Authentication required")
     @APIResponse(responseCode = "403", description = "Project ADMIN or OWNER required")
     public List<ProjectInvitationResponse> list(@PathParam("projectId") Long projectId,
-            @QueryParam("page") @DefaultValue("0") int page, @QueryParam("size") @DefaultValue("20") int size) {
+            @Parameter(description = "Zero-based page index", example = "0")
+            @QueryParam("page") @DefaultValue("0") int page,
+            @Parameter(description = "Number of results per page (1–100)", example = "20")
+            @QueryParam("size") @DefaultValue("20") int size) {
         return invitationService.list(projectId, page, size);
     }
 
