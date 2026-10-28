@@ -33,4 +33,22 @@ class PublicSampleControllerTest {
         assertThrows(BadRequestException.class, () -> controller.getSamples(-1));
         verifyNoInteractions(controller.publicSampleService);
     }
+
+    @Test
+    void exposesAnonymousSpeciesAndOrganizationRoutes() throws Exception {
+        PublicSampleController controller = new PublicSampleController();
+        controller.publicSampleService = mock(PublicSampleService.class);
+        when(controller.publicSampleService.getSpecies()).thenReturn(List.of(42, 73));
+        when(controller.publicSampleService.getOrganizations()).thenReturn(List.of("Org A", "Org B"));
+
+        assertEquals(List.of(42, 73), controller.getSpecies());
+        assertEquals(List.of("Org A", "Org B"), controller.getOrganizations());
+
+        Method speciesEndpoint = PublicSampleController.class.getMethod("getSpecies");
+        assertTrue(speciesEndpoint.isAnnotationPresent(PermitAll.class));
+        assertEquals("/species", speciesEndpoint.getAnnotation(jakarta.ws.rs.Path.class).value());
+        Method organizationsEndpoint = PublicSampleController.class.getMethod("getOrganizations");
+        assertTrue(organizationsEndpoint.isAnnotationPresent(PermitAll.class));
+        assertEquals("/organizations", organizationsEndpoint.getAnnotation(jakarta.ws.rs.Path.class).value());
+    }
 }

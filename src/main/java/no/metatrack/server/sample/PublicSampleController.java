@@ -11,6 +11,8 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
+import java.util.List;
+
 @Path("/api/public/samples")
 @Produces(MediaType.APPLICATION_JSON)
 public class PublicSampleController {
@@ -22,5 +24,19 @@ public class PublicSampleController {
     public PublicSamplePage getSamples(@QueryParam("page") @DefaultValue("0") @Min(0) int page) {
         if (page < 0) throw new BadRequestException("Page must be zero or greater");
         return publicSampleService.getPage(page);
+    }
+
+    @GET
+    @Path("/species")
+    @PermitAll
+    public List<Integer> getSpecies() {
+        return publicSampleService.getSpecies();
+    }
+
+    @GET
+    @Path("/organizations")
+    @PermitAll
+    public List<String> getOrganizations() {
+        return publicSampleService.getOrganizations();
     }
 }

@@ -123,6 +123,11 @@ contains only the sample UUID (`id`), `taxId`, taxonomy-derived `scientificName`
 sample's owning project. A missing tax ID, unknown taxon, or taxonomy service failure returns a `null` scientific name
 without omitting the sample. Samples are ordered by UUID, and subproject visibility links do not create duplicate items.
 
+`GET /api/public/samples/species` returns a sorted array of unique sample `taxId` values (not host tax IDs), and
+`GET /api/public/samples/organizations` returns a sorted array of unique non-blank data-owning organization values
+from projects with samples. Both endpoints are available without authentication and return empty arrays when no
+matching values exist.
+
 ## Email Invitations and Notifications
 
 Project `ADMIN` and `OWNER` members can invite an email address with `VIEWER`, `EDITOR`, or `ADMIN` access,
