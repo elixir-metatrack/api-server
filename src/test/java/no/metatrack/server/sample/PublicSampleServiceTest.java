@@ -1,0 +1,145 @@
+package no.metatrack.server.sample;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.WebApplicationException;
+import no.metatrack.server.taxon.TaxonResponse;
+import no.metatrack.server.taxon.TaxonomyService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+class PublicSampleServiceTest {
+    private final EntityManager entityManager = mock(EntityManager.class);
+    private final TaxonomyService taxonomyService = mock(TaxonomyService.class);
+    private final PublicSampleService service = new PublicSampleService();
+    private TypedQuery<Object[]> pageQuery;
+
+    @BeforeEach
+    void setUp() {
+        service.entityManager = entityManager;
+        service.taxonomyService = taxonomyService;
+        TypedQuery<Long> countQuery = mock(TypedQuery.class);
+        pageQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
+        when(entityManager.createQuery(anyString(), eq(Object[].class))).thenReturn(pageQuery);
+        when(pageQuery.setFirstResult(anyInt())).thenReturn(pageQuery);
+        when(pageQuery.setMaxResults(anyInt())).thenReturn(pageQuery);
+    }
+
+    @Test
+    void returnsOnlyPublicFieldsAndResolvesEachTaxIdOncePerPage() {
+        setRows(3, List.of(
+                row(1, 42, "Owning Organization"),
+                row(2, 42, "Another Organization"),
+                row(3, null, null)));
+        when(taxonomyService.getTaxon("42")).thenReturn(new TaxonResponse("Bacillus subtilis", "42"));
+
+        PublicSamplePage result = service.getPage(0);
+
+        assertEquals(0, result.page());
+        assertEquals(100, result.size());
+        assertEquals(3, result.totalElements());
+        assertEquals(1, result.totalPages());
+        assertEquals(List.of(
+                new PublicSampleResponse(uuid(1), 42, "Bacillus subtilis", "Owning Organization"),
+                new PublicSampleResponse(uuid(2), 42, "Bacillus subtilis", "Another Organization"),
+                new PublicSampleResponse(uuid(3), null, null, null)), result.items());
+        verify(taxonomyService, times(1)).getTaxon("42");
+        verifyNoMoreInteractions(taxonomyService);
+        verify(pageQuery).setFirstResult(0);
+        verify(pageQuery).setMaxResults(100);
+    }
+
+    @Test
+    void returnsNullScientificNameWhenTaxonomyHasNoMatch() {
+        setRows(1, List.<Object[]>of(row(1, 404, "Org")));
+        when(taxonomyService.getTaxon("404")).thenReturn(null);
+
+        assertEquals(new PublicSampleResponse(uuid(1), 404, null, "Org"), service.getPage(0).items().getFirst());
+    }
+
+    @Test
+    void cachesTaxonomyFailuresForTheRestOfThePage() {
+        setRows(2, List.of(row(1, 500, "Org"), row(2, 500, "Org")));
+        when(taxonomyService.getTaxon("500")).thenThrow(new WebApplicationException("Taxonomy unavailable"));
+
+        PublicSamplePage result = service.getPage(0);
+
+        assertTrue(result.items().stream().allMatch(item -> item.scientificName() == null));
+        verify(taxonomyService, times(1)).getTaxon("500");
+    }
+
+    @Test
+    void paginatesInStableHundredRowPages() {
+        setRows(250, List.<Object[]>of(row(101, 23, "Org")));
+
+        PublicSamplePage result = service.getPage(1);
+
+        assertEquals(1, result.page());
+        assertEquals(100, result.size());
+        assertEquals(250, result.totalElements());
+        assertEquals(3, result.totalPages());
+        verify(pageQuery).setFirstResult(100);
+        verify(pageQuery).setMaxResults(100);
+    }
+
+    @Test
+    void returnsEmptyPageForNoSamplesOrOutOfRangePage() {
+        setRows(0, List.of());
+        PublicSamplePage emptyResult = service.getPage(0);
+        assertEquals(0, emptyResult.totalPages());
+        assertTrue(emptyResult.items().isEmpty());
+        verify(entityManager, never()).createQuery(contains("left join"), eq(Object[].class));
+
+        reset(entityManager, pageQuery);
+        TypedQuery<Long> countQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
+        when(countQuery.getSingleResult()).thenReturn(250L);
+        when(entityManager.createQuery(anyString(), eq(Object[].class))).thenReturn(pageQuery);
+
+        PublicSamplePage outOfRange = service.getPage(3);
+        assertTrue(outOfRange.items().isEmpty());
+        assertEquals(3, outOfRange.totalPages());
+        verify(entityManager, never()).createQuery(contains("left join"), eq(Object[].class));
+    }
+
+    @Test
+    void returnsEmptyPageWhenOffsetCannotFitJpaIntegerOffset() {
+        setRows(Long.MAX_VALUE, List.of());
+
+        assertTrue(service.getPage(Integer.MAX_VALUE).items().isEmpty());
+        verify(entityManager, never()).createQuery(contains("left join"), eq(Object[].class));
+    }
+
+    @Test
+    void rejectsNegativePageBeforeQuerying() {
+        assertThrows(BadRequestException.class, () -> service.getPage(-1));
+        verifyNoInteractions(entityManager);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setRows(long total, List<Object[]> rows) {
+        TypedQuery<Long> countQuery = (TypedQuery<Long>) mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
+        when(countQuery.getSingleResult()).thenReturn(total);
+        when(pageQuery.getResultList()).thenReturn(rows);
+    }
+
+    private static Object[] row(int id, Integer taxId, String organization) {
+        return new Object[] {uuid(id), taxId, organization};
+    }
+
+    private static UUID uuid(int leastSignificantBits) {
+        return new UUID(0, leastSignificantBits);
+    }
+}

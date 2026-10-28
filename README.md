@@ -115,6 +115,14 @@ src/main/resources/
 When the application is running, the OpenAPI UI (scalar) is available at:
 `http://localhost:1234/scalar`.
 
+### Public Sample Catalog
+
+`GET /api/public/samples?page=0` is available without authentication and returns samples across all projects in
+zero-based pages of 100. The response contains `items`, `page`, `size`, `totalElements`, and `totalPages`; each item
+contains only the sample UUID (`id`), `taxId`, taxonomy-derived `scientificName`, and `dataOwningOrganization` from the
+sample's owning project. A missing tax ID, unknown taxon, or taxonomy service failure returns a `null` scientific name
+without omitting the sample. Samples are ordered by UUID, and subproject visibility links do not create duplicate items.
+
 ## Email Invitations and Notifications
 
 Project `ADMIN` and `OWNER` members can invite an email address with `VIEWER`, `EDITOR`, or `ADMIN` access,
