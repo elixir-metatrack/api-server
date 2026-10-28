@@ -3,13 +3,18 @@ package no.metatrack.server.sample;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-public record BulkPatchSampleRequest(@Valid @NotEmpty List<SampleRequestData> sampleData) {
+@Schema(description = "Bulk partial sample update. Each entry is matched by sample name and validated independently; valid entries are applied even when other entries produce validation errors. Built-in null fields are unchanged; custom metadata is merged and null values remove existing custom values.")
+public record BulkPatchSampleRequest(
+        @Schema(description = "Non-empty list of sample updates")
+        @Valid @NotEmpty List<SampleRequestData> sampleData) {
     public record SampleRequestData(
+            @Schema(description = "Name of the existing sample within the project")
             @NotBlank String name,
             String alias,
             Integer taxId,
@@ -54,5 +59,6 @@ public record BulkPatchSampleRequest(@Valid @NotEmpty List<SampleRequestData> sa
             String studyAccession,
             String sampleAccession,
             String secondaryAccession,
+            @Schema(description = "Custom values keyed by project metadata-field key; values must match field types, and null removes the existing value")
             Map<String, Object> customMetadata) {}
 }

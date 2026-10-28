@@ -4,15 +4,19 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 
 @Path("/")
+@Tag(name = "Health", description = "Public service status")
 public class StatusController {
     private static final Logger log = Logger.getLogger(StatusController.class);
 
     @GET
     @Path("/status")
     @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get service status", description = "Unauthenticated liveness-style status response.")
     public HealthStatusResponse status() {
         log.info("status:ok");
         return new HealthStatusResponse("OK");
