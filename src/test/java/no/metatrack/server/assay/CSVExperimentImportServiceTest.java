@@ -1,5 +1,6 @@
 package no.metatrack.server.assay;
 
+import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
@@ -18,6 +19,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 
 import java.io.ByteArrayInputStream;
@@ -70,6 +72,7 @@ class CSVExperimentImportServiceTest {
         AssayService assayService = new AssayService();
         assayService.vocabularyService = service.vocabularyService;
         service.rowWriter = new CSVExperimentRowWriter();
+        service.rowWriter.entityManager = mock(EntityManager.class);
         service.rowWriter.assayService = assayService;
         when(service.vocabularyService.validate(anyString(), anyMap())).thenAnswer(invocation ->
                 AssayVocabularyService.validate(new AssayVocabularyRules(terms),
@@ -152,16 +155,25 @@ class CSVExperimentImportServiceTest {
         assay.project.id = 1L;
         CSVExperimentRowWriter writer = new CSVExperimentRowWriter();
         writer.assayService = mock(AssayService.class);
+        writer.entityManager = mock(EntityManager.class);
         when(writer.assayService.getAssayById(2L, assay.id)).thenReturn(assay);
         try (MockedStatic<Sample> samples = mockStatic(Sample.class);
              MockedStatic<File> files = mockStatic(File.class)) {
             samples.when(() -> Sample.findBySampleNameInProject("sample", 2L)).thenReturn(Optional.of(sample));
+            files.when(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE)).thenAnswer(invocation -> {
+                verify(writer.entityManager).flush();
+                return Optional.empty();
+            });
             writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null, null,
                     List.of(new CSVExperimentImportService.PendingFile(
                             "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)), null, null);
             verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null,
                     null, null);
             verify(writer.assayService).associateSample(assay, sample);
+            InOrder order = inOrder(writer.assayService, writer.entityManager);
+            order.verify(writer.assayService).associateSample(assay, sample);
+            order.verify(writer.entityManager).flush();
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));
             files.verifyNoMoreInteractions();
@@ -265,6 +277,15 @@ class CSVExperimentImportServiceTest {
         assertEquals(Set.of(sample), assay.samples);
         assertEquals(Set.of(assay), sample.assays);
         verify(assay, times(2)).addSample(sample);
+    }
+
+    @Test
+    void rowsWithoutFilesDoNotFlushBeforeTransactionCompletion() throws Exception {
+        Path path = Files.writeString(directory.resolve("no-files.csv"), "Sample\nsample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+
+        verify(service.rowWriter.entityManager, never()).flush();
     }
 
     @Test

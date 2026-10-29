@@ -2,6 +2,7 @@ package no.metatrack.server.assay;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.file.File;
@@ -12,6 +13,9 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class CSVExperimentRowWriter {
+    @Inject
+    EntityManager entityManager;
+
     @Inject
     AssayService assayService;
 
@@ -28,6 +32,7 @@ public class CSVExperimentRowWriter {
         if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;
         if (sequencingLaboratory != null) assay.sequencingLaboratory = sequencingLaboratory;
         assayService.associateSample(assay, sample);
+        if (!pendingFiles.isEmpty()) entityManager.flush();
         for (var pendingFile : pendingFiles) {
             File.importPending(assay.project.id, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
                     pendingFile.unencryptedMd5(), pendingFile.readRole()).ifPresent(message -> {

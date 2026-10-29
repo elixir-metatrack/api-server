@@ -12,8 +12,11 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.assay.AssayController;
 import no.metatrack.server.assay.CSVExperimentImportService;
+import no.metatrack.server.assay.CSVExperimentRowWriter;
 import no.metatrack.server.auth.CurrentUser;
 import no.metatrack.server.auth.UserService;
+import no.metatrack.server.file.File;
+import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectService;
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,6 +67,7 @@ class SpreadsheetImportPostgresTest {
     @Inject GlobalSampleVocabularyManagementService globals;
     @Inject CSVSampleSheetImportService samples;
     @Inject CSVExperimentImportService experiments;
+    @Inject CSVExperimentRowWriter experimentRowWriter;
     @Inject SampleController sampleController;
     @Inject AssayController assayController;
     @Inject EntityManager em;
@@ -266,17 +271,22 @@ class SpreadsheetImportPostgresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"xls", "xlsx", "csv", "tsv"})
-    void importsExperimentRowsIntoExistingAssayAndRejectsUnlinkedSamples(String format) throws Exception {
+    void importsFilesForProjectSamplesNotPreviouslyLinkedToTheAssay(String format) throws Exception {
         seed();
         Assay assay = QuarkusTransaction.requiringNew().call(() -> {
-            Sample sample = new Sample();
-            sample.name = "linked";
-            sample.project = Project.findById(project.id);
-            sample.persist();
+            Project storedProject = Project.findById(project.id);
+            Sample unlinked = new Sample();
+            unlinked.name = "unlinked";
+            unlinked.project = storedProject;
+            unlinked.persist();
+            Sample linked = new Sample();
+            linked.name = "linked";
+            linked.project = storedProject;
+            linked.persist();
             Assay created = new Assay();
             created.name = "experiment";
-            created.project = sample.project;
-            created.addSample(sample);
+            created.project = storedProject;
+            created.addSample(linked);
             created.persist();
             return created;
         });
@@ -299,11 +309,47 @@ class SpreadsheetImportPostgresTest {
                 path = write(workbook, format);
             }
             var errors = experiments.importIntoAssay(project.id, assay.id, path.toFile());
-            assertEquals(1, errors.size(), errors.toString());
-            assertEquals(format.equals("csv") || format.equals("tsv") ? "Row 1" : "Experiments!row 2", errors.getFirst().row());
-            assertEquals(3, no.metatrack.server.file.File.count("assay.id", assay.id));
+            assertTrue(errors.isEmpty(), errors.toString());
+            assertEquals(6, File.count("assay.id", assay.id));
+            assertEquals(2L, ((Number) em.createNativeQuery("select count(*) from {h-schema}assay_sample where assay_id = :assay")
+                    .setParameter("assay", assay.id).getSingleResult()).longValue());
             assertEquals(1, Assay.count("project.id", project.id));
         }
+    }
+
+    @Test
+    void rollsBackNewSampleAssociationWhenFileImportConflicts() throws Exception {
+        seed();
+        Assay assay = QuarkusTransaction.requiringNew().call(() -> {
+            Sample sample = new Sample();
+            sample.name = "rollback";
+            sample.project = Project.findById(project.id);
+            sample.persist();
+            Assay created = new Assay();
+            created.name = "experiment";
+            created.project = sample.project;
+            created.persist();
+            return created;
+        });
+        as(editor);
+        Path path = Files.writeString(directory.resolve("file-conflict.csv"),
+                "Sample,File Name,File md5\nrollback,conflict.fastq,md5\n");
+
+        try (MockedStatic<File> files = mockStatic(File.class, CALLS_REAL_METHODS)) {
+            files.when(() -> File.importPending(eq(project.id), eq(assay.id), any(Sample.class), any(Assay.class),
+                    eq("conflict.fastq"), eq("md5"), isNull(), eq(ReadRole.SINGLE)))
+                    .thenReturn(java.util.Optional.of("Conflicting file metadata"));
+
+            var errors = experiments.importIntoAssay(project.id, assay.id, path.toFile());
+
+            assertEquals(1, errors.size(), errors.toString());
+            assertEquals("File Name", errors.getFirst().field());
+            assertEquals("Conflicting file metadata", errors.getFirst().message());
+        }
+
+        assertEquals(0L, ((Number) em.createNativeQuery("select count(*) from {h-schema}assay_sample where assay_id = :assay")
+                .setParameter("assay", assay.id).getSingleResult()).longValue());
+        assertEquals(0, File.count("assay.id", assay.id));
     }
 
     private void as(UUID id) { when(users.requireCurrentUser()).thenReturn(new CurrentUser(id.toString(), "test", Set.of(), null, null, null)); }
