@@ -40,6 +40,15 @@ public interface KeycloakAdminClient {
     );
 
     @GET
+    RestResponse<List<KeycloakProfileRepresentation>> searchUsers(
+            @PathParam("realm") String realm,
+            @QueryParam("search") String search,
+            @QueryParam("exact") boolean exact,
+            @QueryParam("first") int first,
+            @QueryParam("max") int max
+    );
+
+    @GET
     @Path("/{userId}")
     RestResponse<KeycloakUserRepresentation> getUser(
             @PathParam("realm") String realm,
