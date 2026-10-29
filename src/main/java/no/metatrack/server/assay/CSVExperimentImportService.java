@@ -125,9 +125,9 @@ public class CSVExperimentImportService {
         }
 
         Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName.trim(), projectId);
-        if (sample.isEmpty() || assay.samples.stream().noneMatch(member -> member.id.equals(sample.get().id))) {
+        if (sample.isEmpty()) {
             errors.add(new CSVExperimentRowError(row, "Sample", sampleName,
-                    "Sample does not exist in the project or is not associated with the assay"));
+                    "Sample does not exist in the project"));
             return;
         }
 

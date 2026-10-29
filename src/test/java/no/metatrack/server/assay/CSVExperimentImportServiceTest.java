@@ -52,13 +52,17 @@ class CSVExperimentImportServiceTest {
     }
 
     private List<CSVExperimentRowError> importFile(Map<String, Set<String>> terms, Path path) throws Exception {
+        return importFile(terms, path, Optional.of(sample));
+    }
+
+    private List<CSVExperimentRowError> importFile(Map<String, Set<String>> terms, Path path,
+            Optional<Sample> projectSample) throws Exception {
         if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
         assay.project = new Project();
         assay.project.id = 1L;
         sample.name = "sample";
         if (sample.id == null) sample.id = UUID.randomUUID();
-        assay.samples.add(sample);
         service.csvImportSupport = new CSVImportSupport();
         service.spreadsheetSupport = new SpreadsheetImportSupport();
         service.vocabularyService = mock(AssayVocabularyService.class);
@@ -73,7 +77,7 @@ class CSVExperimentImportServiceTest {
         try (MockedStatic<Assay> scopedAssays = mockStatic(Assay.class);
              MockedStatic<Sample> scopedSamples = mockStatic(Sample.class)) {
             scopedAssays.when(() -> Assay.findByIdInProjectScope(1L, assay.id)).thenReturn(Optional.of(assay));
-            scopedSamples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(Optional.of(sample));
+            scopedSamples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(projectSample);
             return service.importIntoAssay(1L, assay.id, path.toFile());
         }
     }
@@ -178,9 +182,14 @@ class CSVExperimentImportServiceTest {
     @Test
     void singleEndTemplateAssignsSingleReadRole() throws Exception {
         try (MockedStatic<File> files = mockStatic(File.class)) {
+            assertTrue(assay.samples.isEmpty());
+            assertTrue(sample.assays.isEmpty());
             var errors = importRows(Map.of(), singleEndRow());
 
             assertTrue(errors.isEmpty());
+            assertEquals(Set.of(sample), assay.samples);
+            assertEquals(Set.of(assay), sample.assays);
+            verify(assay).addSample(sample);
             files.verify(() -> File.validateImportPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
@@ -239,12 +248,50 @@ class CSVExperimentImportServiceTest {
             assertNull(assay.libraryLayout);
             assertEquals(50, assay.insertSize);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
-            assertEquals(Set.of(sample), assay.samples);
+            assertTrue(assay.samples.isEmpty());
             assertTrue(sample.assays.isEmpty());
             verify(assay, never()).addSample(any());
             files.verifyNoInteractions();
         }
         verify(service.vocabularyService, times(1)).loadRules();
+    }
+
+    @Test
+    void repeatedRowsAssociateSampleWithoutDuplicatingMembership() throws Exception {
+        Path path = Files.writeString(directory.resolve("repeated-sample.csv"), "Sample\nsample\nsample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+
+        assertEquals(Set.of(sample), assay.samples);
+        assertEquals(Set.of(assay), sample.assays);
+        verify(assay, times(2)).addSample(sample);
+    }
+
+    @Test
+    void existingAssayMembershipRemainsValidDuringImport() throws Exception {
+        assay.addSample(sample);
+        clearInvocations(assay);
+        Path path = Files.writeString(directory.resolve("existing-membership.csv"), "Sample\nsample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+
+        assertEquals(Set.of(sample), assay.samples);
+        assertEquals(Set.of(assay), sample.assays);
+        verify(assay).addSample(sample);
+    }
+
+    @Test
+    void missingProjectSampleIsRejectedWithoutAssociatingIt() throws Exception {
+        Path path = Files.writeString(directory.resolve("missing-sample.csv"), "Sample\nsample\n");
+
+        var errors = importFile(Map.of(), path, Optional.empty());
+
+        assertEquals(1, errors.size());
+        assertEquals("Sample", errors.getFirst().field());
+        assertEquals("Sample does not exist in the project", errors.getFirst().message());
+        assertTrue(assay.samples.isEmpty());
+        assertTrue(sample.assays.isEmpty());
+        verify(assay, never()).addSample(any());
     }
 
     @Test
