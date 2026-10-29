@@ -9,6 +9,7 @@ quarkus:
     port: 1234
     access-log:
       enabled: true
+      exclude-pattern: ^/api/users/search(?:/.*)?$
       log-to-file: false
   virtual-threads:
     enabled: true
@@ -45,6 +46,9 @@ quarkus:
       keycloak-identities:
         expire-after-write: ${KEYCLOAK_USERNAME_CACHE_TTL:10M}
         maximum-size: ${KEYCLOAK_USERNAME_CACHE_MAX_SIZE:1000}
+      keycloak-user-search:
+        expire-after-write: ${KEYCLOAK_USER_SEARCH_CACHE_TTL:5M}
+        maximum-size: ${KEYCLOAK_USER_SEARCH_CACHE_MAX_SIZE:1000}
   smallrye-openapi:
     path: /openapi
     always-include: true
