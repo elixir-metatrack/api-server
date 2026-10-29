@@ -9,10 +9,12 @@ import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import org.junit.jupiter.api.Test;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,6 +94,49 @@ class KeycloakProfileClientTest {
                 }
             });
             ((AutoCloseable) client).close();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void generalSearchEncodesQueryAndUsesBoundedParameters() throws Exception {
+        var requestQuery = new AtomicReference<String>();
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/admin/realms/realm/users", exchange -> {
+            requestQuery.set(exchange.getRequestURI().getRawQuery());
+            byte[] json = ("[{\"id\":\"" + UUID.randomUUID()
+                    + "\",\"username\":\"ada@example.org\",\"email\":\"ada@example.org\","
+                    + "\"firstName\":\"Ada\",\"lastName\":\"Lovelace\"}]")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, json.length);
+            exchange.getResponseBody().write(json);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var client = RestClientBuilder.newBuilder()
+                    .baseUri(URI.create("http://127.0.0.1:" + server.getAddress().getPort()))
+                    .property("microprofile.rest.client.disable.default.mapper", true)
+                    .build(LocalClient.class);
+            try (var response = client.searchUsers("realm", "ada team+タグ@example.org", false, 0, 21)) {
+                assertEquals(200, response.getStatus());
+                assertEquals("Ada", response.getEntity().getFirst().firstName());
+            } finally {
+                ((AutoCloseable) client).close();
+            }
+
+            Map<String, String> parameters = new LinkedHashMap<>();
+            for (String entry : requestQuery.get().split("&")) {
+                String[] pair = entry.split("=", 2);
+                parameters.put(URLDecoder.decode(pair[0], StandardCharsets.UTF_8),
+                        URLDecoder.decode(pair[1], StandardCharsets.UTF_8));
+            }
+            assertEquals("ada team+タグ@example.org", parameters.get("search"));
+            assertEquals("false", parameters.get("exact"));
+            assertEquals("0", parameters.get("first"));
+            assertEquals("21", parameters.get("max"));
         } finally {
             server.stop(0);
         }
