@@ -21,6 +21,9 @@ class SampleMetadataFieldServiceTest {
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("1priority"));
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("collection_date"));
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("has space"));
+        for (String key : new String[]{"project_accession", "study_accession", "sample_accession", "secondary_accession"}) {
+            assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey(key));
+        }
     }
 
     @Test

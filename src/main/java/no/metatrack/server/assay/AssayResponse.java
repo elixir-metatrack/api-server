@@ -15,7 +15,9 @@ public record AssayResponse(
         String libraryLayout,
         Integer insertSize,
         Instant createdOn,
-        Instant modifiedOn) {
+        Instant modifiedOn,
+        String experimentAccession,
+        String runAccession) {
 
     public static AssayResponse fromEntity(Assay assay) {
         return new AssayResponse(
@@ -30,6 +32,8 @@ public record AssayResponse(
                 assay.libraryLayout,
                 assay.insertSize,
                 assay.createdOn,
-                assay.modifiedOn);
+                assay.modifiedOn,
+                assay.experimentAccession,
+                assay.runAccession);
     }
 }

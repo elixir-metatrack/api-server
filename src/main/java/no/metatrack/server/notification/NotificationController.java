@@ -7,14 +7,19 @@ import jakarta.ws.rs.*;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.UUID;
 
 @Path("/api/notifications")
 @Authenticated
+@SecurityRequirement(name = "bearerAuth")
 @Produces("application/json")
 @Consumes("application/json")
+@Tag(name = "Notifications", description = "Recipient-scoped notification inbox and invitation synchronization")
 public class NotificationController {
     @Inject
     NotificationService notificationService;
@@ -35,7 +40,9 @@ public class NotificationController {
     @APIResponse(responseCode = "400", description = "Invalid pagination")
     @APIResponse(responseCode = "401", description = "Authentication required")
     public NotificationPage list(@QueryParam("page") @DefaultValue("0") int page,
+                                 @Parameter(description = "Maximum number of results per page (1–100)", example = "20")
                                  @QueryParam("size") @DefaultValue("20") int size,
+                                 @Parameter(description = "Filter to unread (`true`) or read (`false`); omit for all", example = "true")
                                  @QueryParam("unread") Boolean unread) {
         return notificationService.list(page, size, unread);
     }

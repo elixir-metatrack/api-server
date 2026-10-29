@@ -1,5 +1,103 @@
 # Changelog
 
+## [0.7.0](https://github.com/elixir-metatrack/api-server/compare/0.6.0...0.7.0) (2026-10-27)
+
+
+### Features
+
+* add accession fields to sample requests, services, and response classes ([c07c051](https://github.com/elixir-metatrack/api-server/commit/c07c051b303f0eabc754eea4c9ae0d9c5aedfec3))
+* add accession fields to spreadsheet exports and update documentation ([ed94688](https://github.com/elixir-metatrack/api-server/commit/ed94688ea8fe36813e33d215b8b4427dcfcc966f))
+* add accession fields to vocabulary catalog and metadata field service ([8a1052c](https://github.com/elixir-metatrack/api-server/commit/8a1052c0f3c41e4600a44d8a8a29f5adc368c6c7))
+* add additional metadata fields for sample table and migrations ([938c07a](https://github.com/elixir-metatrack/api-server/commit/938c07a0baeeb2adc789826373ad3f8799263ed8))
+* add experiment and run accession fields to assay table and entity ([35609a2](https://github.com/elixir-metatrack/api-server/commit/35609a29cc184c7385ffb82d3230916a41b68c1f))
+* add project metadata fields to database schema and entity model ([f0899b2](https://github.com/elixir-metatrack/api-server/commit/f0899b2c6150558564cb57039cd0df7f3ee04597))
+* add project publication entity, API endpoints, database schema, and tests ([8f0079c](https://github.com/elixir-metatrack/api-server/commit/8f0079ca753689102295e9edc306118ff021e4a8))
+* enable metadata column creation during sample sheet imports ([2772ea2](https://github.com/elixir-metatrack/api-server/commit/2772ea26e30beeb47b9988c94fc54e6e953c1042))
+* extend accession field support to assays, services, exports, and imports ([f9b0e73](https://github.com/elixir-metatrack/api-server/commit/f9b0e73f50c0469f9e236063ebb0438c29423da4))
+* extend project service with metadata fields, validation, and tests ([28e86aa](https://github.com/elixir-metatrack/api-server/commit/28e86aa980df4c5de07bb8348f11cf192d657805))
+
+
+### Bug Fixes
+
+* correct misapplied migration scripts for project metadata and publications tables ([c63f113](https://github.com/elixir-metatrack/api-server/commit/c63f1135a193a55e98ecaf1650475f310c216211))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.4 ([#106](https://github.com/elixir-metatrack/api-server/issues/106)) ([53ae77c](https://github.com/elixir-metatrack/api-server/commit/53ae77cf3bcb43cacc6ce0a8c252490320c129fb))
+* **deps:** update dependency org.apache.poi:poi-ooxml to v6 ([a3b6beb](https://github.com/elixir-metatrack/api-server/commit/a3b6beb2b5403aa4d1efe691f1b6f673a126fc53))
+* fix keycloak profile attribute mapping ([e932719](https://github.com/elixir-metatrack/api-server/commit/e932719ea5d768d0b847466657b6416c20a89c0f))
+* update CSV parsing logic for the new template format ([ca85cae](https://github.com/elixir-metatrack/api-server/commit/ca85caefed5b16e096961d0aa8fb659c2646e087))
+
+
+### Tests
+
+* enhance assay tests with additional experiment and run accession scenarios ([b2668ff](https://github.com/elixir-metatrack/api-server/commit/b2668ffcb97be82478ca307a0da0641437e00c0d))
+* extend CSVExperimentImportServiceTest with optional accession scenarios ([20703b8](https://github.com/elixir-metatrack/api-server/commit/20703b8e83ad2a51001cd56cb751770332e6414f))
+* extend validation and import tests for accession fields in metadata services and CSV imports ([5ee5a67](https://github.com/elixir-metatrack/api-server/commit/5ee5a6728f2da878d0fab906417826f4901a1049))
+* freeze GlobalSampleVocabularyMigrationTest catalog to v1.0.7 for stable migration validation ([b693580](https://github.com/elixir-metatrack/api-server/commit/b6935808c371388db585a0639f7a29ea7f710111))
+* replace TestTransaction with QuarkusTransaction for fixture management ([a9cde86](https://github.com/elixir-metatrack/api-server/commit/a9cde868b7abca0e408ad610bfa8ee1b97e4b0cf))
+* update tests to parse headers according to the new templates ([c011322](https://github.com/elixir-metatrack/api-server/commit/c011322d0dbf68335aa7b985df1c1a39840b0cbf))
+
+
+### Miscellaneous Chores
+
+* **deps:** update maven plugins to v3.6.1 ([830a81b](https://github.com/elixir-metatrack/api-server/commit/830a81bf3bb88a8091a2c23d69c7884232484d76))
+* **main:** release 0.6.1-SNAPSHOT ([5522bbf](https://github.com/elixir-metatrack/api-server/commit/5522bbff30b53295691424706e99bca8497d1f13))
+* replace template files with updated ones ([1168454](https://github.com/elixir-metatrack/api-server/commit/116845456aa1ee83283cedc70289180c3e5679fc))
+* replace template files with updated ones ([adebdd6](https://github.com/elixir-metatrack/api-server/commit/adebdd6ce4f7d902fa264ad7ee7b56ffdd85b2f2))
+
+## [0.6.0](https://github.com/elixir-metatrack/api-server/compare/0.5.0...0.6.0) (2026-10-23)
+
+
+### Features
+
+* add Keycloak profile representation and update support in admin client ([5cf1190](https://github.com/elixir-metatrack/api-server/commit/5cf1190f54f4de0acdd303c520ef6e8c95c08258))
+* add support for purging all object versions in S3, refine file deletion logic ([d57c160](https://github.com/elixir-metatrack/api-server/commit/d57c1606cc8842ed8f3e712a1dca7351ffadb1b9))
+* add tooltip field to SampleMetadataField with database migration ([09ddb15](https://github.com/elixir-metatrack/api-server/commit/09ddb15e9873899019072b57aa471489fc621a8b))
+* add tooltip support to SampleMetadataField with validation and service updates ([b3bb26e](https://github.com/elixir-metatrack/api-server/commit/b3bb26eea2dc86af39b32399dcbc08ca860b0e92))
+* export sample and experiment data as importable Excel workbooks ([1fd5cd6](https://github.com/elixir-metatrack/api-server/commit/1fd5cd64f14f485ca18ba8a00c1e2c808ee99dc3))
+* implement user profile update and validation with Keycloak integration ([a2946b9](https://github.com/elixir-metatrack/api-server/commit/a2946b9db6f8219af468d48a9e4d18fa5ce284f2))
+* introduce PresignController for upload/download URL generation and refine file deletion in FileController ([da03173](https://github.com/elixir-metatrack/api-server/commit/da03173b9991b6bb1f8a96d5f5de1938fcc9c265))
+
+
+### Bug Fixes
+
+* **deps:** update aws-java-sdk-v2 monorepo to v2.56.0 ([58d86b1](https://github.com/elixir-metatrack/api-server/commit/58d86b111a75f506945746672e50f967d416c9e4))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.3 ([9776913](https://github.com/elixir-metatrack/api-server/commit/977691310ddeb597c3bc79345d35e8a6b7d41fef))
+* **deps:** update quarkus ecosystem to v3.40.1.1 ([#95](https://github.com/elixir-metatrack/api-server/issues/95)) ([f8085b2](https://github.com/elixir-metatrack/api-server/commit/f8085b2bdca3221b8f519315c68c5f6372a225d4))
+* preserve spreadsheet numeric values and validate collection dates ([dccaed2](https://github.com/elixir-metatrack/api-server/commit/dccaed22eef1d73338d7fbf3024a4648c3092159))
+
+
+### Code Refactoring
+
+* clarify spreadsheet conversion and vocabulary validation ([0c5817c](https://github.com/elixir-metatrack/api-server/commit/0c5817c5e092d2b5f29c9f749ef24c8268cf8f6e))
+
+
+### Documentation
+
+* add API documentation for self-service profile read and update operations ([3e4382a](https://github.com/elixir-metatrack/api-server/commit/3e4382a117abc7f204f8d8e4ac3b62263174208e))
+* update spreadsheet button names and TSV selection behavior ([b95c413](https://github.com/elixir-metatrack/api-server/commit/b95c4139a93c705cdfc005bafeaf5aa867852586))
+
+
+### Tests
+
+* add DatabaseMigrationTest and remove redundant freshInstallation test in SubProjectMigrationTest ([3f3b13a](https://github.com/elixir-metatrack/api-server/commit/3f3b13a05ad7e61b2053d2e8bbd70ea1fd726ea3))
+* add tests for file deletion logic in FileController, S3 storage, and HTTP endpoints ([0701e32](https://github.com/elixir-metatrack/api-server/commit/0701e32c22e984a3af3cdff0c54e137d17dadb7e))
+* add unit tests for Keycloak profile client including serialization, deserialization, and error handling scenarios ([7aeae0d](https://github.com/elixir-metatrack/api-server/commit/7aeae0d125f740f8c9416312b49efa43cb10c6d0))
+* add unit tests for optional tooltip validation, patching, and creation scenarios ([c733951](https://github.com/elixir-metatrack/api-server/commit/c733951578258e8689152e3b6867f4dec288090f))
+* add unit tests for user profile components including normalization, validation, and service interactions ([39f1757](https://github.com/elixir-metatrack/api-server/commit/39f1757398e85e23ce80ed443bf10b447ecc4121))
+
+
+### Continuous Integration
+
+* add GitHub Actions workflow for build, test, and workflow validation ([be55734](https://github.com/elixir-metatrack/api-server/commit/be5573424db04bcdfc7f634e6ebede3c35a58bd8))
+
+
+### Miscellaneous Chores
+
+* **deps:** update actions/upload-artifact action to v7 ([b73f9fe](https://github.com/elixir-metatrack/api-server/commit/b73f9fe982eb8a1cc0844a7d8932526a40b946c7))
+* **deps:** update dependency maven to v3.10.0 ([aa8ce92](https://github.com/elixir-metatrack/api-server/commit/aa8ce92836920852f3e0885bf4bf8f5fffda433b))
+* **deps:** update dependency org.mockito:mockito-junit-jupiter to v5.24.0 ([8e42100](https://github.com/elixir-metatrack/api-server/commit/8e421002ae6a77e2cdc124df2daec6ab03109f04))
+* **deps:** update postgres docker tag to v18 ([982d669](https://github.com/elixir-metatrack/api-server/commit/982d669f16fc6d06a2be4907fe8c3e9982e3cb2f))
+* **main:** release 0.5.1-SNAPSHOT ([a70bc04](https://github.com/elixir-metatrack/api-server/commit/a70bc04ffe1afb2872ea02947c370841c7569df4))
+
 ## [0.5.0](https://github.com/elixir-metatrack/api-server/compare/0.4.0...0.5.0) (2026-10-16)
 
 

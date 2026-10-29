@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,16 +55,25 @@ class KeycloakProfileClientTest {
                     .build(LocalClient.class);
             try (var result = client.getProfile("realm", "subject")) {
                 assertEquals("Ada", result.getEntity().firstName());
+                assertEquals("user@example.org", result.getEntity().email());
                 assertEquals(List.of("one", "two"), result.getEntity().attributes().get("unrelated"));
             }
             try (var result = client.getUser("realm", "subject")) {
                 assertEquals("user@example.org", result.getEntity().email());
                 assertEquals(true, result.getEntity().emailVerified());
             }
-            try (var result = client.updateProfile("realm", "subject", new KeycloakProfileUpdate(Map.of("firstName", "", "attributes", Map.of("orcid", List.of()))))) {
+            Map<String, Object> update = new LinkedHashMap<>();
+            update.put("username", "live");
+            update.put("email", null);
+            update.put("firstName", "");
+            update.put("lastName", "Name");
+            update.put("attributes", Map.of("orcid", List.of()));
+            try (var result = client.updateProfile("realm", "subject", new KeycloakProfileUpdate(update))) {
                 assertEquals(204, result.getStatus());
-                assertEquals(mapper.readTree("{\"firstName\":\"\",\"attributes\":{\"orcid\":[]}}"), mapper.readTree(body.get()));
+                assertEquals(mapper.readTree("{\"username\":\"live\",\"email\":null,\"firstName\":\"\",\"lastName\":\"Name\",\"attributes\":{\"orcid\":[]}}"), mapper.readTree(body.get()));
             }
+            assertThrows(IllegalArgumentException.class,
+                    () -> new KeycloakProfileUpdate(Map.of("roles", List.of("system-admin"))));
             for (int code : new int[]{400, 401, 403, 404, 409, 500}) {
                 status.set(code);
                 try (var result = client.getProfile("realm", "subject")) {

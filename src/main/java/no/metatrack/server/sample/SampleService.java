@@ -125,6 +125,10 @@ public class SampleService {
             String county,
             String commune,
             String hospitalHealthInstitution,
+            String projectAccession,
+            String studyAccession,
+            String sampleAccession,
+            String secondaryAccession,
             Map<String, Object> customMetadata) {
 
         Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
@@ -142,7 +146,8 @@ public class SampleService {
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
                 otherPathogensTested, otherPathogensTestResult, hostHabitat, isolationSourceHostAssociated,
                 hostBehaviour, isolationSourceNonHostAssociated, influenzaVirusType, influenzaSubType, serovar,
-                strain, hostAge, county, commune, hospitalHealthInstitution), customMetadata);
+                strain, hostAge, county, commune, hospitalHealthInstitution,
+                projectAccession, studyAccession, sampleAccession, secondaryAccession), customMetadata);
 
         Sample sample = new Sample();
         sample.name = name;
@@ -185,6 +190,10 @@ public class SampleService {
         if (county != null) sample.county = trim(county);
         if (commune != null) sample.commune = trim(commune);
         if (hospitalHealthInstitution != null) sample.hospitalHealthInstitution = trim(hospitalHealthInstitution);
+        if (projectAccession != null) sample.projectAccession = trim(projectAccession);
+        if (studyAccession != null) sample.studyAccession = trim(studyAccession);
+        if (sampleAccession != null) sample.sampleAccession = trim(sampleAccession);
+        if (secondaryAccession != null) sample.secondaryAccession = trim(secondaryAccession);
 
         sample.createdOn = Instant.now();
         sample.modifiedOn = Instant.now();
@@ -243,6 +252,10 @@ public class SampleService {
             String county,
             String commune,
             String hospitalHealthInstitution,
+            String projectAccession,
+            String studyAccession,
+            String sampleAccession,
+            String secondaryAccession,
             Map<String, Object> customMetadata) {
 
         Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
@@ -252,7 +265,8 @@ public class SampleService {
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
                 otherPathogensTested, otherPathogensTestResult, hostHabitat, isolationSourceHostAssociated,
                 hostBehaviour, isolationSourceNonHostAssociated, influenzaVirusType, influenzaSubType, serovar,
-                strain, hostAge, county, commune, hospitalHealthInstitution), customMetadata);
+                strain, hostAge, county, commune, hospitalHealthInstitution,
+                projectAccession, studyAccession, sampleAccession, secondaryAccession), customMetadata);
         if (name != null) sample.name = name;
         if (alias != null) sample.alias = trim(alias);
         if (taxId != null) sample.taxId = taxId;
@@ -293,6 +307,10 @@ public class SampleService {
         if (county != null) sample.county = trim(county);
         if (commune != null) sample.commune = trim(commune);
         if (hospitalHealthInstitution != null) sample.hospitalHealthInstitution = trim(hospitalHealthInstitution);
+        if (projectAccession != null) sample.projectAccession = trim(projectAccession);
+        if (studyAccession != null) sample.studyAccession = trim(studyAccession);
+        if (sampleAccession != null) sample.sampleAccession = trim(sampleAccession);
+        if (secondaryAccession != null) sample.secondaryAccession = trim(secondaryAccession);
 
         sample.modifiedOn = Instant.now();
 
@@ -372,6 +390,10 @@ public class SampleService {
             if (data.county() != null) sample.county = trim(data.county());
             if (data.commune() != null) sample.commune = trim(data.commune());
             if (data.hospitalHealthInstitution() != null) sample.hospitalHealthInstitution = trim(data.hospitalHealthInstitution());
+            if (data.projectAccession() != null) sample.projectAccession = trim(data.projectAccession());
+            if (data.studyAccession() != null) sample.studyAccession = trim(data.studyAccession());
+            if (data.sampleAccession() != null) sample.sampleAccession = trim(data.sampleAccession());
+            if (data.secondaryAccession() != null) sample.secondaryAccession = trim(data.secondaryAccession());
             metadataService.apply(sample.project.id, sample, data.customMetadata());
             sample.modifiedOn = Instant.now();
         }
@@ -400,7 +422,8 @@ public class SampleService {
                 data.otherPathogensTestResult(), data.hostHabitat(), data.isolationSourceHostAssociated(),
                 data.hostBehaviour(), data.isolationSourceNonHostAssociated(), data.influenzaVirusType(),
                 data.influenzaSubType(), data.serovar(), data.strain(), data.hostAge(), data.county(), data.commune(),
-                data.hospitalHealthInstitution());
+                data.hospitalHealthInstitution(), data.projectAccession(), data.studyAccession(),
+                data.sampleAccession(), data.secondaryAccession());
     }
 
     private Map<String, String> builtInValues(
@@ -412,7 +435,8 @@ public class SampleService {
             String otherPathogensTestResult, String hostHabitat, String isolationSourceHostAssociated,
             String hostBehaviour, String isolationSourceNonHostAssociated, String influenzaVirusType,
             String influenzaSubType, String serovar, String strain, String hostAge, String county, String commune,
-            String hospitalHealthInstitution) {
+            String hospitalHealthInstitution, String projectAccession, String studyAccession,
+            String sampleAccession, String secondaryAccession) {
         Map<String, String> values = new java.util.LinkedHashMap<>();
         values.put("alias", alias);
         values.put("mlst", mlst);
@@ -448,6 +472,10 @@ public class SampleService {
         values.put("county", county);
         values.put("commune", commune);
         values.put("hospital_health_institution", hospitalHealthInstitution);
+        values.put("project_accession", projectAccession);
+        values.put("study_accession", studyAccession);
+        values.put("sample_accession", sampleAccession);
+        values.put("secondary_accession", secondaryAccession);
         return values;
     }
 

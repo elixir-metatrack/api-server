@@ -68,6 +68,11 @@ taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
 keycloak-admin-api/mp-rest/url: ${KEYCLOAK_BASE_URL}
 keycloak:
   realm: ${KEYCLOAK_REALM}
+  profile:
+    attributes:
+      country: ${KEYCLOAK_PROFILE_COUNTRY_ATTRIBUTE:Country}
+      institution: ${KEYCLOAK_PROFILE_INSTITUTION_ATTRIBUTE:Institution}
+      orcid: ${KEYCLOAK_PROFILE_ORCID_ATTRIBUTE:ORCID}
 
 "%prod":
   metatrack:

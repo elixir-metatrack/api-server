@@ -1,13 +1,16 @@
 package no.metatrack.server.project;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
+@Schema(description = "New project details. The authenticated caller becomes owner; data-owning organization is required.")
 public record CreateProjectRequest(
         @NotBlank
-        @Pattern(
-                regexp = "^[a-zA-Z0-9_-]+$",
-                message = "Field can only contain alphanumeric characters, hyphens, and underscores")
+        @Schema(description = "Unique project name")
         String name,
 
-        String description) {}
+        String description,
+        @NotBlank @Size(max = 255) String dataOwningOrganization,
+        String detailedDescription,
+        String comments) {}

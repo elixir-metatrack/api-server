@@ -45,7 +45,7 @@ class InvitationDeliveryPostgresTest {
     void setup() {
         mailbox.clear();
         owner = UUID.randomUUID();
-        projectId = projects.createProject(UUID.randomUUID().toString(), "Delivery test", owner.toString()).id;
+        projectId = projects.createProject(new no.metatrack.server.project.CreateProjectRequest(UUID.randomUUID().toString(), "Delivery test", "Test organization", null, null), owner.toString()).id;
         saved = invitations.create(projectId, "recipient@example.org", null, owner, "Owner", ProjectRole.EDITOR);
     }
 

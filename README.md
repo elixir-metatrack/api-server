@@ -5,7 +5,7 @@ for biological and genomic data. It provides robust management of projects, samp
 
 ## Tech Stack
 
-- **Language:** Java 21
+- **Language:** Java 25
 - **Framework:** [Quarkus](https://quarkus.io/) (with virtual threads enabled)
 - **Database:** PostgreSQL
 - **ORM:** Hibernate ORM with Panache (Active Record pattern)
@@ -17,7 +17,7 @@ for biological and genomic data. It provides robust management of projects, samp
 
 ## Requirements
 
-- **Java:** JDK 21+
+- **Java:** JDK 25+
 - **Database:** PostgreSQL 16+ (recommended)
 - **Storage:** Access to an S3-compatible object store and an existing bucket
 - **Auth:** Access to Metatrack Keycloak realm
@@ -114,6 +114,21 @@ src/main/resources/
 
 When the application is running, the OpenAPI UI (scalar) is available at:
 `http://localhost:1234/scalar`.
+
+### Public Sample Catalog
+
+`GET /api/public/samples?page=0` is available without authentication and returns samples across all projects in
+zero-based pages of 100. The response contains `items`, `page`, `size`, `totalElements`, and `totalPages`; each item
+contains only the sample UUID (`id`), `taxId`, taxonomy-derived `scientificName`, `dataOwningOrganization` from the
+sample's owning project, `hostTaxId`, taxonomy-derived `hostScientificName`, `collectionYear`, and `isolationSource`.
+The collection year is derived from the collection date; the full date is not exposed. Missing metadata returns `null`.
+A missing tax ID, unknown taxon, or taxonomy service failure returns a `null` scientific name for the sample or host
+without omitting the sample. Samples are ordered by UUID, and subproject visibility links do not create duplicate items.
+
+`GET /api/public/samples/species` returns a sorted array of unique sample `taxId` values (not host tax IDs), and
+`GET /api/public/samples/organizations` returns a sorted array of unique non-blank data-owning organization values
+from projects with samples. Both endpoints are available without authentication and return empty arrays when no
+matching values exist.
 
 ## Email Invitations and Notifications
 
@@ -367,6 +382,28 @@ skipped, while valid samples/rows are still processed even though the overall re
 not interpret that status as a rollback of the entire bulk operation. CSV/TSV errors use canonical field keys even
 when an accepted column alias was present in the uploaded file, and `sample` contains the sample name when available
 (or row context when it is not).
+
+## Excel Table Imports and Exports
+
+Sample and experiment uploads accept `.xlsx` and `.xls` as well as the existing CSV/TSV formats.
+They use the same multipart `file` parameter and endpoints:
+
+- `POST /api/projects/{projectId}/samples/samplesheet`
+- `POST /api/projects/{projectId}/assays/{assayId}/experiments`
+
+The server detects Excel files from their contents. Downloadable XLSX templates and the worksheet format
+are described in [Excel template version 1](docs/excel-template-v1.md).
+
+Project viewers can export sample data or experiment data in an assay as XLSX:
+
+- `POST /api/projects/{projectId}/samples/export`
+- `POST /api/projects/{projectId}/assays/{assayId}/experiments/export`
+
+Send JSON `{"sampleNames":["sample-1","sample-2"]}` (1–10,000 distinct sample names).
+The webapp's **XLS** button downloads an XLSX file with selected rows, or filtered rows across all pages when
+nothing is selected. Exports include all importable fields, active custom sample metadata and custom
+text vocabularies. Sample exports include `project_accession`, `study_accession`, `sample_accession`,
+and `secondary_accession`. See the format document for reimport requirements and size limits.
 
 ## Tests
 

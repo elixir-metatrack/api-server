@@ -27,9 +27,16 @@ class GlobalSampleVocabularyMigrationTest {
                 .results()
                 .map(result -> result.group(1))
                 .collect(Collectors.toSet());
-        Set<String> catalogKeys = SampleVocabularyBuiltInCatalog.columns().stream()
-                .map(SampleVocabularyColumn::key)
-                .collect(Collectors.toSet());
+        // Freeze the catalog at V1.0.7: applied migrations must not follow later catalog additions.
+        Set<String> catalogKeys = Set.of(
+                "alias", "mlst", "project_title", "description", "isolate", "collected_by",
+                "environmental_sample", "host_associated", "host_common_name", "host_subject_id",
+                "collector_name", "collecting_institution", "host_sex", "influenza_test_method",
+                "influenza_test_result", "other_pathogens_tested", "other_pathogens_test_result",
+                "host_habitat", "isolation_source_host_associated", "host_behaviour",
+                "isolation_source_non_host_associated", "influenza_virus_type", "influenza_sub_type",
+                "serovar", "strain", "host_age", "county", "commune", "hospital_health_institution",
+                "isolation_source", "location", "sequencing_lab", "institution", "host_health_state");
 
         assertEquals(catalogKeys, deletedKeys);
     }

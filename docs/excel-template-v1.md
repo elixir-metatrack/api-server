@@ -1,0 +1,130 @@
+# Excel template version 1
+
+Use **XLS Template** in the Sample or Experiment toolbar. The existing CSV template download
+remains available. XLSX templates are generated from the existing bundled CSV column definitions:
+
+| GET endpoint | Download |
+| --- | --- |
+| `/api/templates/excel/sample` | `sample-v1.xlsx` |
+| `/api/templates/excel/sample_extended` | `sample_extended-v1.xlsx` |
+| `/api/templates/excel/sample_virus` | `sample_virus-v1.xlsx` |
+| `/api/templates/excel/experiment_PE` | `experiment_PE-v1.xlsx` |
+| `/api/templates/excel/experiment_SE` | `experiment_SE-v1.xlsx` |
+
+These downloads contain no project data and are public, like the CSV templates. Templates are shared across
+projects; add any project-specific custom attribute columns yourself using their field keys.
+
+## Export existing data
+
+Use **XLS** in the Samples table or inside an assay's Experiment table to download an XLSX file. If rows are selected,
+the export contains the selected rows matching the current filter; otherwise it contains all filtered
+rows across all pages. Exports include every importable field, regardless of column visibility. The
+**TSV** button uses the same row selection and exports the visible data columns.
+
+Authenticated project VIEWERs (or higher) can use these endpoints with
+`Content-Type: application/json` and a body such as `{"sampleNames":["sample-1","sample-2"]}`:
+
+| POST endpoint | Download |
+| --- | --- |
+| `/api/projects/{projectId}/samples/export` | `samples-{projectId}.xlsx` |
+| `/api/projects/{projectId}/assays/{assayId}/experiments/export` | `experiments-{assayId}.xlsx` |
+
+Select 1–10,000 distinct sample names. Names must belong to the requested project and, for experiments,
+be linked to the requested assay. A missing or inaccessible selected sample rejects the export instead
+of silently returning a subset. Responses are private (`Cache-Control: no-store`).
+
+The exported first sheet uses the version 1 import layout. Sample exports use canonical field keys,
+include active custom fields, and include configured custom TEXT vocabularies on a second sheet.
+Archived fields, database IDs, timestamps, storage paths and taxonomy display labels are not exported.
+Dates use ISO text, booleans remain booleans, and numeric values use Excel numbers where precision can
+be preserved. Higher precision decimals are stored as text. Identifiers and text beginning with `=`
+remain text, never formulas.
+
+Experiment exports include sequencing/library metadata, Study Accession, and file names/checksums.
+Each file has its own row in the appropriate single/forward/reverse columns; this preserves multiple
+files of one read role without guessing file pairs. Samples without files have a metadata-only row.
+Legacy files without a read role use the single-file columns. Files lacking an MD5 can be exported,
+but their MD5 must be filled in before importing those rows.
+
+Reimport uses the existing creation and permission rules. Sample imports do not overwrite existing names:
+use a different target project or rename samples first. Create matching custom field keys and types in
+the target project before importing; new vocabulary definitions require ADMIN/OWNER. Experiment imports
+require the referenced samples to already exist and be linked to the target assay. Existing metadata/file
+conflicts are still rejected, and importing file references does not copy stored file contents.
+
+Exports are limited to 500,000 cells, 511 data columns, 100,000 worksheet rows and 20 MiB. Values longer
+than Excel's 32,767-character cell limit are rejected rather than truncated. Select fewer samples if an
+export exceeds the limits. Downloads use `.xlsx`, while imports continue to accept `.xls` and `.xlsx`.
+
+## First worksheet: data
+
+The first worksheet contains Sample or Experiment rows. Worksheet names are descriptive; their order determines
+their purpose. Downloaded templates contain:
+
+1. `TEMPLATE VERSION:` in A1 and `1` in B1.
+2. Requirements, examples and descriptions, which are instructions and are not imported.
+3. A `METADATA FIELDS:` row containing the column headers, starting in column B.
+4. Data rows below the headers, starting in column B. Column A contains instructions only.
+
+Keep these header rows when filling the template. Version 1 is checked during import; unsupported versions
+are rejected. Header-first workbooks without a version marker are also accepted, with headers and data starting
+in column A. Unversioned workbooks using the existing `METADATA FIELDS:` layout are accepted as well.
+
+The column names, required values and validations follow the existing CSV importer. For Samples, add custom
+attribute columns using keys from the project's custom attributes. These attributes must already exist.
+Experiment rows reference samples already linked to the selected assay.
+
+Blank data rows are ignored. Duplicate headers, values without a header, formula cells and Excel error cells
+are rejected with their worksheet position. The data sheet must contain at least one data row and the required
+`Sample Name`/`name` or `Sample` column. Unknown columns are rejected instead of being silently ignored; Sample
+columns may use a built-in header or an active custom attribute key (an unambiguous custom label is also accepted).
+Paste formula results as values before importing. Excel dates are read as ISO dates (`YYYY-MM-DD`); boolean cells
+become `true`/`false`. Numeric metadata (Tax ID, Host Tax ID, Latitude, Longitude, Insert Size and custom NUMBER
+attributes) uses the stored numeric value, ignoring display rounding, separators and other number formatting.
+Text fields use their displayed value, including number formats with leading zeros. Store identifiers as text
+to avoid Excel changing them.
+
+Collection dates in text cells and CSV/TSV files accept `yyyy-MM-dd`, `d/M/yyyy` and `M/d/yyyy`, as well as
+two-digit years (2000–2099) in slash dates. Invalid calendar dates are rejected. Ambiguous slash dates use
+day/month/year: `3/4/2026` means 3 April. Prefer ISO dates to avoid ambiguity.
+
+## Optional second worksheet: Sample vocabularies
+
+Sample templates include an empty `Vocabularies` worksheet. Its header must contain exactly `field_key` and
+`value`. Each row defines one allowed value, with the field key repeated for additional values:
+
+| field_key | value |
+| --- | --- |
+| treatment_group | control |
+| treatment_group | treated |
+
+Before importing this example, create a custom TEXT attribute with key `treatment_group` in the project
+and add a column with that key to the first worksheet.
+
+- Only existing, active custom Sample TEXT attributes are eligible. The canonical field key must appear
+  in the data worksheet. The importer does not create attributes.
+- Built-in attributes cannot be configured here. Their application-managed vocabulary rules still apply
+  when validating imported Sample values.
+- New vocabulary definitions require project ADMIN or OWNER rights. Editors may import data and reuse
+  identical existing definitions.
+- An existing vocabulary must have exactly the same set of terms. Conflicting definitions are rejected;
+  change a vocabulary separately through the project's vocabulary API.
+- Terms are trimmed, case-sensitive and unique. Blank field keys or values are rejected.
+- Omit the second sheet or leave only its headers when no definitions are needed.
+- Experiment workbooks do not support vocabularies. Additional nonempty worksheets are rejected.
+  Sample workbooks likewise reject nonempty worksheets beyond the second sheet.
+
+The complete workbook structure, vocabulary definitions and required permissions are checked before any
+definitions or rows are saved. Afterwards, the existing partial-import behavior applies: invalid data rows
+are skipped and reported, while valid rows and new vocabulary definitions are saved. A response with row
+errors does not roll back valid rows, and definitions can be saved even if every data row is invalid.
+Check the imported data before retrying an upload.
+
+## File support and limits
+
+Both `.xls` and `.xlsx` uploads use this worksheet layout. Downloads use `.xlsx` only. Workbooks must be
+unencrypted; `.xlsm` and `.xlsb` uploads are not supported. Excel files are limited to 20 MiB and each worksheet
+to 100,000 rows and 512 columns. For safe processing, the expanded contents of an XLSX package are limited to
+256 MiB. The deployment's request-size limit may be lower.
+
+CSV/TSV parsing, templates and permissions remain unchanged; they do not import vocabulary definitions.

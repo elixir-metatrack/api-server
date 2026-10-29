@@ -5,7 +5,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Consumes;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
@@ -16,8 +15,12 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/api")
+@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "User profile", description = "Read and update the authenticated caller's own profile")
 @APIResponses({
         @APIResponse(responseCode = "401", description = "Authentication required"),
         @APIResponse(responseCode = "404", description = "Current subject no longer exists in Keycloak"),
@@ -44,15 +47,16 @@ public class UserController {
             + "Returns a post-write live read; roles remain token-derived. Re-read before retrying an uncertain timeout or failed post-write read; writes are not retried automatically.")
     @RequestBody(required = true, description = "Partial profile object; no target ID or protected account fields are accepted",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = UserProfileRequest.class),
                     examples = @ExampleObject(value = "{\"firstName\":\"Ada\",\"country\":\"NO\",\"orcid\":null}")))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Saved live profile", content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @APIResponse(responseCode = "400", description = "Malformed patch, invalid field, or Keycloak realm profile-validation rejection; sanitized feedback"),
             @APIResponse(responseCode = "409", description = "Keycloak edit conflict")
     })
-    public UserResponse updateProfile(JsonNode body) {
+    public UserResponse updateProfile(UserProfileRequest body) {
         var user = userService.requireCurrentUser();
-        return profileService.updateProfile(user, UserProfilePatch.parse(body));
+        return profileService.updateProfile(user, body == null ? UserProfilePatch.parse(null) : body.toPatch());
     }
 
     @GET

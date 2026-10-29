@@ -9,7 +9,7 @@ public final class KeycloakProfileUpdate {
     private final Map<String, Object> fields;
 
     public KeycloakProfileUpdate(Map<String, Object> fields) {
-        if (!java.util.Set.of("firstName", "lastName", "attributes").containsAll(fields.keySet())) {
+        if (!java.util.Set.of("username", "email", "firstName", "lastName", "attributes").containsAll(fields.keySet())) {
             throw new IllegalArgumentException("Unsupported profile update field");
         }
         this.fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));

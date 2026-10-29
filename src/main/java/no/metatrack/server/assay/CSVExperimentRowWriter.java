@@ -16,12 +16,13 @@ public class CSVExperimentRowWriter {
     AssayService assayService;
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public void write(Long projectId, UUID assayId, String sampleName, String instrumentModel, String libraryName,
+    public void write(Long projectId, UUID assayId, String sampleName, String studyAccession, String instrumentModel, String libraryName,
             String librarySource, String librarySelection, String libraryStrategy, String libraryLayout,
             Integer insertSize, String sequencingPlatform, String sequencingLaboratory,
-            List<CSVExperimentImportService.PendingFile> pendingFiles) {
-        assayService.updateAssay(projectId, assayId, null, null, instrumentModel, libraryName, librarySource,
-                librarySelection, libraryStrategy, libraryLayout, insertSize);
+            List<CSVExperimentImportService.PendingFile> pendingFiles,
+            String experimentAccession, String runAccession) {
+        assayService.updateAssay(projectId, assayId, null, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout, insertSize, experimentAccession, runAccession);
         Assay assay = assayService.getAssayById(projectId, assayId);
         Sample sample = Sample.findBySampleNameInProject(sampleName, projectId).orElseThrow(NotFoundException::new);
         if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;

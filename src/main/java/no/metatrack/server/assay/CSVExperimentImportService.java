@@ -13,6 +13,9 @@ import no.metatrack.server.file.File;
 import no.metatrack.server.file.PresignUrlService;
 import no.metatrack.server.file.ReadRole;
 import no.metatrack.server.sample.Sample;
+import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
+import no.metatrack.server.spreadsheet.SpreadsheetTable;
+import no.metatrack.server.spreadsheet.TableUploadSupport;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.BufferedReader;
@@ -31,6 +34,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class CSVExperimentImportService {
     private static final Map<String, String> VOCABULARY_HEADERS = Map.of(
+            "study_accession", "Study Accession",
             "instrument_model", "Sequencing instrument",
             "library_name", "Library Name",
             "library_source", "Library Source",
@@ -39,6 +43,13 @@ public class CSVExperimentImportService {
             "library_layout", "Library Layout",
             "sequencing_platform", "Sequencing platform",
             "sequencing_laboratory", "Sequencing Laboratory");
+    private static final Set<String> IMPORT_HEADERS = Set.of(
+            "experiment accession", "experiment_accession", "run accession", "run_accession",
+            "sample", "study accession", "file md5", "file name", "file unencrypted md5",
+            "forward file md5", "forward file name", "forward file unencrypted md5",
+            "insert size", "reverse file md5", "reverse file name", "reverse file unencrypted md5",
+            "sequencing platform", "sequencing instrument", "library name", "library layout",
+            "library selection", "library source", "library strategy", "sequencing laboratory");
 
     @Inject
     CSVImportSupport csvImportSupport;
@@ -49,40 +60,74 @@ public class CSVExperimentImportService {
     @Inject
     CSVExperimentRowWriter rowWriter;
 
+    @Inject
+    SpreadsheetImportSupport spreadsheetSupport;
+
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
         Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
         if (file == null || !file.isFile()) {
-            throw new BadRequestException("CSV file is missing");
+            throw new BadRequestException("Import file is missing");
         }
 
+        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file)
+                ? spreadsheetSupport.read(file, false)
+                : null;
+        if (spreadsheet != null) validateSpreadsheet(spreadsheet);
+        List<CSVRecord> records = spreadsheet == null ? readCsvRecords(file) : spreadsheet.records();
         List<CSVExperimentRowError> errors = new ArrayList<>();
         Set<String> importedReferences = new HashSet<>();
         AssayVocabularyRules rules = vocabularyService.loadRules();
-        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-            skipBom(reader);
-            for (CSVRecord record : csvImportSupport.prepareRecords(reader, csvImportSupport.detectDelimiter(file))) {
-                importRecord(projectId, assay, record, errors, importedReferences, rules);
-            }
-        } catch (IOException e) {
-            throw new BadRequestException("Unable to read CSV file", e);
+
+        for (CSVRecord record : records) {
+            String row = spreadsheet == null
+                    ? "Row " + record.getRecordNumber()
+                    : spreadsheet.location(record);
+            importRecord(projectId, assay, record, errors, importedReferences, rules, row);
         }
         return errors;
     }
 
+    private List<CSVRecord> readCsvRecords(java.io.File file) {
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            skipBom(reader);
+            return csvImportSupport.prepareRecords(reader, csvImportSupport.detectDelimiter(file));
+        } catch (IOException e) {
+            throw new BadRequestException("Unable to read CSV file", e);
+        }
+    }
+
+    void validateSpreadsheet(SpreadsheetTable table) {
+        if (table.headers().stream()
+                .map(csvImportSupport::normalizeHeader)
+                .noneMatch("sample"::equals)) {
+            throw new BadRequestException("Experiments worksheet must contain a Sample column");
+        }
+        if (table.records().isEmpty()) {
+            throw new BadRequestException("Experiments worksheet contains no data rows");
+        }
+
+        List<String> unknownHeaders = table.headers().stream()
+                .filter(header -> !IMPORT_HEADERS.contains(csvImportSupport.normalizeHeader(header)))
+                .toList();
+        if (!unknownHeaders.isEmpty()) {
+            throw new BadRequestException("Experiments worksheet contains unknown columns: "
+                    + String.join(", ", unknownHeaders));
+        }
+    }
+
     private void importRecord(Long projectId, Assay assay, CSVRecord record, List<CSVExperimentRowError> errors,
-            Set<String> importedReferences, AssayVocabularyRules rules) {
+            Set<String> importedReferences, AssayVocabularyRules rules, String row) {
         String sampleName = value(record, "Sample");
-        String row = "Row " + record.getRecordNumber();
         if (sampleName == null || sampleName.isBlank()) {
             errors.add(new CSVExperimentRowError(row, "Sample", sampleName, "Sample column is missing or empty"));
             return;
         }
 
         Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName.trim(), projectId);
-        if (sample.isEmpty() || assay.samples.stream().noneMatch(member -> member.id.equals(sample.get().id))) {
+        if (sample.isEmpty()) {
             errors.add(new CSVExperimentRowError(row, "Sample", sampleName,
-                    "Sample does not exist in the project or is not associated with the assay"));
+                    "Sample does not exist in the project"));
             return;
         }
 
@@ -96,7 +141,11 @@ public class CSVExperimentImportService {
         }
 
         Integer insertSize = parseInteger(record, "Insert Size", row, errors);
-        if (hasMetadataConflict(assay, metadata, insertSize, row, errors)) return;
+        boolean accessionConflict = hasAccessionConflict(assay.experimentAccession,
+                value(record, "Experiment Accession"), "Experiment Accession", row, errors);
+        accessionConflict |= hasAccessionConflict(assay.runAccession,
+                value(record, "Run Accession"), "Run Accession", row, errors);
+        if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return;
         int rowErrorCount = errors.size();
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
@@ -114,10 +163,12 @@ public class CSVExperimentImportService {
 
         try {
             rowWriter.write(projectId, assay.id, sampleName.trim(),
+                    patchValue(record, "Study Accession"),
                     patchValue(record, "Sequencing instrument"), patchValue(record, "Library Name"),
                     patchValue(record, "Library Source"), patchValue(record, "Library Selection"),
                     patchValue(record, "Library Strategy"), patchValue(record, "Library Layout"), insertSize,
-                    patchValue(record, "Sequencing platform"), patchValue(record, "Sequencing Laboratory"), pendingFiles);
+                    patchValue(record, "Sequencing platform"), patchValue(record, "Sequencing Laboratory"), pendingFiles,
+                    patchValue(record, "Experiment Accession"), patchValue(record, "Run Accession"));
         } catch (AssayVocabularyValidationException e) {
             e.violations().forEach(violation -> errors.add(new CSVExperimentRowError(row,
                     VOCABULARY_HEADERS.getOrDefault(violation.field(), violation.field()),
@@ -177,6 +228,7 @@ public class CSVExperimentImportService {
     private boolean hasMetadataConflict(Assay assay, Map<String, String> metadata, Integer insertSize,
             String row, List<CSVExperimentRowError> errors) {
         Map<String, String> existingValues = Map.of(
+                "study_accession", assay.studyAccession == null ? "" : assay.studyAccession,
                 "instrument_model", assay.instrumentModel == null ? "" : assay.instrumentModel,
                 "library_name", assay.libraryName == null ? "" : assay.libraryName,
                 "library_source", assay.librarySource == null ? "" : assay.librarySource,
@@ -203,6 +255,15 @@ public class CSVExperimentImportService {
         return hasConflict;
     }
 
+    private boolean hasAccessionConflict(String existing, String incoming, String field,
+            String row, List<CSVExperimentRowError> errors) {
+        if (incoming == null || incoming.isBlank() || existing == null || existing.isBlank()
+                || existing.equals(incoming)) return false;
+        errors.add(new CSVExperimentRowError(row, field, incoming,
+                "Cannot replace existing value '" + existing + "' with '" + incoming + "'"));
+        return true;
+    }
+
     private boolean hasError(List<CSVExperimentRowError> errors, String row, String field) {
         return errors.stream().anyMatch(error -> error.row().equals(row) && error.field().equals(field));
     }
@@ -211,7 +272,11 @@ public class CSVExperimentImportService {
     }
 
     private String value(CSVRecord record, String header) {
-        String value = csvImportSupport.getMappedValue(record, header);
+        String value = switch (header) {
+            case "Experiment Accession" -> csvImportSupport.getMappedValue(record, header, "experiment_accession");
+            case "Run Accession" -> csvImportSupport.getMappedValue(record, header, "run_accession");
+            default -> csvImportSupport.getMappedValue(record, header);
+        };
         return value == null ? null : value.trim();
     }
 

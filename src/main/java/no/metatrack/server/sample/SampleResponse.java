@@ -1,10 +1,13 @@
 package no.metatrack.server.sample;
 
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
+@Schema(description = "Sample details, including active custom metadata values. Fields with no stored value are null.")
 public record SampleResponse(
         UUID id,
         String name,
@@ -49,6 +52,11 @@ public record SampleResponse(
         String hospitalHealthInstitution,
         Instant createdOn,
         Instant modifiedOn,
+        String projectAccession,
+        String studyAccession,
+        String sampleAccession,
+        String secondaryAccession,
+        @Schema(description = "Active custom metadata values keyed by metadata-field key")
         Map<String, Object> customMetadata) {
     public static SampleResponse fromEntity(Sample sample, Map<String, Object> customMetadata) {
         return new SampleResponse(
@@ -95,6 +103,10 @@ public record SampleResponse(
                 sample.hospitalHealthInstitution,
                 sample.createdOn,
                 sample.modifiedOn,
+                sample.projectAccession,
+                sample.studyAccession,
+                sample.sampleAccession,
+                sample.secondaryAccession,
                 customMetadata);
     }
 }

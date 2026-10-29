@@ -18,11 +18,20 @@ import java.util.Objects;
 public class UserProfileService {
     private final KeycloakAdminClient client;
     private final String realm;
+    private final String countryAttribute;
+    private final String institutionAttribute;
+    private final String orcidAttribute;
 
     public UserProfileService(@RestClient KeycloakAdminClient client,
-                              @ConfigProperty(name = "keycloak.realm") String realm) {
+                              @ConfigProperty(name = "keycloak.realm") String realm,
+                              @ConfigProperty(name = "keycloak.profile.attributes.country", defaultValue = "country") String countryAttribute,
+                              @ConfigProperty(name = "keycloak.profile.attributes.institution", defaultValue = "institution") String institutionAttribute,
+                              @ConfigProperty(name = "keycloak.profile.attributes.orcid", defaultValue = "orcid") String orcidAttribute) {
         this.client = client;
         this.realm = realm;
+        this.countryAttribute = countryAttribute;
+        this.institutionAttribute = institutionAttribute;
+        this.orcidAttribute = orcidAttribute;
     }
 
     public UserResponse getProfile(CurrentUser user) {
@@ -45,14 +54,19 @@ public class UserProfileService {
                     changes.put(field, value == null ? "" : value);
                 }
             } else {
+                String attribute = attributeKey(field);
                 List<String> replacement = value == null ? List.of() : List.of(value);
-                if (!Objects.equals(attributes.get(field), replacement)) {
-                    attributes.put(field, replacement);
+                if (!Objects.equals(attributes.get(attribute), replacement)) {
+                    attributes.put(attribute, replacement);
                     attributesChanged = true;
                 }
             }
         }
         if (attributesChanged) {
+            changes.putIfAbsent("username", current.username());
+            changes.putIfAbsent("email", current.email());
+            changes.putIfAbsent("firstName", current.firstName());
+            changes.putIfAbsent("lastName", current.lastName());
             changes.put("attributes", attributes);
         }
         if (changes.isEmpty()) {
@@ -64,7 +78,7 @@ public class UserProfileService {
                 case 400 -> throw UserProfilePatch.invalid("profile", "Keycloak rejected the profile; check supplied fields and realm policy");
                 case 404 -> throw new WebApplicationException("Current user not found", 404);
                 case 409 -> throw new WebApplicationException("Profile update conflict", 409);
-                default -> throw new KeycloakIdentityException("Keycloak profile update failed");
+                default -> throw upstreamHttpFailure("update", result.getStatus(), null);
             }
         } catch (KeycloakIdentityException exception) {
             throw exception;
@@ -76,7 +90,7 @@ public class UserProfileService {
             if (status == 404 || status == 409) {
                 throw new WebApplicationException(status == 404 ? "Current user not found" : "Profile update conflict", status);
             }
-            throw new KeycloakIdentityException("Keycloak profile update failed", exception);
+            throw upstreamHttpFailure("update", status, exception);
         } catch (RuntimeException exception) {
             throw new KeycloakIdentityException("Keycloak profile update outcome uncertain", exception);
         }
@@ -92,7 +106,7 @@ public class UserProfileService {
                 throw new WebApplicationException("Current user not found", 404);
             }
             if (result.getStatus() != 200) {
-                throw new KeycloakIdentityException("Keycloak profile read failed");
+                throw upstreamHttpFailure("read", result.getStatus(), null);
             }
             var profile = result.getEntity();
             if (profile == null || !user.id().equals(profile.id()) || profile.username() == null) {
@@ -105,19 +119,35 @@ public class UserProfileService {
             if (exception.getResponse().getStatus() == 404) {
                 throw new WebApplicationException("Current user not found", 404);
             }
-            throw new KeycloakIdentityException("Keycloak profile read failed", exception);
+            throw upstreamHttpFailure("read", exception.getResponse().getStatus(), exception);
         } catch (RuntimeException exception) {
             throw new KeycloakIdentityException("Keycloak profile read failed", exception);
         }
     }
 
     private UserResponse response(CurrentUser user, KeycloakProfileRepresentation profile) {
-        return new UserResponse(user.id(), profile.username(), user.roles(), attribute(profile, "country"),
-                attribute(profile, "institution"), attribute(profile, "orcid"), profile.firstName(), profile.lastName());
+        return new UserResponse(user.id(), profile.username(), user.roles(), attribute(profile, countryAttribute),
+                attribute(profile, institutionAttribute), attribute(profile, orcidAttribute), profile.firstName(), profile.lastName());
+    }
+
+    private KeycloakIdentityException upstreamHttpFailure(String operation, int status, Throwable cause) {
+        String message = "Keycloak profile " + operation + " failed (category=upstream_http, status=" + status + ")";
+        return cause == null
+                ? new KeycloakIdentityException(message)
+                : new KeycloakIdentityException(message, cause);
     }
 
     private String attribute(KeycloakProfileRepresentation profile, String field) {
         var values = profile.attributes() == null ? null : profile.attributes().get(field);
         return values == null || values.isEmpty() ? null : values.getFirst();
+    }
+
+    private String attributeKey(String field) {
+        return switch (field) {
+            case "country" -> countryAttribute;
+            case "institution" -> institutionAttribute;
+            case "orcid" -> orcidAttribute;
+            default -> throw new IllegalArgumentException("Unsupported profile attribute");
+        };
     }
 }

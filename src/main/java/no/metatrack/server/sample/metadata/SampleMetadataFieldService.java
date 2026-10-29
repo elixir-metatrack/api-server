@@ -26,7 +26,8 @@ public class SampleMetadataFieldService {
             "influenza_test_result", "other_pathogens_tested", "other_pathogens_test_result", "host_habitat",
             "isolation_source_host_associated", "host_behaviour", "isolation_source_non_host_associated",
             "influenza_virus_type", "influenza_sub_type", "serovar", "strain", "host_age", "county",
-            "commune", "hospital_health_institution", "created_on", "modified_on", "custom_metadata");
+            "commune", "hospital_health_institution", "created_on", "modified_on", "custom_metadata",
+            "project_accession", "study_accession", "sample_accession", "secondary_accession");
 
     public List<SampleMetadataField> list(Long projectId, boolean includeArchived) {
         Project project = requireProject(projectId);
@@ -87,7 +88,7 @@ public class SampleMetadataFieldService {
                 .orElseThrow(NotFoundException::new);
     }
 
-    static String validateKey(String rawKey) {
+    public static String validateKey(String rawKey) {
         if (rawKey == null) throw new BadRequestException("Metadata field key is required");
         String key = rawKey.trim().toLowerCase(Locale.ROOT);
         if (!KEY_PATTERN.matcher(key).matches()) {

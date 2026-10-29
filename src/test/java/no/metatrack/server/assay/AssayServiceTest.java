@@ -20,6 +20,73 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AssayServiceTest {
+    @Test
+    void createPreservesNullableBlankAndUnvalidatedAccessions() {
+        var service = serviceWithRules(Map.of());
+        Project project = new Project();
+        try (MockedStatic<PanacheEntityBase> projects = mockStatic(PanacheEntityBase.class)) {
+            projects.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            for (String accession : new String[]{null, "", " \t ", " arbitrary accession "}) {
+                Assay assay = service.createAssay(1L, "new", "study", null, null, null,
+                        null, null, null, null, accession, accession);
+                assertEquals(accession, assay.experimentAccession);
+                assertEquals(accession, assay.runAccession);
+                assertEquals("study", assay.studyAccession);
+                assertTrue(project.assays.contains(assay));
+            }
+        }
+        verify(service.vocabularyService, times(4)).validate(eq("new"), argThat(values ->
+                !values.containsKey("experiment_accession") && !values.containsKey("run_accession")));
+    }
+
+    @Test
+    void patchAccessionsPreservesNullsAndStoresBlankAndUnvalidatedStrings() {
+        var service = serviceWithRules(Map.of());
+        Assay assay = new Assay();
+        assay.name = "existing";
+        assay.studyAccession = "study";
+        assay.experimentAccession = "experiment";
+        assay.runAccession = "run";
+        UUID id = UUID.randomUUID();
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                    null, null);
+            assertEquals("experiment", assay.experimentAccession);
+            assertEquals("run", assay.runAccession);
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                    " arbitrary experiment ", " arbitrary run ");
+            assertEquals(" arbitrary experiment ", assay.experimentAccession);
+            assertEquals(" arbitrary run ", assay.runAccession);
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                    "", " \t ");
+            assertEquals("", assay.experimentAccession);
+            assertEquals(" \t ", assay.runAccession);
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null);
+            assertEquals("", assay.experimentAccession);
+            assertEquals(" \t ", assay.runAccession);
+            assertEquals("study", assay.studyAccession);
+        }
+        verify(service.vocabularyService, times(4)).validate(eq("existing"), argThat(values ->
+                !values.containsKey("experiment_accession") && !values.containsKey("run_accession")));
+    }
+
+    @Test
+    void responsePreservesStudyAndNullableOrVerbatimAccessions() {
+        Assay assay = new Assay();
+        assay.studyAccession = "study";
+        AssayResponse emptyResponse = AssayResponse.fromEntity(assay);
+        assertEquals("study", emptyResponse.studyAccession());
+        assertNull(emptyResponse.experimentAccession());
+        assertNull(emptyResponse.runAccession());
+        assay.experimentAccession = " experiment ";
+        assay.runAccession = " \t ";
+        AssayResponse response = AssayResponse.fromEntity(assay);
+        assertEquals("study", response.studyAccession());
+        assertEquals(" experiment ", response.experimentAccession());
+        assertEquals(" \t ", response.runAccession());
+    }
+
     private AssayService serviceWithRules(Map<String, Set<String>> terms) {
         AssayService service = new AssayService();
         service.vocabularyService = mock(AssayVocabularyService.class);
@@ -118,6 +185,8 @@ class AssayServiceTest {
         assay.name = "old";
         assay.libraryLayout = "legacy";
         assay.insertSize = 100;
+        assay.experimentAccession = "old experiment";
+        assay.runAccession = "old run";
         assay.modifiedOn = Instant.EPOCH;
         UUID id = UUID.randomUUID();
         var service = serviceWithRules(Map.of("library_layout", Set.of("PAIRED")));
@@ -125,7 +194,7 @@ class AssayServiceTest {
             assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
             assertThrows(AssayVocabularyValidationException.class, () ->
                     service.updateAssay(1L, id, "new", "study", "instrument", "library", "source",
-                            "selection", "strategy", "invalid", 200));
+                            "selection", "strategy", "invalid", 200, "new experiment", "new run"));
             assertEquals("old", assay.name);
             assertNull(assay.studyAccession);
             assertNull(assay.instrumentModel);
@@ -135,6 +204,8 @@ class AssayServiceTest {
             assertNull(assay.libraryStrategy);
             assertEquals("legacy", assay.libraryLayout);
             assertEquals(100, assay.insertSize);
+            assertEquals("old experiment", assay.experimentAccession);
+            assertEquals("old run", assay.runAccession);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
         }
     }

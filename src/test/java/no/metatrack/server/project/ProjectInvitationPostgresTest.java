@@ -52,7 +52,7 @@ class ProjectInvitationPostgresTest {
     void setup() {
         owner = UUID.randomUUID();
         recipient = UUID.randomUUID();
-        projectId = projects.createProject(UUID.randomUUID().toString(), "Test", owner.toString()).id;
+        projectId = projects.createProject(new CreateProjectRequest(UUID.randomUUID().toString(), "Test", "Test organization", null, null), owner.toString()).id;
     }
 
     @AfterAll
@@ -163,7 +163,7 @@ class ProjectInvitationPostgresTest {
         }));
         assertNull(memberRole());
         assertEquals(InvitationStatus.PENDING, invitations.list(projectId, owner, 0, 20).getFirst().status());
-        Long other = projects.createProject(UUID.randomUUID().toString(), "Other", owner.toString()).id;
+        Long other = projects.createProject(new CreateProjectRequest(UUID.randomUUID().toString(), "Other", "Test organization", null, null), owner.toString()).id;
         assertStatus(404, () -> invitations.revoke(other, invitation.id(), owner));
         accept(invitation.id());
         projects.deleteProject(projectId);

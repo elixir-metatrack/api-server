@@ -28,6 +28,16 @@
       "groupName": "maven plugins"
     },
     {
+      "description": "Disable patch updates for Docker images",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Auto-merge patch updates",
       "matchManagers": [
         "maven"
