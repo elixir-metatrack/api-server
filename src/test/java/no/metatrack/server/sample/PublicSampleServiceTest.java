@@ -41,8 +41,8 @@ class PublicSampleServiceTest {
     @Test
     void returnsOnlyPublicFieldsAndResolvesEachTaxIdOncePerPage() {
         setRows(3, List.of(
-                new Object[] {uuid(1), 42, "Owning Organization", 9606, LocalDate.of(2024, 12, 31), "Blood"},
-                new Object[] {uuid(2), 42, "Another Organization", 42, LocalDate.of(2025, 1, 1), "Soil"},
+                new Object[] {uuid(1), 42, "Owning Organization", 9606, LocalDate.of(2024, 12, 31), "Blood", "SAMPLE-001"},
+                new Object[] {uuid(2), 42, "Another Organization", 42, LocalDate.of(2025, 1, 1), "Soil", "SAMPLE-002"},
                 row(3, null, null)));
         when(taxonomyService.getTaxon("42")).thenReturn(new TaxonResponse("Bacillus subtilis", "42"));
         when(taxonomyService.getTaxon("9606")).thenReturn(new TaxonResponse("Homo sapiens", "9606"));
@@ -55,15 +55,15 @@ class PublicSampleServiceTest {
         assertEquals(1, result.totalPages());
         assertEquals(List.of(
                 new PublicSampleResponse(uuid(1), 42, "Bacillus subtilis", "Owning Organization",
-                        9606, "Homo sapiens", 2024, "Blood"),
+                        9606, "Homo sapiens", 2024, "Blood", "SAMPLE-001"),
                 new PublicSampleResponse(uuid(2), 42, "Bacillus subtilis", "Another Organization",
-                        42, "Bacillus subtilis", 2025, "Soil"),
-                new PublicSampleResponse(uuid(3), null, null, null, null, null, null, null)), result.items());
+                        42, "Bacillus subtilis", 2025, "Soil", "SAMPLE-002"),
+                new PublicSampleResponse(uuid(3), null, null, null, null, null, null, null, null)), result.items());
         verify(taxonomyService, times(1)).getTaxon("42");
         verify(taxonomyService, times(1)).getTaxon("9606");
         verifyNoMoreInteractions(taxonomyService);
         verify(entityManager).createQuery(
-                "select s.id, s.taxId, p.dataOwningOrganization, s.hostTaxId, s.collectionDate, s.isolationSource "
+                "select s.id, s.taxId, p.dataOwningOrganization, s.hostTaxId, s.collectionDate, s.isolationSource, s.sampleAccession "
                         + "from Sample s left join s.project p order by s.id", Object[].class);
         verify(pageQuery).setFirstResult(0);
         verify(pageQuery).setMaxResults(100);
@@ -74,7 +74,7 @@ class PublicSampleServiceTest {
         setRows(1, List.<Object[]>of(row(1, 404, "Org")));
         when(taxonomyService.getTaxon("404")).thenReturn(null);
 
-        assertEquals(new PublicSampleResponse(uuid(1), 404, null, "Org", null, null, null, null),
+        assertEquals(new PublicSampleResponse(uuid(1), 404, null, "Org", null, null, null, null, null),
                 service.getPage(0).items().getFirst());
     }
 
@@ -92,8 +92,8 @@ class PublicSampleServiceTest {
     @Test
     void cachesUnknownHostTaxaIncludingWhenUsedAsSampleTaxa() {
         setRows(3, List.of(
-                new Object[] {uuid(1), null, "Org", 404, null, null},
-                new Object[] {uuid(2), null, "Org", 404, null, null},
+                new Object[] {uuid(1), null, "Org", 404, null, null, null},
+                new Object[] {uuid(2), null, "Org", 404, null, null, null},
                 row(3, 404, "Org")));
         when(taxonomyService.getTaxon("404")).thenReturn(null);
 
@@ -113,8 +113,8 @@ class PublicSampleServiceTest {
                 new ProcessingException("Connection failed"), new WebApplicationException("Taxonomy unavailable"))) {
             reset(taxonomyService);
             setRows(2, List.of(
-                    new Object[] {uuid(1), 42, "Org", 9606, LocalDate.of(2024, 2, 29), "Blood"},
-                    new Object[] {uuid(2), 42, "Org", 9606, null, null}));
+                    new Object[] {uuid(1), 42, "Org", 9606, LocalDate.of(2024, 2, 29), "Blood", null},
+                    new Object[] {uuid(2), 42, "Org", 9606, null, null, null}));
             when(taxonomyService.getTaxon("42")).thenReturn(new TaxonResponse("Bacillus subtilis", "42"));
             when(taxonomyService.getTaxon("9606")).thenThrow(failure);
 
@@ -122,7 +122,7 @@ class PublicSampleServiceTest {
 
             assertEquals(2, result.items().size());
             assertEquals(new PublicSampleResponse(uuid(1), 42, "Bacillus subtilis", "Org",
-                    9606, null, 2024, "Blood"), result.items().getFirst());
+                    9606, null, 2024, "Blood", null), result.items().getFirst());
             assertNull(result.items().getLast().hostScientificName());
             verify(taxonomyService, times(1)).getTaxon("9606");
             verify(taxonomyService, times(1)).getTaxon("42");
@@ -229,7 +229,7 @@ class PublicSampleServiceTest {
     }
 
     private static Object[] row(int id, Integer taxId, String organization) {
-        return new Object[] {uuid(id), taxId, organization, null, null, null};
+        return new Object[] {uuid(id), taxId, organization, null, null, null, null};
     }
 
     private static UUID uuid(int leastSignificantBits) {

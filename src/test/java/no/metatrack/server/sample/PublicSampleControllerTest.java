@@ -19,19 +19,20 @@ class PublicSampleControllerTest {
     @Test
     void serializesOnlyPublicMetadataWithYearRatherThanFullCollectionDate() throws Exception {
         PublicSampleResponse sample = new PublicSampleResponse(new UUID(0, 1), 42, "Bacillus subtilis", "Org",
-                9606, "Homo sapiens", 2024, "Blood");
+                9606, "Homo sapiens", 2024, "Blood", "SAMPLE-001");
 
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(sample));
 
         Set<String> fields = new HashSet<>();
         json.fieldNames().forEachRemaining(fields::add);
         assertEquals(Set.of("id", "taxId", "scientificName", "dataOwningOrganization", "hostTaxId",
-                "hostScientificName", "collectionYear", "isolationSource"), fields);
+                "hostScientificName", "collectionYear", "isolationSource", "sampleAccession"), fields);
         assertEquals(9606, json.get("hostTaxId").intValue());
         assertEquals("Homo sapiens", json.get("hostScientificName").textValue());
         assertTrue(json.get("collectionYear").isInt());
         assertEquals(2024, json.get("collectionYear").intValue());
         assertEquals("Blood", json.get("isolationSource").textValue());
+        assertEquals("SAMPLE-001", json.get("sampleAccession").textValue());
         assertFalse(json.has("collectionDate"));
     }
 
