@@ -117,6 +117,9 @@ keycloak:
       login-url: https://spa.example.test/login
       registration-url: https://spa.example.test/register
   quarkus:
+    security:
+      events:
+        enabled: true
     mailer:
       mock: true
       from: invitations@example.invalid
