@@ -30,4 +30,21 @@ class ProjectMembersAccessTest {
         when(controller.projectMemberService.listAllProjectMembers(1L)).thenReturn(List.of(member));
         assertEquals(List.of(member), controller.getAllProjectMembers(1L));
     }
+
+    @Test
+    void addingMemberDoesNotWriteMembershipDirectly() {
+        ProjectController controller = new ProjectController();
+        controller.projectRoleCheck = mock(ProjectRoleCheck.class);
+        controller.projectService = mock(ProjectService.class);
+        controller.invitationCoordinator = mock(no.metatrack.server.invitation.InvitationCoordinator.class);
+        when(controller.projectRoleCheck.isAtLeast(1L, ProjectRole.ADMIN)).thenReturn(true);
+        UUID recipient = UUID.randomUUID();
+
+        try (var response = controller.addMember(1L, recipient, new AddMemberRequest(ProjectRole.EDITOR))) {
+            assertEquals(204, response.getStatus());
+        }
+
+        verify(controller.invitationCoordinator).create(1L, recipient, ProjectRole.EDITOR);
+        verify(controller.projectService, never()).addMember(anyLong(), any(), any());
+    }
 }
