@@ -90,7 +90,7 @@ class SpreadsheetExportWriterTest {
             var file = files.get(index);
             String prefix = file.readRole() == ReadRole.FORWARD ? "Forward " : file.readRole() == ReadRole.REVERSE ? "Reverse " : "";
             var record = table.records().get(index);
-            assertEquals("00012", record.get("Sample"));
+            assertEquals("00012", record.get("Sample Name"));
             assertEquals(file.name(), record.get(prefix + "File Name"));
             assertEquals("md5", record.get(prefix + "File md5"));
             assertEquals("plain-md5", record.get(prefix + "File Unencrypted md5"));
@@ -100,7 +100,7 @@ class SpreadsheetExportWriterTest {
             assertEquals("ILLUMINA", record.get("Sequencing platform"));
             assertEquals("1234", record.get("Insert Size"));
         }
-        assertEquals("empty", table.records().getLast().get("Sample"));
+        assertEquals("empty", table.records().getLast().get("Sample Name"));
         assertEquals("", table.records().getLast().get("File Name"));
         assertTrue(table.vocabularies().isEmpty());
         assertFalse(table.headers().contains("objectKey"));

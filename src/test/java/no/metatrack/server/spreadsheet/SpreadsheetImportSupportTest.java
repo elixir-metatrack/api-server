@@ -100,7 +100,7 @@ class SpreadsheetImportSupportTest {
         }
         var filled = reader.read(file.toFile(), !experiment);
         assertEquals(1, filled.records().size());
-        assertEquals("real-sample", filled.records().getFirst().get(experiment ? "Sample" : "Sample Name"));
+        assertEquals("real-sample", filled.records().getFirst().get("Sample Name"));
     }
 
     @ParameterizedTest
@@ -130,7 +130,7 @@ class SpreadsheetImportSupportTest {
     void importsStoredExperimentInsertSize(String format) throws Exception {
         try (Workbook workbook = workbook(format)) {
             Sheet sheet = workbook.createSheet("Experiments");
-            row(sheet, 0, "Sample", "Insert Size");
+            row(sheet, 0, "Sample Name", "Insert Size");
             number(workbook, row(sheet, 1, "sample-1"), 1, 1234, "#,##0.00");
             var record = reader.read(write(workbook, format).toFile(), false).records().getFirst();
             assertEquals("1234", record.get("Insert Size"));
@@ -228,7 +228,7 @@ class SpreadsheetImportSupportTest {
     @ValueSource(strings = {"xls", "xlsx"})
     void experimentsRejectVocabularySheet(String format) throws Exception {
         try (Workbook workbook = workbook(format)) {
-            row(workbook.createSheet("Experiments"), 0, "Sample");
+            row(workbook.createSheet("Experiments"), 0, "Sample Name");
             row(workbook.createSheet("Vocabularies"), 0, "field_key", "value");
             assertThrows(BadRequestException.class, () -> reader.read(write(workbook, format).toFile(), false));
         }

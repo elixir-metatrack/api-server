@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CSVExperimentImportServiceTest {
-    private static final String HEADER = "Sample,Sequencing instrument,Library Name,Library Source,Library Selection,"
+    private static final String HEADER = "Sample Name,Sequencing instrument,Library Name,Library Source,Library Selection,"
             + "Library Strategy,Library Layout,Sequencing platform,Sequencing Laboratory,Insert Size,"
             + "File Name,File md5,Forward File Name,Forward File md5,Reverse File Name,Reverse File md5\n";
 
@@ -119,6 +119,31 @@ class CSVExperimentImportServiceTest {
             assertEquals(source.sequencingLaboratory, assay.sequencingLaboratory);
             assertEquals(source.insertSize, assay.insertSize);
         }
+    }
+
+    @Test
+    void importsUpdatedSemicolonDelimitedExperimentTemplate() throws Exception {
+        Path path = Files.writeString(directory.resolve("experiment-template.csv"),
+                "Sample Name;Sequencing platform;Sequencing instrument;Library Name;Library Layout;"
+                        + "Library Selection;Library Source;Library Strategy;Sequencing Laboratory;"
+                        + "Forward File Name;Forward File md5;Insert Size;Reverse File Name;Reverse File md5\n"
+                        + "sample;ILLUMINA;instrument;library;PAIRED;selection;source;strategy;lab;;;100;;\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals("ILLUMINA", assay.sequencingPlatform);
+        assertEquals(100, assay.insertSize);
+    }
+
+    @Test
+    void rejectsOldSampleHeader() throws Exception {
+        Path path = Files.writeString(directory.resolve("old-sample-header.csv"), "Sample\nsample\n");
+
+        var errors = importFile(Map.of(), path);
+
+        assertEquals(1, errors.size());
+        assertEquals("Sample Name", errors.getFirst().field());
+        assertEquals("Sample Name column is missing or empty", errors.getFirst().message());
+        assertTrue(assay.samples.isEmpty());
     }
 
     @Test
@@ -270,7 +295,7 @@ class CSVExperimentImportServiceTest {
 
     @Test
     void repeatedRowsAssociateSampleWithoutDuplicatingMembership() throws Exception {
-        Path path = Files.writeString(directory.resolve("repeated-sample.csv"), "Sample\nsample\nsample\n");
+        Path path = Files.writeString(directory.resolve("repeated-sample.csv"), "Sample Name\nsample\nsample\n");
 
         assertTrue(importFile(Map.of(), path).isEmpty());
 
@@ -281,7 +306,7 @@ class CSVExperimentImportServiceTest {
 
     @Test
     void rowsWithoutFilesDoNotFlushBeforeTransactionCompletion() throws Exception {
-        Path path = Files.writeString(directory.resolve("no-files.csv"), "Sample\nsample\n");
+        Path path = Files.writeString(directory.resolve("no-files.csv"), "Sample Name\nsample\n");
 
         assertTrue(importFile(Map.of(), path).isEmpty());
 
@@ -292,7 +317,7 @@ class CSVExperimentImportServiceTest {
     void existingAssayMembershipRemainsValidDuringImport() throws Exception {
         assay.addSample(sample);
         clearInvocations(assay);
-        Path path = Files.writeString(directory.resolve("existing-membership.csv"), "Sample\nsample\n");
+        Path path = Files.writeString(directory.resolve("existing-membership.csv"), "Sample Name\nsample\n");
 
         assertTrue(importFile(Map.of(), path).isEmpty());
 
@@ -303,12 +328,12 @@ class CSVExperimentImportServiceTest {
 
     @Test
     void missingProjectSampleIsRejectedWithoutAssociatingIt() throws Exception {
-        Path path = Files.writeString(directory.resolve("missing-sample.csv"), "Sample\nsample\n");
+        Path path = Files.writeString(directory.resolve("missing-sample.csv"), "Sample Name\nsample\n");
 
         var errors = importFile(Map.of(), path, Optional.empty());
 
         assertEquals(1, errors.size());
-        assertEquals("Sample", errors.getFirst().field());
+        assertEquals("Sample Name", errors.getFirst().field());
         assertEquals("Sample does not exist in the project", errors.getFirst().message());
         assertTrue(assay.samples.isEmpty());
         assertTrue(sample.assays.isEmpty());
@@ -510,10 +535,12 @@ class CSVExperimentImportServiceTest {
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
                 spreadsheet("File Name\nreads.fastq\n")));
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
-                spreadsheet("Sample,Unexpected\nsample,value\n")));
+                spreadsheet("Sample Name,Unexpected\nsample,value\n")));
+        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
+                spreadsheet("Sample\nsample\n")));
 
         SpreadsheetTable empty = new SpreadsheetTable(
-                "Experiments", List.of("Sample"), List.of(), Map.of(), Map.of());
+                "Experiments", List.of("Sample Name"), List.of(), Map.of(), Map.of());
         BadRequestException error = assertThrows(
                 BadRequestException.class, () -> service.validateSpreadsheet(empty));
         assertTrue(error.getMessage().contains("no data rows"));
@@ -522,7 +549,7 @@ class CSVExperimentImportServiceTest {
     @Test
     void accessionImportsBackfillPreserveBlanksAndRejectConflictsPerRow() throws Exception {
         Path path = Files.writeString(directory.resolve("accessions.csv"),
-                "Sample,experiment_accession,run_accession\n"
+                "Sample Name,experiment_accession,run_accession\n"
                         + "sample,  ERX123  , ERR123 \n"
                         + "sample,,\n"
                         + "sample,ERX999,ERR999\n"
@@ -542,7 +569,7 @@ class CSVExperimentImportServiceTest {
         assay.experimentAccession = "ERX123";
         assay.runAccession = "ERR123";
         assertTrue(importFile(Map.of(), Files.writeString(directory.resolve("old.csv"),
-                "Sample\nsample\n")).isEmpty());
+                "Sample Name\nsample\n")).isEmpty());
         assertEquals("ERX123", assay.experimentAccession);
         assertEquals("ERR123", assay.runAccession);
     }
@@ -566,7 +593,7 @@ class CSVExperimentImportServiceTest {
                         var data = sheet.createRow(header.getRowNum() + 1);
                         for (var cell : header) {
                             String value = switch (cell.getStringCellValue()) {
-                                case "Sample" -> "sample";
+                                case "Sample Name" -> "sample";
                                 case "experiment_accession" -> "000123";
                                 case "run_accession" -> "ERR123";
                                 default -> null;

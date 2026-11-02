@@ -45,7 +45,7 @@ public class CSVExperimentImportService {
             "sequencing_laboratory", "Sequencing Laboratory");
     private static final Set<String> IMPORT_HEADERS = Set.of(
             "experiment accession", "experiment_accession", "run accession", "run_accession",
-            "sample", "study accession", "file md5", "file name", "file unencrypted md5",
+            "sample name", "study accession", "file md5", "file name", "file unencrypted md5",
             "forward file md5", "forward file name", "forward file unencrypted md5",
             "insert size", "reverse file md5", "reverse file name", "reverse file unencrypted md5",
             "sequencing platform", "sequencing instrument", "library name", "library layout",
@@ -100,8 +100,8 @@ public class CSVExperimentImportService {
     void validateSpreadsheet(SpreadsheetTable table) {
         if (table.headers().stream()
                 .map(csvImportSupport::normalizeHeader)
-                .noneMatch("sample"::equals)) {
-            throw new BadRequestException("Experiments worksheet must contain a Sample column");
+                .noneMatch("sample name"::equals)) {
+            throw new BadRequestException("Experiments worksheet must contain a Sample Name column");
         }
         if (table.records().isEmpty()) {
             throw new BadRequestException("Experiments worksheet contains no data rows");
@@ -118,15 +118,16 @@ public class CSVExperimentImportService {
 
     private void importRecord(Long projectId, Assay assay, CSVRecord record, List<CSVExperimentRowError> errors,
             Set<String> importedReferences, AssayVocabularyRules rules, String row) {
-        String sampleName = value(record, "Sample");
+        String sampleName = value(record, "Sample Name");
         if (sampleName == null || sampleName.isBlank()) {
-            errors.add(new CSVExperimentRowError(row, "Sample", sampleName, "Sample column is missing or empty"));
+            errors.add(new CSVExperimentRowError(row, "Sample Name", sampleName,
+                    "Sample Name column is missing or empty"));
             return;
         }
 
         Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName.trim(), projectId);
         if (sample.isEmpty()) {
-            errors.add(new CSVExperimentRowError(row, "Sample", sampleName,
+            errors.add(new CSVExperimentRowError(row, "Sample Name", sampleName,
                     "Sample does not exist in the project"));
             return;
         }
