@@ -4,6 +4,7 @@ import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.auth.CurrentUser;
 import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.VerifiedEmailIdentity;
+import no.metatrack.server.auth.keycloak.KeycloakIdentity;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
 import no.metatrack.server.auth.keycloak.KeycloakIdentityException;
 import no.metatrack.server.auth.keycloak.KeycloakUserRepresentation;
@@ -32,10 +33,11 @@ class ProjectInvitationServiceTest {
 
     @Test
     void authorizationPrecedesLookupAndValidation() {
-        assertStatus(403, () -> service.create(1L, null));
+        assertStatus(403, () -> service.create(1L, (CreateProjectInvitationRequest) null));
+        assertStatus(403, () -> service.create(1L, UUID.randomUUID(), null));
         verifyNoInteractions(identities, transactions);
         when(users.requireCurrentUser()).thenThrow(new WebApplicationException(401));
-        assertStatus(401, () -> service.create(1L, null));
+        assertStatus(401, () -> service.create(1L, (CreateProjectInvitationRequest) null));
     }
 
     @Test
@@ -47,6 +49,9 @@ class ProjectInvitationServiceTest {
                 new CreateProjectInvitationRequest(null, ProjectRole.VIEWER),
                 new CreateProjectInvitationRequest("invalid", ProjectRole.VIEWER)}) {
             assertStatus(400, () -> service.create(1L, request));
+        }
+        for (var role : new ProjectRole[]{null, ProjectRole.OWNER}) {
+            assertStatus(400, () -> service.create(1L, UUID.randomUUID(), role));
         }
         verifyNoInteractions(identities, transactions);
     }
@@ -76,6 +81,37 @@ class ProjectInvitationServiceTest {
         when(identities.findByEmail("a@example.org")).thenThrow(new KeycloakIdentityException("Unavailable"));
         assertThrows(KeycloakIdentityException.class,
                 () -> service.create(1L, new CreateProjectInvitationRequest("a@example.org", ProjectRole.VIEWER)));
+        verifyNoInteractions(transactions);
+    }
+
+    @Test
+    void uuidInvitationNormalizesAccountEmailAndBindsRecipient() {
+        when(roles.isAtLeast(1L, ProjectRole.ADMIN)).thenReturn(true);
+        UUID recipient = UUID.randomUUID();
+        when(identities.identity(recipient)).thenReturn(Optional.of(new KeycloakIdentity("Recipient", " A@Example.org ")));
+
+        service.create(1L, recipient, ProjectRole.EDITOR);
+
+        var order = inOrder(roles, identities, transactions);
+        order.verify(roles).isAtLeast(1L, ProjectRole.ADMIN);
+        order.verify(identities).identity(recipient);
+        order.verify(transactions).create(1L, "a@example.org", recipient, inviter, "Inviter", ProjectRole.EDITOR);
+    }
+
+    @Test
+    void uuidInvitationRejectsMissingIdentityInvalidEmailAndLookupFailureWithoutWriting() {
+        when(roles.isAtLeast(1L, ProjectRole.ADMIN)).thenReturn(true);
+        UUID recipient = UUID.randomUUID();
+        when(identities.identity(recipient)).thenReturn(Optional.empty());
+        assertStatus(404, () -> service.create(1L, recipient, ProjectRole.VIEWER));
+        verifyNoInteractions(transactions);
+
+        when(identities.identity(recipient)).thenReturn(Optional.of(new KeycloakIdentity("Recipient", "invalid")));
+        assertStatus(400, () -> service.create(1L, recipient, ProjectRole.VIEWER));
+        verifyNoInteractions(transactions);
+
+        when(identities.identity(recipient)).thenThrow(new KeycloakIdentityException("Unavailable"));
+        assertThrows(KeycloakIdentityException.class, () -> service.create(1L, recipient, ProjectRole.VIEWER));
         verifyNoInteractions(transactions);
     }
 

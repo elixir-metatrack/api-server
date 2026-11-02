@@ -7,6 +7,7 @@ import no.metatrack.server.auth.keycloak.IdentityLookupService;
 import no.metatrack.server.project.CreateProjectInvitationRequest;
 import no.metatrack.server.project.ProjectInvitationResponse;
 import no.metatrack.server.project.ProjectInvitationService;
+import no.metatrack.server.project.ProjectRole;
 import org.jboss.logging.Logger;
 
 import java.util.UUID;
@@ -31,7 +32,14 @@ public class InvitationCoordinator {
     }
 
     public ProjectInvitationResponse create(Long projectId, CreateProjectInvitationRequest request) {
-        var saved = invitations.create(projectId, request);
+        return deliver(projectId, invitations.create(projectId, request));
+    }
+
+    public ProjectInvitationResponse create(Long projectId, UUID recipientId, ProjectRole role) {
+        return deliver(projectId, invitations.create(projectId, recipientId, role));
+    }
+
+    private ProjectInvitationResponse deliver(Long projectId, ProjectInvitationResponse saved) {
         try {
             var attempt = delivery.claim(projectId, saved.id(), saved.inviterId());
             return send(attempt, attempt.envelope().registered());

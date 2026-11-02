@@ -63,6 +63,29 @@ class InvitationCoordinatorTest {
     }
 
     @Test
+    void uuidCreationUsesTheSamePostCommitDeliveryPath() {
+        UUID recipient = UUID.randomUUID();
+        var registeredEnvelope = new InvitationDeliveryTransactions.Envelope(request.email(), true, "Owner", "Project",
+                request.role(), saved.expiresOn());
+        var registeredAttempt = new InvitationDeliveryTransactions.Attempt(UUID.randomUUID(), registeredEnvelope,
+                saved.withDelivery(DeliveryStatus.SENDING, saved.createdOn(), null, saved.createdOn().plusSeconds(300)));
+        when(invitations.create(1L, recipient, ProjectRole.EDITOR)).thenReturn(saved);
+        when(delivery.claim(1L, saved.id(), saved.inviterId())).thenReturn(registeredAttempt);
+        when(email.render(registeredEnvelope, true)).thenReturn(mail);
+        when(delivery.complete(eq(saved.id()), eq(registeredAttempt.id()), any())).thenAnswer(call ->
+                saved.withDelivery(call.getArgument(2), saved.createdOn(), saved.createdOn(), saved.createdOn().plusSeconds(60)));
+
+        assertEquals(DeliveryStatus.SENT, coordinator.create(1L, recipient, ProjectRole.EDITOR).deliveryStatus());
+
+        var order = inOrder(invitations, delivery, email);
+        order.verify(invitations).create(1L, recipient, ProjectRole.EDITOR);
+        order.verify(delivery).claim(1L, saved.id(), saved.inviterId());
+        order.verify(email).render(registeredEnvelope, true);
+        order.verify(email).send(mail);
+        order.verify(delivery).complete(saved.id(), registeredAttempt.id(), DeliveryStatus.SENT);
+    }
+
+    @Test
     void smtpTimeoutIsUncertainAndPreservesInvitation() {
         doThrow(new RuntimeException("SMTP timeout with private details")).when(email).send(mail);
         var response = coordinator.create(1L, request);

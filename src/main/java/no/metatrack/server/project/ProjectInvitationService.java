@@ -3,6 +3,7 @@ package no.metatrack.server.project;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.auth.EmailAddress;
 import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
@@ -28,18 +29,24 @@ public class ProjectInvitationService {
     public ProjectInvitationResponse create(Long projectId, CreateProjectInvitationRequest request) {
         var inviter = userService.requireCurrentUser();
         requireAdmin(projectId);
-        if (request == null || request.role() == null || request.role() == ProjectRole.OWNER) {
-            throw new BadRequestException("Invitation role must be VIEWER, EDITOR or ADMIN");
-        }
-        String email;
-        try {
-            email = EmailAddress.normalize(request.email());
-        } catch (IllegalArgumentException exception) {
-            throw new BadRequestException("Invalid email");
-        }
+        if (request == null) throw new BadRequestException("Invitation details are required");
+        requireInvitationRole(request.role());
+        String email = normalizeEmail(request.email());
         // Resolve outside the write transaction, only after project authorization and role validation.
         UUID recipient = identities.findByEmail(email).map(user -> UUID.fromString(user.id())).orElse(null);
         return transactions.create(projectId, email, recipient, UUID.fromString(inviter.id()), inviter.name(), request.role());
+    }
+
+    public ProjectInvitationResponse create(Long projectId, UUID recipientId, ProjectRole role) {
+        var inviter = userService.requireCurrentUser();
+        requireAdmin(projectId);
+        requireInvitationRole(role);
+        if (recipientId == null) throw new BadRequestException("Invitation recipient is required");
+
+        // Resolve outside the write transaction, only after project authorization and role validation.
+        String email = identities.identity(recipientId).map(identity -> normalizeEmail(identity.email()))
+                .orElseThrow(NotFoundException::new);
+        return transactions.create(projectId, email, recipientId, UUID.fromString(inviter.id()), inviter.name(), role);
     }
 
     public List<ProjectInvitationResponse> list(Long projectId, int page, int size) {
@@ -68,6 +75,20 @@ public class ProjectInvitationService {
     private void requireAdmin(Long projectId) {
         if (!roleCheck.isAtLeast(projectId, ProjectRole.ADMIN)) {
             throw new ForbiddenException();
+        }
+    }
+
+    private void requireInvitationRole(ProjectRole role) {
+        if (role == null || role == ProjectRole.OWNER) {
+            throw new BadRequestException("Invitation role must be VIEWER, EDITOR or ADMIN");
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        try {
+            return EmailAddress.normalize(email);
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestException("Invalid email");
         }
     }
 }

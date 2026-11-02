@@ -7,6 +7,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import no.metatrack.server.auth.CurrentUser;
 import no.metatrack.server.auth.UserService;
+import no.metatrack.server.invitation.InvitationCoordinator;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.ExampleObject;
@@ -37,6 +38,9 @@ public class ProjectController {
 
     @Inject
     ProjectMemberService projectMemberService;
+
+    @Inject
+    InvitationCoordinator invitationCoordinator;
 
     @GET
     @Produces("application/json")
@@ -127,9 +131,10 @@ public class ProjectController {
     @Authenticated
     @Path("/{projectId}/member/{memberId}")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Add a project member", description = "Requires ADMIN membership; OWNER-level grants are restricted to owners. Returns no response body.")
-    @APIResponse(responseCode = "204", description = "Member added")
+    @Operation(summary = "Invite a project member", description = "Requires ADMIN membership; the user joins only after accepting the invitation. OWNER-level grants are not allowed.")
+    @APIResponse(responseCode = "204", description = "Invitation created; the recipient must accept before joining")
     @APIResponse(responseCode = "403", description = "Insufficient project role")
+    @APIResponse(responseCode = "404", description = "Recipient account not found")
     public Response addMember(
             @PathParam("projectId") Long projectId, @PathParam("memberId") UUID memberId,
             @RequestBody(description = "Role to assign to the member", content = @Content(mediaType = "application/json",
@@ -139,7 +144,7 @@ public class ProjectController {
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.ADMIN))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
 
-        projectService.addMember(projectId, memberId, request.role());
+        invitationCoordinator.create(projectId, memberId, request.role());
         return Response.noContent().build();
     }
 
