@@ -135,15 +135,20 @@ class CSVExperimentImportServiceTest {
     }
 
     @Test
-    void rejectsOldSampleHeader() throws Exception {
-        Path path = Files.writeString(directory.resolve("old-sample-header.csv"), "Sample\nsample\n");
+    void importsLegacySampleHeader() throws Exception {
+        Path path = Files.writeString(directory.resolve("legacy-sample-header.csv"), "Sample\nsample\n");
 
-        var errors = importFile(Map.of(), path);
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals(Set.of(sample), assay.samples);
+    }
 
-        assertEquals(1, errors.size());
-        assertEquals("Sample Name", errors.getFirst().field());
-        assertEquals("Sample Name column is missing or empty", errors.getFirst().message());
-        assertTrue(assay.samples.isEmpty());
+    @Test
+    void prefersCanonicalSampleNameWhenBothSampleHeadersArePresent() throws Exception {
+        Path path = Files.writeString(directory.resolve("both-sample-headers.csv"),
+                "Sample Name,Sample\nsample,not-sample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals(Set.of(sample), assay.samples);
     }
 
     @Test
@@ -536,8 +541,7 @@ class CSVExperimentImportServiceTest {
                 spreadsheet("File Name\nreads.fastq\n")));
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
                 spreadsheet("Sample Name,Unexpected\nsample,value\n")));
-        assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
-                spreadsheet("Sample\nsample\n")));
+        assertDoesNotThrow(() -> service.validateSpreadsheet(spreadsheet("Sample\nsample\n")));
 
         SpreadsheetTable empty = new SpreadsheetTable(
                 "Experiments", List.of("Sample Name"), List.of(), Map.of(), Map.of());

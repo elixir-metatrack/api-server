@@ -1,5 +1,7 @@
 package no.metatrack.server.auth;
 
+import io.quarkus.cache.CacheManager;
+import io.quarkus.cache.CaffeineCache;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -35,6 +37,9 @@ import static org.mockito.Mockito.*;
 class UserSearchCacheTest {
     @Inject
     UserSearchService userSearchService;
+
+    @Inject
+    CacheManager cacheManager;
 
     private KeycloakAdminClient keycloakAdminClient;
 
@@ -87,6 +92,11 @@ class UserSearchCacheTest {
 
         queries.forEach(userSearchService::search);
         assertEquals(3, calls.get());
+        CaffeineCache cache = cacheManager.getCache("keycloak-user-search").orElseThrow().as(CaffeineCache.class);
+        List.copyOf(cache.keySet()).forEach(key -> {
+            var cachedValue = cache.getIfPresent(key);
+            if (cachedValue != null) cachedValue.join();
+        });
         queries.forEach(userSearchService::search);
 
         assertTrue(calls.get() > 3);
