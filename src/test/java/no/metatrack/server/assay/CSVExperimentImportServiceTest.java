@@ -17,6 +17,7 @@ import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
 import no.metatrack.server.spreadsheet.SpreadsheetTemplateService;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
@@ -316,6 +317,66 @@ class CSVExperimentImportServiceTest {
         assertTrue(importFile(Map.of(), path).isEmpty());
 
         verify(service.rowWriter.entityManager, never()).flush();
+    }
+
+    @Test
+    void filenamesImportWithoutMd5ColumnsForEveryReadRoleInCsvAndExcel() throws Exception {
+        List<String> headers = List.of("Sample Name", "File Name", "Forward File Name", "Reverse File Name");
+        List<String> values = List.of("sample", "single.fastq", "forward.fastq", "reverse.fastq");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("files-without-md5.csv"), csv),
+                writeWorkbook("files-without-md5.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "single.fastq", null, null, ReadRole.SINGLE));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "forward.fastq", null, null, ReadRole.FORWARD));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "reverse.fastq", null, null, ReadRole.REVERSE));
+            }
+        }
+    }
+
+    @Test
+    void checksumsWithoutFilenameColumnsAreIgnoredInCsvAndExcel() throws Exception {
+        List<String> headers = List.of("Sample Name", "File md5", "Forward File md5", "Reverse File md5");
+        List<String> values = List.of("sample", "single-md5", "forward-md5", "reverse-md5");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("checksums-without-files.csv"), csv),
+                writeWorkbook("checksums-without-files.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verifyNoInteractions();
+            }
+        }
+    }
+
+    @Test
+    void blankFilenamesAndChecksumsAreOptionalIndependentlyInCsvAndExcel() throws Exception {
+        List<String> headers = List.of(
+                "Sample Name", "File Name", "File md5", "Forward File Name", "Forward File md5",
+                "Reverse File Name", "Reverse File md5");
+        List<String> values = List.of("sample", "single.fastq", " ", " ", "forward-md5", "", "");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("blank-file-fields.csv"), csv),
+                writeWorkbook("blank-file-fields.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verify(() -> File.importPending(1L, assay.id, sample, assay, "single.fastq", null, null,
+                        ReadRole.SINGLE));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, null, "forward-md5", null, ReadRole.FORWARD), never());
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, null, null, null, ReadRole.REVERSE), never());
+            }
+        }
     }
 
     @Test
@@ -627,5 +688,22 @@ class CSVExperimentImportServiceTest {
                 records,
                 Map.of(1L, 2),
                 Map.of());
+    }
+
+    private Path writeWorkbook(String filename, List<String> headers, List<String> values) throws Exception {
+        Path path = directory.resolve(filename);
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Experiments");
+            var header = sheet.createRow(0);
+            var data = sheet.createRow(1);
+            for (int column = 0; column < headers.size(); column++) {
+                header.createCell(column).setCellValue(headers.get(column));
+                data.createCell(column).setCellValue(values.get(column));
+            }
+            try (var output = Files.newOutputStream(path)) {
+                workbook.write(output);
+            }
+        }
+        return path;
     }
 }

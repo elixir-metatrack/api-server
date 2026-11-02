@@ -259,32 +259,28 @@ public class CSVExperimentImportService {
             Set<String> rowReferences,
             List<PendingFile> pendingFiles,
             List<CSVExperimentRowError> errors) {
-        if ((fileName == null || fileName.isBlank()) && (md5 == null || md5.isBlank())) return;
+        if (fileName == null || fileName.isBlank()) return;
+        String normalizedMd5 = md5 == null || md5.isBlank() ? null : md5;
+        String normalizedUnencryptedMd5 = unencryptedMd5 == null || unencryptedMd5.isBlank()
+                ? null
+                : unencryptedMd5;
         boolean valid = true;
-        if (fileName == null || fileName.isBlank()) {
-            errors.add(new CSVExperimentRowError(row, field, fileName, "File name is required"));
-            valid = false;
-        } else {
-            String reference = PresignUrlService.virtualPath(projectId, assay.id, sample.name, fileName);
-            if (importedReferences.contains(reference) || !rowReferences.add(reference)) {
-                errors.add(new CSVExperimentRowError(row, field, fileName, "Duplicate file reference in import"));
-                valid = false;
-            }
-        }
-        if (md5 == null || md5.isBlank()) {
-            errors.add(new CSVExperimentRowError(row, field + " md5", md5, "File md5 is required"));
+        String reference = PresignUrlService.virtualPath(projectId, assay.id, sample.name, fileName);
+        if (importedReferences.contains(reference) || !rowReferences.add(reference)) {
+            errors.add(new CSVExperimentRowError(row, field, fileName, "Duplicate file reference in import"));
             valid = false;
         }
         if (!valid) return;
 
-        File.validateImportPending(projectId, assay.id, sample, assay, fileName, md5, unencryptedMd5, readRole)
+        File.validateImportPending(
+                        projectId, assay.id, sample, assay, fileName, normalizedMd5, normalizedUnencryptedMd5, readRole)
                 .ifPresent(message -> errors.add(new CSVExperimentRowError(row, field, fileName, message)));
         if (errors.stream()
                 .anyMatch(error -> error.row().equals(row) && error.field().equals(field))) {
             valid = false;
         }
         if (valid) {
-            pendingFiles.add(new PendingFile(field, fileName, md5, unencryptedMd5, readRole));
+            pendingFiles.add(new PendingFile(field, fileName, normalizedMd5, normalizedUnencryptedMd5, readRole));
         }
     }
 
