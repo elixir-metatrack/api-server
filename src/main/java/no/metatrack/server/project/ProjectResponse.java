@@ -1,5 +1,6 @@
 package no.metatrack.server.project;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.Instant;
@@ -18,6 +19,9 @@ public record ProjectResponse(
         Long parentProjectId,
         String dataOwningOrganization,
         String detailedDescription,
-        String comments
+        String comments,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Authenticated caller's membership role; only included by GET /api/projects/me")
+        ProjectRole role
 ) {
 }

@@ -60,7 +60,7 @@ public class ProjectController {
     @GET
     @Path("/me")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "List your projects", description = "Returns projects where the authenticated caller is a member.")
+    @Operation(summary = "List your projects", description = "Returns projects where the authenticated caller is a member, including their membership role.")
     public List<ProjectResponse> getProjectsForUser() {
         String currentUserIdString = userService.requireCurrentUser().id();
         UUID currentUserId = UUID.fromString(currentUserIdString);

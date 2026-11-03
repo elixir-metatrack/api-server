@@ -196,22 +196,40 @@ public class ProjectService {
     }
 
     public List<ProjectResponse> getAllUserProjects(UUID currentUserId) {
-        return toResponses(Project.findProjectsByMember(currentUserId));
+        return toResponses(Project.findProjectsByMember(currentUserId), currentUserId);
     }
 
     public ProjectResponse toResponse(Project project) {
         String ownerUsername = ownerUsername(project.owner).orElse(null);
-        return response(project, ownerUsername);
+        return response(project, ownerUsername, null);
     }
 
     List<ProjectResponse> toResponses(List<Project> projects) {
+        return toResponses(projects, null);
+    }
+
+    List<ProjectResponse> toResponses(List<Project> projects, UUID memberId) {
         Map<UUID, Optional<String>> usernames = new LinkedHashMap<>();
         for (Project project : projects) {
             usernames.computeIfAbsent(project.owner, this::ownerUsername);
         }
         return projects.stream()
-                .map(project -> response(project, usernames.get(project.owner).orElse(null)))
+                .map(project -> response(
+                        project,
+                        usernames.get(project.owner).orElse(null),
+                        membershipRole(project, memberId)))
                 .toList();
+    }
+
+    private ProjectRole membershipRole(Project project, UUID memberId) {
+        if (memberId == null) {
+            return null;
+        }
+        return project.projectMembers.stream()
+                .filter(member -> memberId.equals(member.memberId))
+                .map(member -> member.role)
+                .findFirst()
+                .orElse(null);
     }
 
     private Optional<String> ownerUsername(UUID ownerId) {
@@ -223,7 +241,7 @@ public class ProjectService {
         }
     }
 
-    private ProjectResponse response(Project project, String ownerUsername) {
+    private ProjectResponse response(Project project, String ownerUsername, ProjectRole role) {
         // Sub-projects don't own samples directly (Project.samples) - their samples
         // are the curated subset linked in via Project.linkedSamples.
         long sampleCount = project.isSubProject() ? project.linkedSamples.size() : project.samples.size();
@@ -240,7 +258,8 @@ public class ProjectService {
                 project.parentProject != null ? project.parentProject.id : null,
                 project.dataOwningOrganization,
                 project.detailedDescription,
-                visibleComments(project)
+                visibleComments(project),
+                role
         );
     }
 
