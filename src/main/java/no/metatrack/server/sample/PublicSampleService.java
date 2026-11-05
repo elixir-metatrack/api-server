@@ -21,7 +21,7 @@ public class PublicSampleService {
     private static final int PAGE_SIZE = 100;
     private static final String COUNT_QUERY = "select count(s) from Sample s";
     private static final String SAMPLE_PAGE_QUERY = "select s.id, s.taxId, p.dataOwningOrganization, "
-            + "s.hostTaxId, s.collectionDate, s.isolationSource "
+            + "s.hostTaxId, s.collectionDate, s.isolationSource, s.sampleAccession "
             + "from Sample s left join s.project p order by s.id";
 
     @Inject
@@ -79,10 +79,11 @@ public class PublicSampleService {
         Integer hostTaxId = (Integer) row[3];
         LocalDate collectionDate = (LocalDate) row[4];
         String isolationSource = (String) row[5];
+        String sampleAccession = (String) row[6];
 
         return new PublicSampleResponse(id, taxId, resolveScientificName(taxId, scientificNamesByTaxId), organization,
                 hostTaxId, resolveScientificName(hostTaxId, scientificNamesByTaxId),
-                collectionDate == null ? null : collectionDate.getYear(), isolationSource);
+                collectionDate == null ? null : collectionDate.getYear(), isolationSource, sampleAccession);
     }
 
     private String resolveScientificName(Integer taxId, Map<Integer, String> scientificNamesByTaxId) {

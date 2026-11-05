@@ -71,7 +71,7 @@ public class SpreadsheetExportWriter {
             new SampleColumn("secondary_accession", s -> s.secondaryAccession));
 
     private static final List<String> EXPERIMENT_HEADERS = List.of(
-            "Sample", "Study Accession", "Experiment Accession", "Run Accession", "Sequencing instrument", "Library Name", "Library Source",
+            "Sample Name", "Study Accession", "Experiment Accession", "Run Accession", "Sequencing instrument", "Library Name", "Library Source",
             "Library Selection", "Library Strategy", "Library Layout", "Insert Size", "Sequencing platform",
             "Sequencing Laboratory", "File Name", "File md5", "File Unencrypted md5",
             "Forward File Name", "Forward File md5", "Forward File Unencrypted md5",

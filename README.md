@@ -202,8 +202,8 @@ sign-in variant. Neither delivery failure nor resend extends the original invita
 - Enforce unique email addresses in the realm. Ambiguous exact-email search results are rejected, not guessed.
 - Include `email` and boolean `email_verified` claims in API access tokens, and retain the stable UUID `sub` claim.
 - Grant the existing confidential admin client's service account only the realm user-search/read permissions needed
-  for exact email and ID lookup (for example the applicable `query-users`/`view-users` permissions or fine-grained
-  equivalent); do not grant user-creation or realm-administration privileges solely for invitations.
+  for exact email, ID lookup, and directory search (for example the applicable `query-users`/`view-users` permissions
+  or fine-grained equivalent); do not grant user-creation or realm-administration privileges solely for these features.
 - Configure approved SPA redirect URIs and normal authorization-code flow with PKCE and OIDC state validation.
 - Provide trusted SPA `/login` and `/register` entry routes. The registration route initiates Keycloak registration
   through the SPA's OIDC library and returns to the inbox after authentication. Do not use a static Keycloak
@@ -231,6 +231,31 @@ certificate/hostname verification, and disables mock delivery; mailer timeout is
 mock mail, with SPA entry defaults `http://localhost:3000/login` and `http://localhost:3000/register`.
 Do not log raw recipient emails, SMTP credentials, access tokens, or Keycloak response bodies. Apply Flyway migrations
 before serving the new endpoints; project deletion cascades to invitation-linked notifications.
+
+## Realm User Search
+
+Authenticated clients can use `GET /api/users/search?q=ada` to populate user pickers. Search is realm-wide and
+available to any authenticated caller, including discovery of the caller's own account; it does not grant project
+membership or project access. Results expose user IDs, names, display names, and email addresses, so deployments
+should treat the endpoint as directory data and grant the Keycloak service account only the user-query/read permissions
+required for the deployed Keycloak version.
+
+Keycloak's general search may match names, usernames, and email. Matching and ordering remain Keycloak-defined; this
+API does not promise custom fuzzy matching. The trimmed query must contain 2–256 characters; its case and internal
+whitespace are preserved. Blank, too-short, oversized, wildcard (`*`), or quoted queries return `400` without
+contacting Keycloak. The endpoint returns up to 20 upstream-ordered users plus `hasMore`; it does not paginate.
+Unauthenticated calls return `401`, and Keycloak failures return a sanitized `502`. Responses include
+`Cache-Control: no-store` for downstream clients and intermediaries. Search requests are excluded from HTTP access logs
+to avoid recording search terms.
+
+Successful results are cached per API instance; replicas do not share cache entries. Profile edits, new accounts, and
+external Keycloak changes can remain invisible until the cache entry expires, and profile writes do not invalidate
+search results. Directory results are only for selection and display, never proof of eligibility for a later operation.
+
+| Variable | Meaning / default |
+|---|---|
+| `KEYCLOAK_USER_SEARCH_CACHE_TTL` | Local search-result cache lifetime; `5M` |
+| `KEYCLOAK_USER_SEARCH_CACHE_MAX_SIZE` | Maximum cached query entries per API instance; `1000` |
 
 ## Self-Service Profile
 

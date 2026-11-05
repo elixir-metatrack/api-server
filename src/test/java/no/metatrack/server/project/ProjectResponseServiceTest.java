@@ -1,5 +1,6 @@
 package no.metatrack.server.project;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import no.metatrack.server.auth.keycloak.IdentityLookupService;
 import no.metatrack.server.auth.keycloak.KeycloakIdentityException;
 import no.metatrack.server.sample.Sample;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -39,6 +41,48 @@ class ProjectResponseServiceTest {
         assertEquals(2, response.sampleCount());
         assertEquals(project.createdOn, response.createdOn());
         assertEquals(project.modifiedOn, response.modifiedOn());
+        assertNull(response.role());
+    }
+
+    @Test
+    void userProjectResponsesIncludeTheCallersMembershipRole() {
+        IdentityLookupService identities = mock(IdentityLookupService.class);
+        UUID userId = UUID.randomUUID();
+        UUID otherMemberId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        when(identities.username(ownerId)).thenReturn(Optional.empty());
+        List<Project> projects = java.util.Arrays.stream(ProjectRole.values())
+                .map(role -> {
+                    Project project = project(role.ordinal() + 1, ownerId, role.name());
+                    project.projectMembers.add(member(project, userId, role));
+                    project.projectMembers.add(member(project, otherMemberId, role == ProjectRole.OWNER
+                            ? ProjectRole.VIEWER : ProjectRole.OWNER));
+                    return project;
+                })
+                .toList();
+
+        List<ProjectResponse> responses = new ProjectService(identities).toResponses(projects, userId);
+
+        assertEquals(List.of(ProjectRole.values()), responses.stream().map(ProjectResponse::role).toList());
+    }
+
+    @Test
+    void roleIsOmittedFromSerializedResponsesOutsideTheMeEndpoint() throws Exception {
+        IdentityLookupService identities = mock(IdentityLookupService.class);
+        UUID ownerId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        when(identities.username(ownerId)).thenReturn(Optional.empty());
+        Project project = project(1L, ownerId, "Project one");
+        project.projectMembers.add(member(project, memberId, ProjectRole.EDITOR));
+        ProjectService service = new ProjectService(identities);
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+
+        var ordinaryResponse = mapper.readTree(mapper.writeValueAsString(service.toResponse(project)));
+        var memberResponse = mapper.readTree(mapper.writeValueAsString(
+                service.toResponses(List.of(project), memberId).getFirst()));
+
+        assertFalse(ordinaryResponse.has("role"));
+        assertEquals(ProjectRole.EDITOR.name(), memberResponse.get("role").asText());
     }
 
     @Test
@@ -123,6 +167,7 @@ class ProjectResponseServiceTest {
         IdentityLookupService identities = mock(IdentityLookupService.class);
 
         assertEquals(List.of(), new ProjectService(identities).toResponses(List.of()));
+        assertEquals(List.of(), new ProjectService(identities).toResponses(List.of(), UUID.randomUUID()));
 
         verifyNoInteractions(identities);
     }
@@ -152,5 +197,13 @@ class ProjectResponseServiceTest {
         Sample sample = new Sample();
         sample.project = project;
         return sample;
+    }
+
+    private ProjectMember member(Project project, UUID memberId, ProjectRole role) {
+        ProjectMember member = new ProjectMember();
+        member.project = project;
+        member.memberId = memberId;
+        member.role = role;
+        return member;
     }
 }

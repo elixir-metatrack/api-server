@@ -1,5 +1,6 @@
 package no.metatrack.server.assay;
 
+import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.BadRequestException;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyRules;
 import no.metatrack.server.assay.vocabulary.AssayVocabularyService;
@@ -16,8 +17,10 @@ import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
 import no.metatrack.server.spreadsheet.SpreadsheetTemplateService;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 
 import java.io.ByteArrayInputStream;
@@ -36,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CSVExperimentImportServiceTest {
-    private static final String HEADER = "Sample,Sequencing instrument,Library Name,Library Source,Library Selection,"
+    private static final String HEADER = "Sample Name,Sequencing instrument,Library Name,Library Source,Library Selection,"
             + "Library Strategy,Library Layout,Sequencing platform,Sequencing Laboratory,Insert Size,"
             + "File Name,File md5,Forward File Name,Forward File md5,Reverse File Name,Reverse File md5\n";
 
@@ -70,6 +73,7 @@ class CSVExperimentImportServiceTest {
         AssayService assayService = new AssayService();
         assayService.vocabularyService = service.vocabularyService;
         service.rowWriter = new CSVExperimentRowWriter();
+        service.rowWriter.entityManager = mock(EntityManager.class);
         service.rowWriter.assayService = assayService;
         when(service.vocabularyService.validate(anyString(), anyMap())).thenAnswer(invocation ->
                 AssayVocabularyService.validate(new AssayVocabularyRules(terms),
@@ -119,6 +123,36 @@ class CSVExperimentImportServiceTest {
     }
 
     @Test
+    void importsUpdatedSemicolonDelimitedExperimentTemplate() throws Exception {
+        Path path = Files.writeString(directory.resolve("experiment-template.csv"),
+                "Sample Name;Sequencing platform;Sequencing instrument;Library Name;Library Layout;"
+                        + "Library Selection;Library Source;Library Strategy;Sequencing Laboratory;"
+                        + "Forward File Name;Forward File md5;Insert Size;Reverse File Name;Reverse File md5\n"
+                        + "sample;ILLUMINA;instrument;library;PAIRED;selection;source;strategy;lab;;;100;;\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals("ILLUMINA", assay.sequencingPlatform);
+        assertEquals(100, assay.insertSize);
+    }
+
+    @Test
+    void importsLegacySampleHeader() throws Exception {
+        Path path = Files.writeString(directory.resolve("legacy-sample-header.csv"), "Sample\nsample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals(Set.of(sample), assay.samples);
+    }
+
+    @Test
+    void prefersCanonicalSampleNameWhenBothSampleHeadersArePresent() throws Exception {
+        Path path = Files.writeString(directory.resolve("both-sample-headers.csv"),
+                "Sample Name,Sample\nsample,not-sample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+        assertEquals(Set.of(sample), assay.samples);
+    }
+
+    @Test
     void exportedStudyAccessionCannotReplaceExistingValue() throws Exception {
         assay.id = UUID.randomUUID();
         assay.studyAccession = "existing";
@@ -152,16 +186,25 @@ class CSVExperimentImportServiceTest {
         assay.project.id = 1L;
         CSVExperimentRowWriter writer = new CSVExperimentRowWriter();
         writer.assayService = mock(AssayService.class);
+        writer.entityManager = mock(EntityManager.class);
         when(writer.assayService.getAssayById(2L, assay.id)).thenReturn(assay);
         try (MockedStatic<Sample> samples = mockStatic(Sample.class);
              MockedStatic<File> files = mockStatic(File.class)) {
             samples.when(() -> Sample.findBySampleNameInProject("sample", 2L)).thenReturn(Optional.of(sample));
+            files.when(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
+                    ReadRole.SINGLE)).thenAnswer(invocation -> {
+                verify(writer.entityManager).flush();
+                return Optional.empty();
+            });
             writer.write(2L, assay.id, "sample", null, null, null, null, null, null, null, null, null, null,
                     List.of(new CSVExperimentImportService.PendingFile(
                             "File Name", "reads.fastq", "md5", null, ReadRole.SINGLE)), null, null);
             verify(writer.assayService).updateAssay(2L, assay.id, null, null, null, null, null, null, null, null, null,
                     null, null);
             verify(writer.assayService).associateSample(assay, sample);
+            InOrder order = inOrder(writer.assayService, writer.entityManager);
+            order.verify(writer.assayService).associateSample(assay, sample);
+            order.verify(writer.entityManager).flush();
             files.verify(() -> File.importPending(1L, assay.id, sample, assay, "reads.fastq", "md5", null,
                     ReadRole.SINGLE));
             files.verifyNoMoreInteractions();
@@ -258,7 +301,7 @@ class CSVExperimentImportServiceTest {
 
     @Test
     void repeatedRowsAssociateSampleWithoutDuplicatingMembership() throws Exception {
-        Path path = Files.writeString(directory.resolve("repeated-sample.csv"), "Sample\nsample\nsample\n");
+        Path path = Files.writeString(directory.resolve("repeated-sample.csv"), "Sample Name\nsample\nsample\n");
 
         assertTrue(importFile(Map.of(), path).isEmpty());
 
@@ -268,10 +311,79 @@ class CSVExperimentImportServiceTest {
     }
 
     @Test
+    void rowsWithoutFilesDoNotFlushBeforeTransactionCompletion() throws Exception {
+        Path path = Files.writeString(directory.resolve("no-files.csv"), "Sample Name\nsample\n");
+
+        assertTrue(importFile(Map.of(), path).isEmpty());
+
+        verify(service.rowWriter.entityManager, never()).flush();
+    }
+
+    @Test
+    void filenamesImportWithoutMd5ColumnsForEveryReadRoleInCsvAndExcel() throws Exception {
+        List<String> headers = List.of("Sample Name", "File Name", "Forward File Name", "Reverse File Name");
+        List<String> values = List.of("sample", "single.fastq", "forward.fastq", "reverse.fastq");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("files-without-md5.csv"), csv),
+                writeWorkbook("files-without-md5.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "single.fastq", null, null, ReadRole.SINGLE));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "forward.fastq", null, null, ReadRole.FORWARD));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, "reverse.fastq", null, null, ReadRole.REVERSE));
+            }
+        }
+    }
+
+    @Test
+    void checksumsWithoutFilenameColumnsAreIgnoredInCsvAndExcel() throws Exception {
+        List<String> headers = List.of("Sample Name", "File md5", "Forward File md5", "Reverse File md5");
+        List<String> values = List.of("sample", "single-md5", "forward-md5", "reverse-md5");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("checksums-without-files.csv"), csv),
+                writeWorkbook("checksums-without-files.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verifyNoInteractions();
+            }
+        }
+    }
+
+    @Test
+    void blankFilenamesAndChecksumsAreOptionalIndependentlyInCsvAndExcel() throws Exception {
+        List<String> headers = List.of(
+                "Sample Name", "File Name", "File md5", "Forward File Name", "Forward File md5",
+                "Reverse File Name", "Reverse File md5");
+        List<String> values = List.of("sample", "single.fastq", " ", " ", "forward-md5", "", "");
+        String csv = String.join(",", headers) + "\n" + String.join(",", values) + "\n";
+
+        for (Path path : List.of(
+                Files.writeString(directory.resolve("blank-file-fields.csv"), csv),
+                writeWorkbook("blank-file-fields.xlsx", headers, values))) {
+            try (MockedStatic<File> files = mockStatic(File.class)) {
+                assertTrue(importFile(Map.of(), path).isEmpty(), path.toString());
+                files.verify(() -> File.importPending(1L, assay.id, sample, assay, "single.fastq", null, null,
+                        ReadRole.SINGLE));
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, null, "forward-md5", null, ReadRole.FORWARD), never());
+                files.verify(() -> File.importPending(
+                        1L, assay.id, sample, assay, null, null, null, ReadRole.REVERSE), never());
+            }
+        }
+    }
+
+    @Test
     void existingAssayMembershipRemainsValidDuringImport() throws Exception {
         assay.addSample(sample);
         clearInvocations(assay);
-        Path path = Files.writeString(directory.resolve("existing-membership.csv"), "Sample\nsample\n");
+        Path path = Files.writeString(directory.resolve("existing-membership.csv"), "Sample Name\nsample\n");
 
         assertTrue(importFile(Map.of(), path).isEmpty());
 
@@ -282,12 +394,12 @@ class CSVExperimentImportServiceTest {
 
     @Test
     void missingProjectSampleIsRejectedWithoutAssociatingIt() throws Exception {
-        Path path = Files.writeString(directory.resolve("missing-sample.csv"), "Sample\nsample\n");
+        Path path = Files.writeString(directory.resolve("missing-sample.csv"), "Sample Name\nsample\n");
 
         var errors = importFile(Map.of(), path, Optional.empty());
 
         assertEquals(1, errors.size());
-        assertEquals("Sample", errors.getFirst().field());
+        assertEquals("Sample Name", errors.getFirst().field());
         assertEquals("Sample does not exist in the project", errors.getFirst().message());
         assertTrue(assay.samples.isEmpty());
         assertTrue(sample.assays.isEmpty());
@@ -489,10 +601,11 @@ class CSVExperimentImportServiceTest {
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
                 spreadsheet("File Name\nreads.fastq\n")));
         assertThrows(BadRequestException.class, () -> service.validateSpreadsheet(
-                spreadsheet("Sample,Unexpected\nsample,value\n")));
+                spreadsheet("Sample Name,Unexpected\nsample,value\n")));
+        assertDoesNotThrow(() -> service.validateSpreadsheet(spreadsheet("Sample\nsample\n")));
 
         SpreadsheetTable empty = new SpreadsheetTable(
-                "Experiments", List.of("Sample"), List.of(), Map.of(), Map.of());
+                "Experiments", List.of("Sample Name"), List.of(), Map.of(), Map.of());
         BadRequestException error = assertThrows(
                 BadRequestException.class, () -> service.validateSpreadsheet(empty));
         assertTrue(error.getMessage().contains("no data rows"));
@@ -501,7 +614,7 @@ class CSVExperimentImportServiceTest {
     @Test
     void accessionImportsBackfillPreserveBlanksAndRejectConflictsPerRow() throws Exception {
         Path path = Files.writeString(directory.resolve("accessions.csv"),
-                "Sample,experiment_accession,run_accession\n"
+                "Sample Name,experiment_accession,run_accession\n"
                         + "sample,  ERX123  , ERR123 \n"
                         + "sample,,\n"
                         + "sample,ERX999,ERR999\n"
@@ -521,7 +634,7 @@ class CSVExperimentImportServiceTest {
         assay.experimentAccession = "ERX123";
         assay.runAccession = "ERR123";
         assertTrue(importFile(Map.of(), Files.writeString(directory.resolve("old.csv"),
-                "Sample\nsample\n")).isEmpty());
+                "Sample Name\nsample\n")).isEmpty());
         assertEquals("ERX123", assay.experimentAccession);
         assertEquals("ERR123", assay.runAccession);
     }
@@ -545,7 +658,7 @@ class CSVExperimentImportServiceTest {
                         var data = sheet.createRow(header.getRowNum() + 1);
                         for (var cell : header) {
                             String value = switch (cell.getStringCellValue()) {
-                                case "Sample" -> "sample";
+                                case "Sample Name" -> "sample";
                                 case "experiment_accession" -> "000123";
                                 case "run_accession" -> "ERR123";
                                 default -> null;
@@ -575,5 +688,22 @@ class CSVExperimentImportServiceTest {
                 records,
                 Map.of(1L, 2),
                 Map.of());
+    }
+
+    private Path writeWorkbook(String filename, List<String> headers, List<String> values) throws Exception {
+        Path path = directory.resolve(filename);
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Experiments");
+            var header = sheet.createRow(0);
+            var data = sheet.createRow(1);
+            for (int column = 0; column < headers.size(); column++) {
+                header.createCell(column).setCellValue(headers.get(column));
+                data.createCell(column).setCellValue(values.get(column));
+            }
+            try (var output = Files.newOutputStream(path)) {
+                workbook.write(output);
+            }
+        }
+        return path;
     }
 }

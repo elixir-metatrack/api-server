@@ -10,4 +10,5 @@ public record PublicSampleResponse(
         Integer hostTaxId,
         String hostScientificName,
         Integer collectionYear,
-        String isolationSource) {}
+        String isolationSource,
+        String sampleAccession) {}

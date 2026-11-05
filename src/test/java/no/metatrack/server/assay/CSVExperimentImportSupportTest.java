@@ -49,6 +49,6 @@ class CSVExperimentImportSupportTest {
         List<CSVRecord> records = support.prepareRecords(new StringReader(template + "\n" + row), ';');
 
         assertEquals(headers.length, records.getFirst().size());
-        assertEquals("sample-1", support.getMappedValue(records.getFirst(), "Sample"));
+        assertEquals("sample-1", support.getMappedValue(records.getFirst(), "Sample Name"));
     }
 }
