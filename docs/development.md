@@ -19,7 +19,8 @@ default Keycloak realm issuer is `http://localhost:18081/realms/metatrack`, and 
 `http://localhost:19001`. The local S3 endpoint is `http://localhost:19000`; PostgreSQL is published at
 `localhost:15432`. These nonstandard defaults avoid common ports used by existing local installations.
 
-The SPA client is named `metatrack-spa` and permits redirects from `http://localhost:3000/*` with PKCE S256. The
+The SPA client is named `metatrack-spa` and permits redirects from `http://localhost:3000/*` with PKCE S256. The client
+for the scalar API is `metatrack-scalar` and permits redirects from `http://localhost:1234/*` with PKCE S256. The
 seeded, email-verified Keycloak users are:
 
 | Username | Password | Email |

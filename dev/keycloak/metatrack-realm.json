@@ -54,6 +54,27 @@
       }
     },
     {
+      "clientId": "metatrack-scalar",
+      "name": "Metatrack local SPA",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:1234/*"
+      ],
+      "webOrigins": [
+        "http://localhost:1234"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:1234/*"
+      }
+    },
+    {
       "clientId": "metatrack-api-admin",
       "name": "Metatrack API local Keycloak lookup client",
       "enabled": true,
