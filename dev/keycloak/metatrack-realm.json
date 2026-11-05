@@ -1,0 +1,123 @@
+{
+  "realm": "metatrack",
+  "displayName": "Metatrack local development",
+  "enabled": true,
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"Country\",\"displayName\":\"Country\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"Institution\",\"displayName\":\"Institution\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"ORCID\",\"displayName\":\"ORCID\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "user"
+      },
+      {
+        "name": "system-admin"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "metatrack-spa",
+      "name": "Metatrack local SPA",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      }
+    },
+    {
+      "clientId": "metatrack-api-admin",
+      "name": "Metatrack API local Keycloak lookup client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "metatrack-local-admin-client-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+  "users": [
+    {
+      "username": "dev-admin",
+      "enabled": true,
+      "email": "dev-admin@example.test",
+      "emailVerified": true,
+      "firstName": "Development",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-admin-password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user",
+        "system-admin"
+      ]
+    },
+    {
+      "username": "dev-user",
+      "enabled": true,
+      "email": "dev-user@example.test",
+      "emailVerified": true,
+      "firstName": "Development",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-user-password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "username": "service-account-metatrack-api-admin",
+      "enabled": true,
+      "serviceAccountClientId": "metatrack-api-admin",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "view-users",
+          "manage-users"
+        ]
+      }
+    }
+  ]
+}
