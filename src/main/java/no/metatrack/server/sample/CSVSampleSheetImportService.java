@@ -631,7 +631,7 @@ public class CSVSampleSheetImportService {
         return header == null ? "" : header.trim().toLowerCase(Locale.ROOT);
     }
 
-    static Map<String, String> builtInValues(Sample sample) {
+    public static Map<String, String> builtInValues(Sample sample) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("alias", sample.alias);
         values.put("mlst", sample.mlst);

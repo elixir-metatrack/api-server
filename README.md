@@ -516,7 +516,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ---
 *This project was generated using Quarkus.*
 
-## ISA-JSON exploration
+## ISA-JSON (experimental)
 
-An experimental project export and a separate synthetic demo seed are available.
-See [the mapping, local setup and validation notes](docs/isa-json-exploration.md).
+Export and import of ISA-JSON, shaped for submission via MARS.
+See [docs/isa-json.md](docs/isa-json.md) for the mapping, diagrams and local setup.

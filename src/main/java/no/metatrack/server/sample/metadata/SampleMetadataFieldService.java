@@ -98,7 +98,7 @@ public class SampleMetadataFieldService {
         return key;
     }
 
-    static String validateLabel(String rawLabel) {
+    public static String validateLabel(String rawLabel) {
         if (rawLabel == null || rawLabel.isBlank()) throw new BadRequestException("Metadata field label is required");
         String label = rawLabel.trim();
         if (label.length() > 255) throw new BadRequestException("Metadata field label must not exceed 255 characters");

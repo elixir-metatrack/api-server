@@ -1,0 +1,601 @@
+{
+  "@id": "urn:metatrack:metatrack.no:investigation:51",
+  "identifier": "metatrack:metatrack.no:project:51",
+  "filename": "i_metatrack_51.json",
+  "title": "My fantastic project",
+  "description": "Synthetic example of the proposed Metatrack ISA-JSON profile v2.",
+  "comments": [
+    {
+      "name": "metatrack:exportProfile",
+      "value": "isa-v2"
+    }
+  ],
+  "ontologySourceReferences": [
+    {
+      "name": "NCBITaxon",
+      "file": "http://purl.obolibrary.org/obo/ncbitaxon.owl",
+      "description": "NCBI organismal classification"
+    }
+  ],
+  "studies": [
+    {
+      "@id": "urn:metatrack:metatrack.no:study:51",
+      "identifier": "metatrack:metatrack.no:project:51",
+      "filename": "s_metatrack_51.txt",
+      "title": "My fantastic project",
+      "description": "Synthetic example of the proposed Metatrack ISA-JSON profile v2.",
+      "characteristicCategories": [
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:organism",
+          "characteristicType": {
+            "annotationValue": "organism"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:taxId",
+          "characteristicType": {
+            "annotationValue": "tax_id"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:description",
+          "characteristicType": {
+            "annotationValue": "description"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:projectTitle",
+          "characteristicType": {
+            "annotationValue": "title"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:isolationSource",
+          "characteristicType": {
+            "annotationValue": "isolation_source"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:collectionDate",
+          "characteristicType": {
+            "annotationValue": "collection date"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:location",
+          "characteristicType": {
+            "annotationValue": "geographic location (country and/or sea)"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:county",
+          "characteristicType": {
+            "annotationValue": "county"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:commune",
+          "characteristicType": {
+            "annotationValue": "commune"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:hostHealthState",
+          "characteristicType": {
+            "annotationValue": "host health state"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:hostScientificName",
+          "characteristicType": {
+            "annotationValue": "host scientific name"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:hostTaxId",
+          "characteristicType": {
+            "annotationValue": "host taxid"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:isolate",
+          "characteristicType": {
+            "annotationValue": "isolate"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:characteristic:mlst",
+          "characteristicType": {
+            "annotationValue": "mlst"
+          }
+        }
+      ],
+      "protocols": [
+        {
+          "@id": "urn:metatrack:metatrack.no:protocol:sample-collection",
+          "name": "sample collection",
+          "protocolType": {
+            "annotationValue": "sample collection"
+          }
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:protocol:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001",
+          "name": "Illumina DNA prep",
+          "protocolType": {
+            "annotationValue": "library construction"
+          },
+          "parameters": [
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_NAME",
+              "parameterName": {
+                "annotationValue": "LIBRARY_NAME"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_CONSTRUCTION_PROTOCOL",
+              "parameterName": {
+                "annotationValue": "LIBRARY_CONSTRUCTION_PROTOCOL"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:DESIGN_DESCRIPTION",
+              "parameterName": {
+                "annotationValue": "DESIGN_DESCRIPTION"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_SOURCE",
+              "parameterName": {
+                "annotationValue": "LIBRARY_SOURCE"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_SELECTION",
+              "parameterName": {
+                "annotationValue": "LIBRARY_SELECTION"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_STRATEGY",
+              "parameterName": {
+                "annotationValue": "LIBRARY_STRATEGY"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_LAYOUT",
+              "parameterName": {
+                "annotationValue": "LIBRARY_LAYOUT"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:NOMINAL_LENGTH",
+              "parameterName": {
+                "annotationValue": "NOMINAL_LENGTH"
+              }
+            }
+          ]
+        },
+        {
+          "@id": "urn:metatrack:metatrack.no:protocol:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001",
+          "name": "nucleic acid sequencing",
+          "protocolType": {
+            "annotationValue": "nucleic acid sequencing"
+          },
+          "parameters": [
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:PLATFORM",
+              "parameterName": {
+                "annotationValue": "PLATFORM"
+              }
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:parameter:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:INSTRUMENT_MODEL",
+              "parameterName": {
+                "annotationValue": "INSTRUMENT_MODEL"
+              }
+            }
+          ]
+        }
+      ],
+      "materials": {
+        "sources": [
+          {
+            "@id": "urn:metatrack:metatrack.no:source:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+            "name": "NorPa_0001",
+            "characteristics": [
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:organism"
+                },
+                "value": {
+                  "annotationValue": "Pseudomonas aeruginosa",
+                  "termSource": "NCBITaxon",
+                  "termAccession": "http://purl.obolibrary.org/obo/NCBITaxon_287"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:taxId"
+                },
+                "value": {
+                  "annotationValue": "287"
+                }
+              }
+            ]
+          }
+        ],
+        "samples": [
+          {
+            "@id": "urn:metatrack:metatrack.no:sample:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+            "name": "NorPa_0001",
+            "derivesFrom": [
+              {
+                "@id": "urn:metatrack:metatrack.no:source:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+              }
+            ],
+            "characteristics": [
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:organism"
+                },
+                "value": {
+                  "annotationValue": "Pseudomonas aeruginosa",
+                  "termSource": "NCBITaxon",
+                  "termAccession": "http://purl.obolibrary.org/obo/NCBITaxon_287"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:taxId"
+                },
+                "value": {
+                  "annotationValue": "287"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:projectTitle"
+                },
+                "value": {
+                  "annotationValue": "My fantastic project"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:description"
+                },
+                "value": {
+                  "annotationValue": "Pseudomonas aeruginosa isolated from blood culture."
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:isolationSource"
+                },
+                "value": {
+                  "annotationValue": "blood"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:collectionDate"
+                },
+                "value": {
+                  "annotationValue": "2021-06-25"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:location"
+                },
+                "value": {
+                  "annotationValue": "Norway"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:county"
+                },
+                "value": {
+                  "annotationValue": "Troms"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:commune"
+                },
+                "value": {
+                  "annotationValue": "Tromsø"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:hostHealthState"
+                },
+                "value": {
+                  "annotationValue": "diseased"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:hostScientificName"
+                },
+                "value": {
+                  "annotationValue": "Homo sapiens",
+                  "termSource": "NCBITaxon",
+                  "termAccession": "http://purl.obolibrary.org/obo/NCBITaxon_9606"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:hostTaxId"
+                },
+                "value": {
+                  "annotationValue": "9606"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:isolate"
+                },
+                "value": {
+                  "annotationValue": "NorPa_0001"
+                }
+              },
+              {
+                "category": {
+                  "@id": "urn:metatrack:metatrack.no:characteristic:mlst"
+                },
+                "value": {
+                  "annotationValue": "ST244"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "processSequence": [
+        {
+          "@id": "urn:metatrack:metatrack.no:process:sample-collection:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+          "executesProtocol": {
+            "@id": "urn:metatrack:metatrack.no:protocol:sample-collection"
+          },
+          "inputs": [
+            {
+              "@id": "urn:metatrack:metatrack.no:source:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+            }
+          ],
+          "outputs": [
+            {
+              "@id": "urn:metatrack:metatrack.no:sample:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+            }
+          ]
+        }
+      ],
+      "assays": [
+        {
+          "@id": "urn:metatrack:metatrack.no:assay:2f0c6a3e-1111-4c1e-9a55-000000000001",
+          "filename": "a_2f0c6a3e-1111-4c1e-9a55-000000000001.txt",
+          "measurementType": {
+            "annotationValue": "genome sequencing"
+          },
+          "technologyType": {
+            "annotationValue": "nucleotide sequencing"
+          },
+          "technologyPlatform": "ILLUMINA NextSeq 500",
+          "comments": [
+            {
+              "name": "metatrack:assayName",
+              "value": "WGS NextSeq run"
+            },
+            {
+              "name": "STUDY_TYPE",
+              "value": "Whole Genome Sequencing"
+            }
+          ],
+          "materials": {
+            "samples": [
+              {
+                "@id": "urn:metatrack:metatrack.no:sample:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+              }
+            ],
+            "otherMaterials": [
+              {
+                "@id": "urn:metatrack:metatrack.no:library:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+                "name": "NorPa_0001 / WGS NextSeq run",
+                "type": "Extract Name",
+                "derivesFrom": [
+                  {
+                    "@id": "urn:metatrack:metatrack.no:sample:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+                  }
+                ]
+              }
+            ]
+          },
+          "dataFiles": [
+            {
+              "@id": "urn:metatrack:metatrack.no:file:899c4bd4-ef87-46f9-9247-c5a7e4bf4e21",
+              "name": "NorPa_0001_R1.fastq.gz",
+              "type": "Raw Data File",
+              "comments": [
+                {
+                  "name": "file type",
+                  "value": "fastq"
+                },
+                {
+                  "name": "file checksum",
+                  "value": "44c32333739e2432300bf5a4bb922a75"
+                },
+                {
+                  "name": "checksum_method",
+                  "value": "MD5"
+                },
+                {
+                  "name": "metatrack:readRole",
+                  "value": "FORWARD"
+                }
+              ]
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:file:0d0c8a51-2b7e-4a39-8a77-6f6a0f8f2c02",
+              "name": "NorPa_0001_R2.fastq.gz",
+              "type": "Raw Data File",
+              "comments": [
+                {
+                  "name": "file type",
+                  "value": "fastq"
+                },
+                {
+                  "name": "file checksum",
+                  "value": "55c32333739e2432300bf5a4bb922a75"
+                },
+                {
+                  "name": "checksum_method",
+                  "value": "MD5"
+                },
+                {
+                  "name": "metatrack:readRole",
+                  "value": "REVERSE"
+                }
+              ]
+            }
+          ],
+          "processSequence": [
+            {
+              "@id": "urn:metatrack:metatrack.no:process:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+              "executesProtocol": {
+                "@id": "urn:metatrack:metatrack.no:protocol:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001"
+              },
+              "inputs": [
+                {
+                  "@id": "urn:metatrack:metatrack.no:sample:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+                }
+              ],
+              "outputs": [
+                {
+                  "@id": "urn:metatrack:metatrack.no:library:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+                }
+              ],
+              "nextProcess": {
+                "@id": "urn:metatrack:metatrack.no:process:sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+              },
+              "comments": [
+                {
+                  "name": "metatrack:generated",
+                  "value": "DESIGN_DESCRIPTION"
+                }
+              ],
+              "parameterValues": [
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_NAME"
+                  },
+                  "value": {
+                    "annotationValue": "NorPa_0001"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_CONSTRUCTION_PROTOCOL"
+                  },
+                  "value": {
+                    "annotationValue": "Illumina DNA prep"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:DESIGN_DESCRIPTION"
+                  },
+                  "value": {
+                    "annotationValue": "WGS of GENOMIC material, RANDOM PCR selection, PAIRED layout, Illumina DNA prep"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_SOURCE"
+                  },
+                  "value": {
+                    "annotationValue": "GENOMIC"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_SELECTION"
+                  },
+                  "value": {
+                    "annotationValue": "RANDOM PCR"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_STRATEGY"
+                  },
+                  "value": {
+                    "annotationValue": "WGS"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:LIBRARY_LAYOUT"
+                  },
+                  "value": {
+                    "annotationValue": "PAIRED"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:NOMINAL_LENGTH"
+                  },
+                  "value": {
+                    "annotationValue": "250"
+                  }
+                }
+              ]
+            },
+            {
+              "@id": "urn:metatrack:metatrack.no:process:sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5",
+              "executesProtocol": {
+                "@id": "urn:metatrack:metatrack.no:protocol:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001"
+              },
+              "performer": "UNN, Tromsø",
+              "inputs": [
+                {
+                  "@id": "urn:metatrack:metatrack.no:library:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+                }
+              ],
+              "outputs": [
+                {
+                  "@id": "urn:metatrack:metatrack.no:file:899c4bd4-ef87-46f9-9247-c5a7e4bf4e21"
+                },
+                {
+                  "@id": "urn:metatrack:metatrack.no:file:0d0c8a51-2b7e-4a39-8a77-6f6a0f8f2c02"
+                }
+              ],
+              "previousProcess": {
+                "@id": "urn:metatrack:metatrack.no:process:library-construction:2f0c6a3e-1111-4c1e-9a55-000000000001:77b60c0a-f809-4cf6-be25-cc7bcfa961a5"
+              },
+              "parameterValues": [
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:PLATFORM"
+                  },
+                  "value": {
+                    "annotationValue": "ILLUMINA"
+                  }
+                },
+                {
+                  "category": {
+                    "@id": "urn:metatrack:metatrack.no:parameter:nucleic-acid-sequencing:2f0c6a3e-1111-4c1e-9a55-000000000001:INSTRUMENT_MODEL"
+                  },
+                  "value": {
+                    "annotationValue": "NextSeq 500"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

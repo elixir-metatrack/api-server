@@ -32,12 +32,15 @@ def main():
             print(f"{name}: /{'/'.join(map(str, error.absolute_path))}: {error.message}")
         print(f"{name}: {'FAIL' if errors else 'PASS'}")
         failed |= bool(errors)
-    definitions, references = set(), set()
+    definitions, references = {}, set()
 
     def visit(node):
         if isinstance(node, dict):
             if "@id" in node:
-                (references if len(node) == 1 else definitions).add(node["@id"])
+                if len(node) == 1:
+                    references.add(node["@id"])
+                else:
+                    definitions.setdefault(node["@id"], []).append(node)
             for child in node.values():
                 visit(child)
         elif isinstance(node, list):
@@ -45,10 +48,22 @@ def main():
                 visit(child)
 
     visit(document)
-    unresolved = sorted(references - definitions)
+    unresolved = sorted(references - definitions.keys())
     print(f"Internal references: {'FAIL ' + str(unresolved) if unresolved else 'PASS'}")
+    # A repeated definition is only harmless if it is identical; otherwise consumers pick one arbitrarily.
+    conflicting = sorted(key for key, nodes in definitions.items()
+                         if any(node != nodes[0] for node in nodes[1:]))
+    print(f"Unique definitions: {'FAIL ' + str(conflicting) if conflicting else 'PASS'}")
+    # Repository adapters walk backwards from each data file to the process that produced it.
+    unproduced = []
+    for study in document.get("studies", []):
+        for assay in study.get("assays", []):
+            outputs = {output.get("@id") for process in assay.get("processSequence", [])
+                       for output in process.get("outputs", [])}
+            unproduced += [file["@id"] for file in assay.get("dataFiles", []) if file.get("@id") not in outputs]
+    print(f"Data files produced by a process: {'FAIL ' + str(sorted(unproduced)) if unproduced else 'PASS'}")
     print("These checks do not establish MARS adapter compatibility or ENA submission readiness.")
-    raise SystemExit(1 if failed or unresolved else 0)
+    raise SystemExit(1 if failed or unresolved or conflicting or unproduced else 0)
 
 
 if __name__ == "__main__":

@@ -46,7 +46,8 @@ def main():
     projects = api_request("/projects")
     project = next((p for p in projects if p["name"] == "isa-json-demo"), None)
     if project is None:
-        project = api_request("/projects", "POST", {"name": "isa-json-demo", "description": description})
+        project = api_request("/projects", "POST", {"name": "isa-json-demo", "description": description,
+                                                         "dataOwningOrganization": "Metatrack demo"})
     elif project.get("description") != description:
         raise SystemExit("A different project named isa-json-demo exists; leaving it unchanged.")
     base = f'/projects/{project["id"]}'
@@ -89,14 +90,14 @@ def main():
     if missing:
         api_request(assay_path + "/samples", "PUT", {"sampleNames": missing})
     existing_files = api_request(assay_path + "/files")
-    rows = ["Sample;Forward File Name;Forward File md5;Reverse File Name;Reverse File md5"]
+    # ENA (and therefore MARS) requires a sequencing platform; it can only be set via the experiment import.
+    rows = ["Sample;Forward File Name;Forward File md5;Reverse File Name;Reverse File md5;Sequencing platform"]
     checksum = hashlib.md5(b"@demo\nACGT\n+\n!!!!\n").hexdigest()
     for sample in demo_samples:
         names = [f'{sample["name"]}_R{read}.fastq' for read in (1, 2)]
         names = ["" if any(f["name"] == name for f in existing_files) else name for name in names]
-        if any(names):
-            rows.append(";".join((sample["name"], names[0], checksum if names[0] else "",
-                                  names[1], checksum if names[1] else "")))
+        rows.append(";".join((sample["name"], names[0], checksum if names[0] else "",
+                              names[1], checksum if names[1] else "", "ILLUMINA")))
     if len(rows) > 1:
         boundary = "isa-demo-" + uuid4().hex
         body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="demo.csv"\r\n'

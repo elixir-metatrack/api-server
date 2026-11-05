@@ -1,0 +1,103 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1.4
+skinparam class {
+  BackgroundColor #F1F5F9
+  BorderColor #94A3B8
+  FontColor #0F172A
+  AttributeFontColor #334155
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam titleFontColor #0F172A
+skinparam titleFontSize 20
+skinparam footerFontColor #64748B
+hide circle
+hide methods
+
+title Metatrack data model (ISA-relevant part)\n<size:13>JPA entities in api-server · members, invitations, notifications and vocabularies left out</size>
+
+class Project {
+  id
+  name
+  description
+  detailedDescription
+  dataOwningOrganization
+  comments
+  owner: Keycloak ID
+}
+
+class Sample {
+  id: UUID
+  name  <i>unique per project</i>
+  alias
+  taxId, hostTaxId
+  collectionDate, location
+  latitude, longitude
+  isolationSource, strain, isolate, serovar, mlst
+  host*: sex, age, health state, ...
+  influenza* / otherPathogens*
+  projectAccession, studyAccession
+  sampleAccession, secondaryAccession
+  <i>... ~40 fixed columns</i>
+}
+
+class Assay {
+  id: UUID
+  name  <i>unique per project</i>
+  sequencingPlatform, instrumentModel
+  sequencingLaboratory
+  libraryName, librarySource
+  librarySelection, libraryStrategy
+  libraryLayout, insertSize
+  studyAccession, experimentAccession
+  runAccession
+}
+
+class File {
+  uuid
+  fileName
+  md5, unencryptedMd5
+  readRole  <i>FORWARD | REVERSE | SINGLE</i>
+  status  <i>PENDING | ...</i>
+  virtualPath, objectKey
+}
+
+class SampleMetadataField #FFF3D6 {
+  key, label, tooltip
+  type  <i>TEXT | NUMBER | BOOLEAN | DATE ...</i>
+  archivedOn
+}
+
+class SampleMetadataValue #FFF3D6 {
+  textValue | numberValue
+  booleanValue | dateValue
+}
+
+class ProjectPublication
+
+Project "1" *-- "*" Sample
+Project "1" *-- "*" Assay
+Project "1" *-- "*" SampleMetadataField : custom fields
+Project "1" *-- "*" ProjectPublication
+Project "0..1" o-- "*" Project : subProjects\n(see linked samples)
+Assay "*" -- "*" Sample : assay_sample
+Sample "1" *-- "*" File
+Assay "1" o-- "*" File
+Sample "1" *-- "*" SampleMetadataValue
+SampleMetadataField "1" *-- "*" SampleMetadataValue
+
+legend bottom
+  <back:#FFF3D6> Custom (user-defined) fields </back>: one field per project, one value per sample × field.
+  A file belongs to <b>one sample and one assay</b> – this pair is what ISA calls a run.
+  Sub-projects own no samples of their own; they make samples of the parent project visible.
+endlegend
+
+@enduml

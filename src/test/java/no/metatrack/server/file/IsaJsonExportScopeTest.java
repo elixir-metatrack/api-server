@@ -5,6 +5,7 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.isa.IsaJsonExportService;
 import no.metatrack.server.project.Project;
@@ -16,6 +17,7 @@ import no.metatrack.server.sample.metadata.SampleMetadataService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,7 +51,7 @@ class IsaJsonExportScopeTest {
         metadata.apply(root.id, visible, Map.of("group", "control"));
         metadata.apply(root.id, hidden, Map.of("group", "private"));
 
-        var subset = exporter.export(child.id);
+        var subset = exporter.export(child.id, null);
         assertEquals(1, subset.at("/studies/0/materials/samples").size());
         assertEquals(1, subset.at("/studies/0/assays/0/materials/samples").size());
         assertEquals(1, subset.at("/studies/0/assays/0/dataFiles").size());
@@ -57,9 +59,38 @@ class IsaJsonExportScopeTest {
         assertFalse(subset.toString().contains("HIDDEN"));
         assertFalse(subset.toString().contains("hidden.fastq"));
         assertFalse(subset.toString().contains("Parent private metadata"));
-        var full = exporter.export(root.id);
+        var full = exporter.export(root.id, null);
         assertEquals(2, full.at("/studies/0/materials/samples").size());
         assertEquals(2, full.at("/studies/0/assays/0/dataFiles").size());
+    }
+
+    @Test
+    void selectionContainsOnlyTheSelectedSamplesAndTheirExperiments() {
+        Project root = project("Selection source");
+        Sample chosen = sample(root, "CHOSEN");
+        Sample other = sample(root, "OTHER");
+        Assay shared = new Assay();
+        shared.project = root;
+        shared.name = "Shared assay";
+        shared.addSample(chosen);
+        shared.addSample(other);
+        shared.persistAndFlush();
+        Assay otherOnly = new Assay();
+        otherOnly.project = root;
+        otherOnly.name = "Other only";
+        otherOnly.addSample(other);
+        otherOnly.persistAndFlush();
+        file(chosen, shared, "chosen.fastq.gz");
+        file(other, shared, "other.fastq.gz");
+
+        var selection = exporter.export(root.id, Set.of("CHOSEN"));
+        assertEquals(1, selection.at("/studies/0/materials/samples").size());
+        assertEquals(1, selection.at("/studies/0/assays").size());
+        assertEquals(1, selection.at("/studies/0/assays/0/dataFiles").size());
+        assertFalse(selection.toString().contains("OTHER"));
+        assertFalse(selection.toString().contains("other.fastq"));
+        assertFalse(selection.toString().contains("Other only"));
+        assertThrows(NotFoundException.class, () -> exporter.export(root.id, Set.of("CHOSEN", "MISSING")));
     }
 
     private Project project(String name) {

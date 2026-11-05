@@ -29,6 +29,7 @@ public class SubProjectTestProfile implements QuarkusTestProfile {
                 Map.entry("metatrack.s3.access-key", "test"),
                 Map.entry("metatrack.s3.secret-key", "test"),
                 Map.entry("keycloak-admin-api/mp-rest/url", "http://localhost:1"),
+                Map.entry("taxon-api/mp-rest/url", "http://localhost:1"),
                 Map.entry("keycloak.realm", "test"));
     }
 }

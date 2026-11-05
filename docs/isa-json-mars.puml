@@ -1,0 +1,49 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam nodesep 40
+skinparam ranksep 45
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1.4
+skinparam rectangle {
+  BorderColor #94A3B8
+  FontColor #0F172A
+}
+skinparam database {
+  BorderColor #94A3B8
+  BackgroundColor #F1F5F9
+}
+skinparam titleFontSize 20
+
+title From Metatrack to ENA via MARS
+
+rectangle "<b>Metatrack</b>\nproject or selected samples" as mt #E5F3EF
+rectangle "<b>ISA-JSON</b>\nGET/POST /api/projects/{id}/exports/isa-json" as isa #E5F3EF
+
+rectangle "MARS (ELIXIR)" as mars #FAFAFA {
+  rectangle "<b>BioSamples adapter</b>\nregisters Source + Sample\nskips samples that already carry\nthe characteristic <i>accession</i>" as bs #FFF3D6
+  rectangle "<b>ENA adapter</b>\nstarts at each Raw Data File and walks back:\nfile → sequencing → Library → library construction → Sample\n\none ISA assay → ENA <b>study</b> (STUDY_TYPE)\none Library → ENA <b>experiment</b> (LIBRARY_*, PLATFORM, INSTRUMENT_MODEL)\nfiles of a Library → ENA <b>run</b> (file names, MD5)" as ena #E5F3EF
+  rectangle "<b>Receipt</b>\naccessions per object" as receipt #FFFFFF
+}
+
+database "BioSamples" as dbbs
+database "ENA (Webin)" as dbena
+
+mt -right-> isa
+isa -down-> bs
+bs -right-> ena : sample accessions
+ena -right-> receipt
+bs -down-> dbbs
+ena -down-> dbena : Webin XML
+receipt -[dashed,norank]-> mt : not built:\nwrite accessions back
+
+legend bottom
+  <back:#E5F3EF> tested offline </back>  MARS 8cc6fca in Docker: the ENA adapter builds study/experiment/run XML from our export
+  and stops before the Webin submission. Result for the demo project: 1 study, 2 experiments, 2 runs, no manual changes.
+  <back:#FFF3D6> not run yet </back>  The BioSamples adapter submits directly, so it was not run. A submission to the ENA test server
+  needs a Webin test account from the team. Checklist validation (ENA) is a separate topic.
+endlegend
+@enduml

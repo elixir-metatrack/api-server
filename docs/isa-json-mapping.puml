@@ -1,0 +1,156 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam nodesep 18
+skinparam ranksep 260
+skinparam ArrowThickness 1.3
+skinparam object {
+  BackgroundColor #FFFFFF
+  BorderColor #94A3B8
+  FontColor #0F172A
+}
+skinparam package {
+  BorderColor #CBD5E1
+  FontColor #0F172A
+  FontSize 16
+}
+skinparam titleFontSize 20
+left to right direction
+
+title Which Metatrack field ends up where in ISA-JSON
+
+package "Metatrack" {
+  map "Project" as P #F1F5F9 {
+    name => text
+    description => text
+  }
+  map "Sample" as S #E5F3EF {
+    name => unique per project
+    taxId => NCBI ID
+    hostTaxId => NCBI ID
+    otherFields => ~40 fixed fields, via field register
+    sampleAccession => BioSamples
+  }
+  map "Custom field" as C #FFF3D6 {
+    label => text
+    definition => key, type, tooltip
+    value => per sample
+  }
+  map "Assay" as A #E6EEF9 {
+    name => unique per project
+    libraryStrategy => e.g. WGS
+    librarySource => ENA term
+    librarySelection => ENA term
+    libraryLayout => SINGLE / PAIRED
+    libraryName => kit / protocol
+    insertSize => number
+    sequencingPlatform => e.g. ILLUMINA
+    instrumentModel => e.g. NextSeq 500
+    sequencingLaboratory => text
+    accessions => study, experiment, run
+  }
+  map "File" as F #FCEBE1 {
+    fileName => text
+    md5 => checksum
+    readRole => FORWARD / REVERSE / SINGLE
+    status => e.g. PENDING
+  }
+}
+
+package "ISA-JSON" {
+  map "Investigation + Study" as IS #F1F5F9 {
+    title => project name
+    description => project description
+  }
+  map "Source  (one per sample)" as ISRC #E5F3EF {
+    name => sample name
+    organism => + tax_id, NCBITaxon term
+  }
+  map "Sample" as ISMP #E5F3EF {
+    name => sample name
+    host => host scientific name + host taxid
+    characteristics => ENA names, e.g. collection date
+    accession => MARS reuses it
+    custom => one characteristic per custom field
+  }
+  map "characteristicCategories" as ICAT #FFF3D6 {
+    label => category name
+    comments => metatrack:fieldKey/Type/tooltip
+  }
+  map "Assay" as IA #E6EEF9 {
+    measurementType => + technologyType, from strategy
+    STUDY_TYPE => comment, from strategy
+    technologyPlatform => platform + instrument
+    comments => assayName, accessions
+  }
+  map "Library  (otherMaterial)" as ILIB #E6EEF9 {
+    name => sample / assay
+  }
+  map "Process: library construction" as IPL #E6EEF9 {
+    LIBRARY_STRATEGY => parameter value
+    LIBRARY_SOURCE => parameter value
+    LIBRARY_SELECTION => parameter value
+    LIBRARY_LAYOUT => parameter value
+    LIBRARY_CONSTRUCTION_PROTOCOL => parameter value
+    NOMINAL_LENGTH => parameter value
+    DESIGN_DESCRIPTION => generated
+  }
+  map "Process: nucleic acid sequencing" as IPS #E6EEF9 {
+    PLATFORM => parameter value
+    INSTRUMENT_MODEL => parameter value
+    performer => sequencing lab
+  }
+  map "Raw Data File" as IF #FCEBE1 {
+    name => file name
+    checksum => comment "file checksum" (MD5)
+    comments => readRole, uploadStatus
+  }
+}
+
+P::name --> IS::title #64748B
+P::description --> IS::description #64748B
+
+S::name --> ISRC::name #2F855A
+S::name --> ISMP::name #2F855A
+S::taxId --> ISRC::organism #2F855A
+S::hostTaxId --> ISMP::host #2F855A
+S::otherFields --> ISMP::characteristics #2F855A
+S::sampleAccession --> ISMP::accession #2F855A
+S::name --> ILIB::name #2F855A
+
+C::label --> ICAT::label #B7791F
+C::definition --> ICAT::comments #B7791F
+C::value --> ISMP::custom #B7791F
+
+A::name --> IA::comments #2B6CB0
+A::name --> ILIB::name #2B6CB0
+A::libraryStrategy --> IA::measurementType #2B6CB0
+A::libraryStrategy --> IA::STUDY_TYPE #2B6CB0
+A::libraryStrategy --> IPL::LIBRARY_STRATEGY #2B6CB0
+A::librarySource --> IPL::LIBRARY_SOURCE #2B6CB0
+A::librarySelection --> IPL::LIBRARY_SELECTION #2B6CB0
+A::libraryLayout --> IPL::LIBRARY_LAYOUT #2B6CB0
+A::libraryName --> IPL::LIBRARY_CONSTRUCTION_PROTOCOL #2B6CB0
+A::insertSize --> IPL::NOMINAL_LENGTH #2B6CB0
+A::sequencingPlatform --> IPS::PLATFORM #2B6CB0
+A::sequencingPlatform --> IA::technologyPlatform #2B6CB0
+A::instrumentModel --> IPS::INSTRUMENT_MODEL #2B6CB0
+A::instrumentModel --> IA::technologyPlatform #2B6CB0
+A::sequencingLaboratory --> IPS::performer #2B6CB0
+A::accessions --> IA::comments #2B6CB0
+
+F::fileName --> IF::name #C05621
+F::md5 --> IF::checksum #C05621
+F::readRole --> IF::comments #C05621
+F::status --> IF::comments #C05621
+
+legend bottom
+  Arrows point in export direction; the import reads the same arrows backwards.
+  <b>Source</b> and <b>Library</b> do not exist in Metatrack: the export creates them, the import skips them.
+  The processes link the chain Source → Sample → Library → Raw Data File; MARS follows it backwards from each file.
+  <b>Not exported:</b> hostSubjectId (patient reference), members, storage paths, timestamps, archived custom fields.
+endlegend
+@enduml

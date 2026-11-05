@@ -1,0 +1,127 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1.4
+skinparam class {
+  BackgroundColor #F1F5F9
+  BorderColor #94A3B8
+  FontColor #0F172A
+  AttributeFontColor #334155
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam titleFontColor #0F172A
+skinparam titleFontSize 20
+skinparam footerFontColor #64748B
+hide circle
+hide methods
+
+title ISA-JSON model (the parts Metatrack and MARS use)\n<size:13>ISA-JSON 1.0 schemas · every object has an @id, references point to it</size>
+
+class Investigation {
+  identifier, title, description
+  filename
+  ontologySourceReferences[]
+  comments[]
+}
+
+class Study {
+  identifier, title, description
+  filename
+  characteristicCategories[]
+  comments[]
+}
+
+class Assay {
+  filename
+  measurementType : OntologyAnnotation
+  technologyType : OntologyAnnotation
+  technologyPlatform
+  comments[]
+}
+
+class Protocol {
+  name
+  protocolType
+  parameters[]
+}
+
+class Process {
+  executesProtocol → Protocol
+  parameterValues[]
+  performer
+  inputs[] / outputs[]
+  previousProcess / nextProcess
+}
+
+class Source <<material>> {
+  name
+  characteristics[]
+}
+
+class Sample <<material>> {
+  name
+  characteristics[]
+  derivesFrom[] → Source
+}
+
+class "otherMaterial" as Other <<material>> {
+  name
+  type  <i>"Extract Name"</i>
+  derivesFrom[] → Sample
+}
+
+class DataFile {
+  name
+  type  <i>"Raw Data File"</i>
+  comments[]
+}
+
+class Characteristic #FFF3D6 {
+  category → characteristicCategory
+  value : OntologyAnnotation | number
+  unit
+}
+
+class OntologyAnnotation #FFF3D6 {
+  annotationValue
+  termSource
+  termAccession
+}
+
+class Comment #FFF3D6 {
+  name
+  value
+}
+
+Investigation "1" *-- "*" Study
+Study "1" *-- "*" Assay
+Study *-- "*" Protocol
+Study *-- "*" Source : materials
+Study *-- "*" Sample : materials
+Study *-- "*" Process : processSequence\n(sample collection)
+Assay *-- "*" Other : materials
+Assay *-- "*" DataFile
+Assay *-- "*" Process : processSequence\n(library, sequencing)
+
+Source <.. Sample : derivesFrom
+Sample <.. Other : derivesFrom
+Process ..> Protocol : executesProtocol
+
+Sample *-- "*" Characteristic
+Characteristic --> OntologyAnnotation
+
+legend bottom
+  <b>Chain of materials:</b> Source → (process) → Sample → (process) → otherMaterial → (process) → DataFile.
+  Processes link these through inputs/outputs; MARS follows the chain backwards from each file.
+  <back:#FFF3D6> Generic building blocks </back>: all field values are Characteristics or Comments, not fixed columns.
+  MARS reads Characteristic values as objects (OntologyAnnotation), not plain strings.
+endlegend
+
+@enduml
