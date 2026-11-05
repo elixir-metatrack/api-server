@@ -11,44 +11,63 @@ for biological and genomic data. It provides robust management of projects, samp
 - **ORM:** Hibernate ORM with Panache (Active Record pattern)
 - **Migrations:** Flyway
 - **Authentication:** OIDC / Keycloak (Service type)
-- **Object Storage:** S3-compatible storage such as Garage, AWS S3, or MinIO (presigned URLs and upload reconciliation)
+- **Object Storage:** S3-compatible storage such as Garage, Silo, or AWS S3 (presigned URLs and upload reconciliation)
 - **Containerization:** Jib (Docker)
 - **Build Tool:** Maven (via `./mvnw` wrapper)
 
 ## Requirements
 
 - **Java:** JDK 25+
-- **Database:** PostgreSQL 16+ (recommended)
-- **Storage:** Access to an S3-compatible object store and an existing bucket
-- **Auth:** Access to Metatrack Keycloak realm
+- **Docker:** Docker Engine or Docker Desktop with Docker Compose v2 and `curl` for local Keycloak readiness checks
+- **Database:** PostgreSQL 18 for the checked-in local stack; external environments may use another supported PostgreSQL version
+- **Storage and auth:** The local development stack provides Silo and Keycloak; the taxonomy API remains external
 
 ## Environment Variables
 
-The following environment variables are required for the application to function correctly:
+Local values for these application settings are provided in `.env.example`. For an external environment, configure
+the corresponding values explicitly (the remote-development workflow is documented in
+[`docs/development.md`](docs/development.md)):
 
-| Variable           | Description                                                     |
-|--------------------|-----------------------------------------------------------------|
-| `DB_PASSWORD`      | Password for the PostgreSQL database                            |
-| `S3_ENDPOINT`      | Full S3 API endpoint URL, including scheme and port             |
-| `S3_REGION`        | S3 signing region                                                |
-| `S3_ACCESS_KEY`    | S3 access key                                                    |
-| `S3_SECRET_KEY`    | S3 secret key                                                    |
-| `S3_BUCKET_NAME`   | Object bucket; defaults to `metatrack`                           |
-| `S3_PATH_STYLE_ACCESS` | Use path-style addressing; defaults to `true`               |
-| `FILE_RECONCILIATION_INTERVAL` | Pending-upload polling interval; defaults to `10s`  |
+| Variable | Description |
+|---|---|
+| `DB_USERNAME`, `DB_PASSWORD`, `JDBC_STRING` | PostgreSQL credentials and JDBC URL |
+| `KEYCLOAK_URL`, `KEYCLOAK_BASE_URL`, `KEYCLOAK_REALM` | OIDC issuer, Keycloak Admin API base URL, and realm name |
+| `KEYCLOAK_ADMIN_CLIENT_ID`, `KEYCLOAK_ADMIN_CLIENT_SECRET` | Confidential client credentials for Keycloak user lookups |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | S3 API endpoint and signing credentials |
+| `S3_BUCKET_NAME` | Object bucket; defaults to `metatrack` |
+| `S3_PATH_STYLE_ACCESS` | Use path-style addressing; defaults to `true` |
+| `FILE_RECONCILIATION_INTERVAL` | Pending-upload polling interval; defaults to `10s` |
+| `TAXON_API_URL` | External taxonomy API base URL; defaults to `http://localhost:8080` |
 
 ## Setup and Running
 
 ### Running in Development Mode
 
-You can run the application in dev mode with live coding enabled:
+Start the reproducible local dependencies and run the API in dev mode with live coding enabled:
 
 ```shell
-./mvnw quarkus:dev
+cp .env.example .env
+./dev/dev.sh api
 ```
 
-> **Note:** The server defaults to port `1234` (configured in `application.yml`). The Quarkus Dev UI is available at
-`http://localhost:1234/q/dev/`.
+The command starts PostgreSQL, Keycloak, and Silo in Docker, creates the local S3 bucket, then starts the API on the
+host. The API listens on port `1234`; the Quarkus Dev UI is at `http://localhost:1234/q/dev/`. See
+[`docs/development.md`](docs/development.md) for seeded login credentials, service ports, stack lifecycle, and the
+explicit remote-development workflow.
+
+To start only the services, run `./dev/dev.sh up`; stop them with `./dev/dev.sh down` (data is preserved). To delete
+the stack's persistent development data, run `./dev/dev.sh reset` and confirm the prompt.
+
+The API can also be explicitly pointed at remote services using a separate ignored environment file:
+
+```shell
+cp .env.remote.example .env.remote
+# Edit .env.remote with trusted endpoints and credentials.
+./dev/dev.sh api --remote .env.remote
+```
+
+Remote mode does not start Compose and disables Flyway startup migrations. It does **not** make API operations
+read-only; requests can still modify remote data.
 
 ### Packaging and Running
 
@@ -87,7 +106,8 @@ Run the native executable: `./target/server-1.0-SNAPSHOT-runner`
 
 - `./mvnw compile` - Compile the project.
 - `./mvnw test` - Run unit and integration tests.
-- `./mvnw quarkus:dev` - Start development server.
+- `./dev/dev.sh api` - Start local dependencies and the API in development mode.
+- `./dev/dev.sh up|down|reset` - Manage the local dependency stack.
 - `./mvnw package` - Build the application.
 - `./mvnw clean` - Remove build artifacts.
 
