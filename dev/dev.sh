@@ -44,13 +44,33 @@ require_local_configuration() {
   local expected_keycloak_base="http://localhost:${KEYCLOAK_HOST_PORT}"
   local expected_keycloak="${expected_keycloak_base}/realms/${KEYCLOAK_REALM}"
   local expected_s3="http://localhost:${SILO_API_HOST_PORT}"
+  local expected_sftpgo="http://localhost:${SFTPGO_HTTP_HOST_PORT:-}"
 
   if [[ "${JDBC_STRING:-}" != "$expected_jdbc" \
       || "${KEYCLOAK_BASE_URL:-}" != "$expected_keycloak_base" \
       || "${KEYCLOAK_URL:-}" != "$expected_keycloak" \
-      || "${S3_ENDPOINT:-}" != "$expected_s3" ]]; then
-    printf 'Local API mode only accepts the local PostgreSQL, Keycloak, and Silo endpoints in .env.\n' >&2
+      || "${S3_ENDPOINT:-}" != "$expected_s3" \
+      || "${SFTPGO_API_URL:-}" != "$expected_sftpgo" \
+      || "${SFTPGO_S3_ENDPOINT:-}" != "http://silo:9000" \
+      || "${SFTPGO_ENABLED:-false}" != true ]]; then
+    printf 'Local API mode only accepts the local PostgreSQL, Keycloak, Silo, and SFTPGo endpoints in .env.\n' >&2
+    printf 'Update an existing .env with the SFTPGo entries from .env.example.\n' >&2
     printf 'For remote endpoints, use: ./dev/dev.sh api --remote ENV_FILE\n' >&2
+    exit 1
+  fi
+  for name in SFTPGO_SFTP_HOST_PORT SFTPGO_HTTP_HOST_PORT SFTPGO_ADMIN_USERNAME \
+      SFTPGO_ADMIN_PASSWORD SFTPGO_SFTP_HOST SFTPGO_SFTP_PORT SFTPGO_S3_REGION \
+      SFTPGO_S3_ACCESS_KEY SFTPGO_S3_SECRET_KEY SFTPGO_S3_BUCKET_NAME \
+      SFTPGO_S3_PATH_STYLE_ACCESS SFTPGO_HOOK_URL SFTPGO_HOOK_SECRET \
+      UPLOAD_BATCH_STAGING_BUDGET_BYTES; do
+    if [[ -z "${!name:-}" ]]; then
+      printf 'Local SFTPGo configuration variable %s must be set in .env.\n' "$name" >&2
+      exit 1
+    fi
+  done
+  if [[ ! "${UPLOAD_BATCH_STAGING_BUDGET_BYTES}" =~ ^[0-9]+$ ]] \
+      || (( UPLOAD_BATCH_STAGING_BUDGET_BYTES <= 0 )); then
+    printf 'UPLOAD_BATCH_STAGING_BUDGET_BYTES must be a positive integer in .env.\n' >&2
     exit 1
   fi
 }
@@ -65,6 +85,23 @@ require_remote_configuration() {
       exit 1
     fi
   done
+  if [[ "${SFTPGO_ENABLED:-false}" == true ]]; then
+    for name in SFTPGO_API_URL SFTPGO_ADMIN_USERNAME SFTPGO_ADMIN_PASSWORD \
+        SFTPGO_SFTP_HOST SFTPGO_SFTP_PORT SFTPGO_S3_ENDPOINT SFTPGO_S3_REGION \
+        SFTPGO_S3_ACCESS_KEY SFTPGO_S3_SECRET_KEY SFTPGO_S3_BUCKET_NAME \
+        SFTPGO_S3_PATH_STYLE_ACCESS SFTPGO_HOOK_URL SFTPGO_HOOK_SECRET \
+        UPLOAD_BATCH_STAGING_BUDGET_BYTES; do
+      if [[ -z "${!name:-}" ]]; then
+        printf 'SFTPGo is enabled but remote environment variable %s is empty.\n' "$name" >&2
+        exit 1
+      fi
+    done
+    if [[ ! "${UPLOAD_BATCH_STAGING_BUDGET_BYTES}" =~ ^[0-9]+$ ]] \
+        || (( UPLOAD_BATCH_STAGING_BUDGET_BYTES <= 0 )); then
+      printf 'SFTPGo is enabled but UPLOAD_BATCH_STAGING_BUDGET_BYTES is not a positive integer.\n' >&2
+      exit 1
+    fi
+  fi
 }
 
 compose() {
@@ -93,6 +130,20 @@ start_local_stack() {
     sleep 2
   done
   compose run --rm --no-deps silo-bootstrap
+  compose up --detach --wait sftpgo
+  local sftpgo_health_url="${SFTPGO_API_URL}/healthz"
+  local attempt
+  for attempt in {1..30}; do
+    if curl --fail --silent "$sftpgo_health_url" >/dev/null; then
+      break
+    fi
+    if [[ "$attempt" -eq 30 ]]; then
+      printf 'SFTPGo did not become ready at %s.\n' "$sftpgo_health_url" >&2
+      compose logs sftpgo >&2
+      exit 1
+    fi
+    sleep 2
+  done
 }
 
 start_api() {
@@ -126,7 +177,7 @@ case "${1:-}" in
     ;;
   reset)
     [[ $# -eq 1 ]] || { usage >&2; exit 2; }
-    printf 'This permanently deletes the PostgreSQL, Keycloak, and Silo volumes for Compose project metatrack-dev.\n'
+    printf 'This permanently deletes the PostgreSQL, Keycloak, Silo, and SFTPGo volumes for Compose project metatrack-dev.\n'
     read -r -p 'Type "reset" to continue: ' confirmation
     if [[ "$confirmation" != reset ]]; then
       printf 'Reset cancelled.\n'
