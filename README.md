@@ -12,13 +12,14 @@ for biological and genomic data. It provides robust management of projects, samp
 - **Migrations:** Flyway
 - **Authentication:** OIDC / Keycloak (Service type)
 - **Object Storage:** S3-compatible storage such as Garage, Silo, or AWS S3 (presigned URLs and upload reconciliation)
+- **Bulk Transfers:** Pinned SFTPGo Open Source with per-batch SSH-key accounts and S3-backed staging
 - **Containerization:** Jib (Docker)
 - **Build Tool:** Maven (via `./mvnw` wrapper)
 
 ## Requirements
 
 - **Java:** JDK 25+
-- **Docker:** Docker Engine or Docker Desktop with Docker Compose v2 and `curl` for local Keycloak readiness checks
+- **Docker:** Docker Engine or Docker Desktop with Docker Compose v2 and `curl` for local Keycloak/SFTPGo readiness checks
 - **Database:** PostgreSQL 18 for the checked-in local stack; external environments may use another supported PostgreSQL version
 - **Storage and auth:** The local development stack provides Silo and Keycloak; the taxonomy API remains external
 
@@ -34,9 +35,17 @@ the corresponding values explicitly (the remote-development workflow is document
 | `KEYCLOAK_URL`, `KEYCLOAK_BASE_URL`, `KEYCLOAK_REALM` | OIDC issuer, Keycloak Admin API base URL, and realm name |
 | `KEYCLOAK_ADMIN_CLIENT_ID`, `KEYCLOAK_ADMIN_CLIENT_SECRET` | Confidential client credentials for Keycloak user lookups |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | S3 API endpoint and signing credentials |
-| `S3_BUCKET_NAME` | Object bucket; defaults to `metatrack` |
+| `S3_BUCKET_NAME` | API-managed object bucket; defaults to `metatrack` |
 | `S3_PATH_STYLE_ACCESS` | Use path-style addressing; defaults to `true` |
 | `FILE_RECONCILIATION_INTERVAL` | Pending-upload polling interval; defaults to `10s` |
+| `SFTPGO_ENABLED`, `SFTPGO_API_URL`, `SFTPGO_ADMIN_USERNAME`, `SFTPGO_ADMIN_PASSWORD` | Enable the private SFTPGo management API integration |
+| `SFTPGO_SFTP_HOST`, `SFTPGO_SFTP_PORT`, `SFTPGO_SFTP_HOST_PORT`, `SFTPGO_HTTP_HOST_PORT` | SFTP endpoint returned to users and local Compose host ports |
+| `SFTPGO_S3_ENDPOINT`, `SFTPGO_S3_REGION`, `SFTPGO_S3_BUCKET_NAME`, `SFTPGO_S3_ACCESS_KEY`, `SFTPGO_S3_SECRET_KEY` | SFTPGo staging storage credentials; use a separate staging-only S3 identity |
+| `SFTPGO_HOOK_URL`, `SFTPGO_HOOK_SECRET` | Private synchronous admission hook and its machine credential |
+| `SFTPGO_RESUME_MAX_SIZE_BYTES` | Maximum SFTPGo S3 object size allowed to resume; default is 50 GiB |
+| `UPLOAD_BATCH_MAX_FILES`, `UPLOAD_BATCH_MAX_FILE_SIZE_BYTES`, `UPLOAD_BATCH_MAX_TRANSFERS_PER_BATCH`, `UPLOAD_BATCH_MAX_TOTAL_TRANSFERS`, `UPLOAD_BATCH_MAX_INGESTION_WORKERS` | Batch, file, transfer, and worker limits; hard ceilings are 100 files and 50 GiB per file |
+| `UPLOAD_BATCH_STAGING_BUDGET_BYTES` | Required global staging reservation budget; local example is 1 TiB |
+| `UPLOAD_BATCH_UPLOAD_WINDOW`, `UPLOAD_BATCH_FAILED_STAGING_RETENTION`, `UPLOAD_BATCH_MULTIPART_COPY_PART_SIZE_BYTES` | Upload expiry, unsuccessful-data retention, and S3 multipart-copy part size |
 | `TAXON_API_URL` | External taxonomy API base URL; defaults to `http://localhost:8080` |
 
 ## Setup and Running
@@ -50,10 +59,12 @@ cp .env.example .env
 ./dev/dev.sh api
 ```
 
-The command starts PostgreSQL, Keycloak, and Silo in Docker, creates the local S3 bucket, then starts the API on the
-host. The API listens on port `1234`; the Quarkus Dev UI is at `http://localhost:1234/q/dev/`. See
+The command starts PostgreSQL, Keycloak, Silo, and pinned SFTPGo OSS in Docker, creates the local S3 bucket, then
+starts the API on the host. The API listens on port `1234`; the Quarkus Dev UI is at `http://localhost:1234/q/dev/`.
+Local SFTPGo listens on `12022` for SFTP and exposes its admin API on loopback port `18082`. See
 [`docs/development.md`](docs/development.md) for seeded login credentials, service ports, stack lifecycle, and the
-explicit remote-development workflow.
+explicit remote-development workflow. See [`docs/upload-batches-runbook.md`](docs/upload-batches-runbook.md) for the
+manifest, SSH transfer/resume, finalize, status, cancellation, and production runbook.
 
 To start only the services, run `./dev/dev.sh up`; stop them with `./dev/dev.sh down` (data is preserved). To delete
 the stack's persistent development data, run `./dev/dev.sh reset` and confirm the prompt.
@@ -122,6 +133,7 @@ src/main/java/no/metatrack/server/
 ├── sample/     # Sample management and CSV/TSV import
 ├── assay/      # Assay grouping and sample associations
 ├── file/       # File metadata, generic S3 URLs, and upload reconciliation
+├── upload/     # Manifest-based SFTP batches, admission hooks, promotion, and cleanup
 ├── stats/      # Platform-wide statistics
 └── health/     # Service health status endpoints
 

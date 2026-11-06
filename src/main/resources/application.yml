@@ -68,7 +68,35 @@ metatrack:
     presign-expiry-seconds: 600
     reconciliation-interval: ${FILE_RECONCILIATION_INTERVAL:10s}
     reconciliation-batch-size: ${FILE_RECONCILIATION_BATCH_SIZE:100}
+  sftpgo:
+    enabled: ${SFTPGO_ENABLED:false}
+    api-url: ${SFTPGO_API_URL:http://localhost:18082}
+    admin-username: ${SFTPGO_ADMIN_USERNAME:}
+    admin-password: ${SFTPGO_ADMIN_PASSWORD:}
+    sftp-host: ${SFTPGO_SFTP_HOST:localhost}
+    sftp-port: ${SFTPGO_SFTP_PORT:2022}
+    s3-endpoint: ${SFTPGO_S3_ENDPOINT:}
+    s3-region: ${SFTPGO_S3_REGION:}
+    s3-access-key: ${SFTPGO_S3_ACCESS_KEY:}
+    s3-secret-key: ${SFTPGO_S3_SECRET_KEY:}
+    s3-bucket-name: ${SFTPGO_S3_BUCKET_NAME:}
+    s3-path-style-access: ${SFTPGO_S3_PATH_STYLE_ACCESS:true}
+    hook-url: ${SFTPGO_HOOK_URL:http://localhost:1234/api/internal/sftpgo/events}
+    hook-secret: ${SFTPGO_HOOK_SECRET:}
+    resume-max-size-bytes: ${SFTPGO_RESUME_MAX_SIZE_BYTES:53687091200}
+  upload-batches:
+    max-files-per-batch: ${UPLOAD_BATCH_MAX_FILES:100}
+    max-file-size-bytes: ${UPLOAD_BATCH_MAX_FILE_SIZE_BYTES:53687091200}
+    max-transfers-per-batch: ${UPLOAD_BATCH_MAX_TRANSFERS_PER_BATCH:2}
+    max-total-transfers: ${UPLOAD_BATCH_MAX_TOTAL_TRANSFERS:8}
+    max-ingestion-workers: ${UPLOAD_BATCH_MAX_INGESTION_WORKERS:2}
+    multipart-copy-part-size-bytes: ${UPLOAD_BATCH_MULTIPART_COPY_PART_SIZE_BYTES:16777216}
+    staging-budget-bytes: ${UPLOAD_BATCH_STAGING_BUDGET_BYTES:0}
+    max-manifest-bytes: ${UPLOAD_BATCH_MAX_MANIFEST_BYTES:1048576}
+    upload-window: ${UPLOAD_BATCH_UPLOAD_WINDOW:P7D}
+    failed-staging-retention: ${UPLOAD_BATCH_FAILED_STAGING_RETENTION:P7D}
 taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
+sftpgo-api/mp-rest/url: ${SFTPGO_API_URL:http://localhost:18082}
 keycloak-admin-api/mp-rest/url: ${KEYCLOAK_BASE_URL}
 keycloak:
   realm: ${KEYCLOAK_REALM}

@@ -6,6 +6,7 @@ import jakarta.ws.rs.NotFoundException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.project.Project;
 import no.metatrack.server.sample.Sample;
+import no.metatrack.server.upload.UploadBatchEntry;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,8 +30,18 @@ public class File extends PanacheEntity {
     @Column(unique = true, nullable = false)
     String virtualPath;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 1024)
     String objectKey;
+
+    @Column(name = "size_bytes")
+    Long sizeBytes;
+
+    @Column(length = 64)
+    String sha256;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "upload_batch_entry_id", unique = true)
+    UploadBatchEntry uploadBatchEntry;
 
     @Enumerated(EnumType.STRING)
     UploadStatus status;
@@ -102,12 +113,62 @@ public class File extends PanacheEntity {
         return Optional.of(file);
     }
 
+    public static Optional<File> findByVirtualPathForUpdate(String virtualPath) {
+        return find("virtualPath", virtualPath)
+                .withLock(LockModeType.PESSIMISTIC_WRITE)
+                .firstResultOptional();
+    }
+
     public static Optional<File> findByUuidOptional(UUID uuid) {
         File file = File.find("uuid", uuid).firstResult();
         if (file == null) {
             return Optional.empty();
         }
         return Optional.of(file);
+    }
+
+    public String fileName() {
+        return fileName;
+    }
+
+    public String virtualPath() {
+        return virtualPath;
+    }
+
+    public String md5() {
+        return md5;
+    }
+
+    public String unencryptedMd5() {
+        return unencryptedMd5;
+    }
+
+    public ReadRole readRole() {
+        return readRole;
+    }
+
+    public UploadStatus status() {
+        return status;
+    }
+
+    public UUID uploadedBy() {
+        return uploadedBy;
+    }
+
+    public String objectKey() {
+        return objectKey;
+    }
+
+    public Long sizeBytes() {
+        return sizeBytes;
+    }
+
+    public String sha256() {
+        return sha256;
+    }
+
+    public UploadBatchEntry uploadBatchEntry() {
+        return uploadBatchEntry;
     }
 
     public static Optional<String> validateImportPending(

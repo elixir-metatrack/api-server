@@ -1,0 +1,1 @@
+ALTER TABLE upload_batch_entry ADD COLUMN destination_cleanup_completed_at timestamp with time zone;
