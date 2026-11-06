@@ -10,7 +10,9 @@ import no.metatrack.server.sample.metadata.SampleMetadataField;
 import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
 import no.metatrack.server.sample.vocabulary.SampleVocabularyResponse;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -63,10 +65,11 @@ class SpreadsheetExportWriterTest {
         assertEquals(expected.size() + 4, table.headers().size());
         assertEquals(Map.of("group", List.of("=control", "treated")), table.vocabularies());
         try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
-            var sheet = workbook.getSheetAt(0);
-            assertEquals(CellType.STRING, sheet.getRow(2).getCell(table.headers().indexOf("description") + 1).getCellType());
-            assertEquals(CellType.STRING, sheet.getRow(2).getCell(table.headers().indexOf("amount") + 1).getCellType());
-            assertEquals(CellType.NUMERIC, sheet.getRow(2).getCell(table.headers().indexOf("latitude") + 1).getCellType());
+            var sheet = (XSSFSheet) workbook.getSheetAt(0);
+            assertHeaderFirst(sheet, "name", sample.name, table.headers().size(), table.records().size());
+            assertEquals(CellType.STRING, sheet.getRow(1).getCell(table.headers().indexOf("description")).getCellType());
+            assertEquals(CellType.STRING, sheet.getRow(1).getCell(table.headers().indexOf("amount")).getCellType());
+            assertEquals(CellType.NUMERIC, sheet.getRow(1).getCell(table.headers().indexOf("latitude")).getCellType());
         }
     }
 
@@ -84,7 +87,8 @@ class SpreadsheetExportWriterTest {
         var files = List.of(file(sample, assay, "single.fastq", ReadRole.SINGLE),
                 file(sample, assay, "r1.fastq", ReadRole.FORWARD), file(sample, assay, "r2.fastq", ReadRole.REVERSE),
                 file(sample, assay, "lane2-r1.fastq", ReadRole.FORWARD), file(sample, assay, "legacy.fastq", null));
-        var table = read(writer.experiments(assay, List.of(sample, empty), files), false, Set.of());
+        byte[] bytes = writer.experiments(assay, List.of(sample, empty), files);
+        var table = read(bytes, false, Set.of());
         assertEquals(6, table.records().size());
         for (int index = 0; index < files.size(); index++) {
             var file = files.get(index);
@@ -104,6 +108,23 @@ class SpreadsheetExportWriterTest {
         assertEquals("", table.records().getLast().get("File Name"));
         assertTrue(table.vocabularies().isEmpty());
         assertFalse(table.headers().contains("objectKey"));
+        try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
+            assertHeaderFirst((XSSFSheet) workbook.getSheetAt(0), "Sample Name", "00012", table.headers().size(),
+                    table.records().size());
+        }
+    }
+
+    @Test
+    void emptyExportsKeepHeaderOnlyAutoFilters() throws Exception {
+        byte[] samples = writer.samples(List.of(), List.of(), Map.of(), List.of());
+        byte[] experiments = writer.experiments(new Assay(), List.of(), List.of());
+        try (var sampleWorkbook = WorkbookFactory.create(new ByteArrayInputStream(samples));
+             var experimentWorkbook = WorkbookFactory.create(new ByteArrayInputStream(experiments))) {
+            assertHeaderFirst((XSSFSheet) sampleWorkbook.getSheetAt(0), "name", null,
+                    sampleWorkbook.getSheetAt(0).getRow(0).getLastCellNum(), 0);
+            assertHeaderFirst((XSSFSheet) experimentWorkbook.getSheetAt(0), "Sample Name", null,
+                    experimentWorkbook.getSheetAt(0).getRow(0).getLastCellNum(), 0);
+        }
     }
 
     @Test
@@ -119,6 +140,20 @@ class SpreadsheetExportWriterTest {
     private SpreadsheetTable read(byte[] bytes, boolean sample, Set<String> numericHeaders) throws Exception {
         Path path = Files.write(directory.resolve("export.xlsx"), bytes);
         return new SpreadsheetImportSupport().read(path.toFile(), sample, numericHeaders);
+    }
+
+    private void assertHeaderFirst(XSSFSheet sheet, String firstHeader, String firstValue, int columns, int lastRow) {
+        assertEquals(firstHeader, sheet.getRow(0).getCell(0).getStringCellValue());
+        if (lastRow > 0) assertEquals(firstValue, sheet.getRow(1).getCell(0).getStringCellValue());
+        assertEquals(1, sheet.getPaneInformation().getHorizontalSplitPosition());
+        assertEquals(1, sheet.getPaneInformation().getVerticalSplitPosition());
+        var autoFilter = sheet.getCTWorksheet().getAutoFilter();
+        assertNotNull(autoFilter);
+        CellRangeAddress range = CellRangeAddress.valueOf(autoFilter.getRef());
+        assertEquals(0, range.getFirstRow());
+        assertEquals(lastRow, range.getLastRow());
+        assertEquals(0, range.getFirstColumn());
+        assertEquals(columns - 1, range.getLastColumn());
     }
 
     private Sample sample(String name) {

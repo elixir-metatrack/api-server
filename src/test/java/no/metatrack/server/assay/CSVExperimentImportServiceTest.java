@@ -647,25 +647,22 @@ class CSVExperimentImportServiceTest {
                 Path path = directory.resolve(type + ".xlsx");
                 try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(template))) {
                     var sheet = workbook.getSheetAt(0);
-                    for (var header : sheet) {
-                        if (header.getCell(0) == null
-                                || !"METADATA FIELDS:".equals(header.getCell(0).getStringCellValue())) continue;
-                        if (includeAccessions) {
-                            int column = header.getLastCellNum();
-                            header.createCell(column).setCellValue("experiment_accession");
-                            header.createCell(column + 1).setCellValue("run_accession");
-                        }
-                        var data = sheet.createRow(header.getRowNum() + 1);
-                        for (var cell : header) {
-                            String value = switch (cell.getStringCellValue()) {
-                                case "Sample Name" -> "sample";
-                                case "experiment_accession" -> "000123";
-                                case "run_accession" -> "ERR123";
-                                default -> null;
-                            };
-                            if (value != null) data.createCell(cell.getColumnIndex()).setCellValue(value);
-                        }
-                        break;
+                    var header = sheet.getRow(0);
+                    assertEquals("Sample Name", header.getCell(0).getStringCellValue());
+                    if (includeAccessions) {
+                        int column = header.getLastCellNum();
+                        header.createCell(column).setCellValue("experiment_accession");
+                        header.createCell(column + 1).setCellValue("run_accession");
+                    }
+                    var data = sheet.createRow(header.getRowNum() + 1);
+                    for (var cell : header) {
+                        String value = switch (cell.getStringCellValue()) {
+                            case "Sample Name" -> "sample";
+                            case "experiment_accession" -> "000123";
+                            case "run_accession" -> "ERR123";
+                            default -> null;
+                        };
+                        if (value != null) data.createCell(cell.getColumnIndex()).setCellValue(value);
                     }
                     try (var output = Files.newOutputStream(path)) {
                         workbook.write(output);
