@@ -72,7 +72,35 @@ services:
       silo:
         condition: service_healthy
 
+  sftpgo:
+    image: drakkan/sftpgo:v2.7.6@sha256:1edd28d80de2a008863fbfc58c8ff7db47b1b410bae48d4e6076192337809b11
+    environment:
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DATA_PROVIDER__USERS_BASE_DIR: /srv/sftpgo/data
+      SFTPGO_DATA_PROVIDER__TRACK_QUOTA: "2"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: ${SFTPGO_ADMIN_USERNAME:?SFTPGO_ADMIN_USERNAME must be set}
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${SFTPGO_ADMIN_PASSWORD:?SFTPGO_ADMIN_PASSWORD must be set}
+      SFTPGO_HTTPD__BINDINGS__0__ADDRESS: 0.0.0.0
+      SFTPGO_HTTPD__BINDINGS__0__PORT: "8080"
+      SFTPGO_SFTPD__BINDINGS__0__ADDRESS: 0.0.0.0
+      SFTPGO_SFTPD__BINDINGS__0__PORT: "2022"
+      SFTPGO_COMMON__UPLOAD_MODE: "6"
+      SFTPGO_COMMON__RESUME_MAX_SIZE: ${SFTPGO_RESUME_MAX_SIZE_BYTES:-53687091200}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:${SFTPGO_SFTP_HOST_PORT}:2022"
+      - "127.0.0.1:${SFTPGO_HTTP_HOST_PORT}:8080"
+    volumes:
+      - sftpgo-control:/var/lib/sftpgo
+      - sftpgo-pipe:/srv/sftpgo
+    depends_on:
+      silo:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   keycloak-data:
   silo-data:
+  sftpgo-control:
+  sftpgo-pipe:
