@@ -13,7 +13,6 @@
 
 ### Bug Fixes
 
-* add sequencing platform and laboratory to assays ([8f3d0a2](https://github.com/elixir-metatrack/api-server/commit/8f3d0a2cada6d36ac1ff63695ac6c111db0c99a3))
 * **deps:** update aws-java-sdk-v2 monorepo to v2.57.10 ([#125](https://github.com/elixir-metatrack/api-server/issues/125)) ([eef3b22](https://github.com/elixir-metatrack/api-server/commit/eef3b22fbbeee45d0685ffb5d56c9e8d1d094c17))
 * **deps:** update aws-java-sdk-v2 monorepo to v2.57.6 ([#116](https://github.com/elixir-metatrack/api-server/issues/116)) ([d7ddf6c](https://github.com/elixir-metatrack/api-server/commit/d7ddf6cb0e73037c399abc8a81ceeae4dd2bb7ac))
 * **deps:** update aws-java-sdk-v2 monorepo to v2.57.7 ([#119](https://github.com/elixir-metatrack/api-server/issues/119)) ([fc1ea2e](https://github.com/elixir-metatrack/api-server/commit/fc1ea2ef05b34a9716108b5981df62591db4fa20))
