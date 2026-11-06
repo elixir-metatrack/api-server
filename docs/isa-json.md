@@ -43,6 +43,16 @@ uv run --with jsonschema==4.25.1 python scripts/validate-isa-json.py target/isa-
   --mars-schema /tmp/mars/schemas/isa_json.schema.json
 ```
 
+To run an export through the MARS ENA adapter without submitting anything (needs Docker):
+
+```sh
+scripts/mars-offline-check/run.sh target/isa-demo.json
+```
+
+The script builds MARS (pinned commit) in Docker and prints the ENA study/experiment/run XML that MARS
+would send to Webin. Samples without an `accession` get the placeholder `SAMEA0000000`, because the
+BioSamples step is not run.
+
 ## Goals and principles
 
 From the requirement: Metatrack must (1) generate ISA-JSON that downstream tools, specifically
@@ -280,9 +290,10 @@ processes not on a file lineage, derived data files.
 - [isa-json-example.json](isa-json-example.json) (synthetic, values from the templates) passes
   the ISA schema, the MARS schema, internal references, unique definitions and "every file has a
   producing process" (`scripts/validate-isa-json.py`).
-- **MARS ENA adapter, offline (2026-10-29):** MARS `8cc6fca` + `mars-repository-lib` v0.0.2 built in Docker;
-  a test harness calls the adapter's study/experiment/run XML creators exactly as
-  `performSubmissionToEna` does, but stops before the Webin submission (dummy BioSample accession).
+- **MARS ENA adapter, offline (2026-10-29, repeated 2026-11-06 with `scripts/mars-offline-check`):** MARS `8cc6fca`
+  + `mars-repository-lib` v0.0.2 built in Docker; the script calls the adapter's study/experiment/run XML creators
+  exactly as `performSubmissionToEna` does, but stops before the Webin submission. With an `accession` on each
+  sample, every experiment references its own sample.
   | Input | Result |
   | --- | --- |
   | MARS's own fixture `biosamples-input-isa.json` (control) | OK, 1 experiment, 1 run |

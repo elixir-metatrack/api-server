@@ -41,7 +41,7 @@ ena -down-> dbena : Webin XML
 receipt -[dashed,norank]-> mt : not built:\nwrite accessions back
 
 legend bottom
-  <back:#E5F3EF> tested offline </back>  MARS 8cc6fca in Docker: the ENA adapter builds study/experiment/run XML from our export
+  <back:#E5F3EF> tested offline </back>  scripts/mars-offline-check/run.sh: MARS 8cc6fca in Docker builds study/experiment/run XML from our export
   and stops before the Webin submission. Result for the demo project: 1 study, 2 experiments, 2 runs, no manual changes.
   <back:#FFF3D6> not run yet </back>  The BioSamples adapter submits directly, so it was not run. A submission to the ENA test server
   needs a Webin test account from the team. Checklist validation (ENA) is a separate topic.
