@@ -1,8 +1,9 @@
 # Local Development Environment
 
 The checked-in Compose stack makes the API's supporting services reproducible across Linux, macOS, and Windows through
-WSL2, on x86-64 and ARM64. Docker Compose manages PostgreSQL, Keycloak, and Silo; run the Java 25 API on the host for
-IDE debugging and Quarkus live reload. Install `curl` on the host for the launcher's Keycloak readiness check.
+WSL2, on x86-64 and ARM64. Docker Compose manages PostgreSQL, Keycloak, Silo, and pinned SFTPGo Open Source; run the
+Java 25 API on the host for IDE debugging and Quarkus live reload. Install `curl` on the host for the launcher's
+Keycloak and SFTPGo readiness checks.
 
 ## Start the local stack
 
@@ -17,7 +18,13 @@ The API command waits for the dependencies to become ready and creates the S3 bu
 the dependencies without starting the API, use `./dev/dev.sh up`. API access is at `http://localhost:1234`. The
 default Keycloak realm issuer is `http://localhost:18081/realms/metatrack`, and the Silo console is
 `http://localhost:19001`. The local S3 endpoint is `http://localhost:19000`; PostgreSQL is published at
-`localhost:15432`. These nonstandard defaults avoid common ports used by existing local installations.
+`localhost:15432`. SFTPGo SFTP is bound to `localhost:12022`; its management API/WebAdmin is bound to
+`localhost:18082`. These nonstandard defaults avoid common ports used by existing local installations. See
+[`upload-batches-runbook.md`](upload-batches-runbook.md) for the batch workflow and production SFTPGo guidance.
+
+The local SFTPGo account database, generated SSH host keys, and writable OSS transfer-pipe directory use dedicated
+Compose volumes. The pipe volume is temporary transfer space, not durable staging; size it for concurrent large files.
+The local SFTPGo administrator and staging S3 credentials in `.env.example` are development-only.
 
 The SPA client is named `metatrack-spa` and permits redirects from `http://localhost:3000/*` with PKCE S256. The client
 for the scalar API is `metatrack-scalar` and permits redirects from `http://localhost:1234/*` with PKCE S256. The
@@ -58,14 +65,17 @@ still require a reachable taxonomy service.
 ./dev/dev.sh reset
 ```
 
-`down` stops containers but keeps the named PostgreSQL, Keycloak, and Silo volumes. `reset` asks for the literal
+`down` stops containers but keeps the named PostgreSQL, Keycloak, Silo, and SFTPGo volumes. `reset` asks for the literal
 confirmation `reset` before running Compose with `--volumes`; it irreversibly removes only the `metatrack-dev`
-Compose project's data. Reset is needed to re-import a changed Keycloak realm seed. Do not use
+Compose project's data, including SFTPGo control data, generated SSH host keys, and temporary transfer-pipe storage.
+Reset is needed to re-import a changed Keycloak realm seed. Do not use
 `docker compose down -v` against another Compose project.
 
-Host ports are configurable in `.env` (`POSTGRES_HOST_PORT`, `KEYCLOAK_HOST_PORT`, `SILO_API_HOST_PORT`, and
-`SILO_CONSOLE_HOST_PORT`). The matching JDBC, Keycloak, and S3 URLs in that same file reference those variables. Keep
-the endpoint variables local in `.env`; `./dev/dev.sh api` refuses non-local database, Keycloak, or S3 endpoints.
+Host ports are configurable in `.env` (`POSTGRES_HOST_PORT`, `KEYCLOAK_HOST_PORT`, `SILO_API_HOST_PORT`,
+`SILO_CONSOLE_HOST_PORT`, `SFTPGO_SFTP_HOST_PORT`, and `SFTPGO_HTTP_HOST_PORT`). The matching JDBC, Keycloak, S3,
+and SFTPGo URLs in that same file reference those variables. Keep endpoint variables local in `.env`; `./dev/dev.sh api`
+refuses non-local database, Keycloak, Silo, or SFTPGo endpoints. SFTPGo's admin API is loopback-only locally; keep it
+on private authenticated connectivity in production and do not publish it on a public interface.
 
 ## Explicit remote development
 
@@ -91,9 +101,9 @@ Maven. Never commit actual credentials or export a production Keycloak realm int
 
 - If a host port is occupied, choose another port in `.env`; its corresponding application URL is expanded from the
   same setting.
-- If a database, Keycloak realm, or bucket looks stale, `./dev/dev.sh down` preserves it. `./dev/dev.sh reset` deletes
+- If a database, Keycloak realm, bucket, or SFTPGo identity looks stale, `./dev/dev.sh down` preserves it. `./dev/dev.sh reset` deletes
   the local volumes and the next `up` bootstraps them again.
-- If Keycloak or Silo is not ready, inspect `docker compose logs keycloak silo postgres` and retry
+- If Keycloak, Silo, or SFTPGo is not ready, inspect `docker compose logs keycloak silo postgres sftpgo` and retry
   `./dev/dev.sh up` after resolving the reported startup issue.
 - Invitation API emails are logged/mocked by the Quarkus dev profile. Keycloak email verification messages are
   separate; the pre-seeded accounts can be used without sending them.
