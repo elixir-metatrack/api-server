@@ -75,8 +75,12 @@ class AssayServiceTest {
     void responsePreservesStudyAndNullableOrVerbatimAccessions() {
         Assay assay = new Assay();
         assay.studyAccession = "study";
+        assay.sequencingPlatform = "ILLUMINA";
+        assay.sequencingLaboratory = "Lab A";
         AssayResponse emptyResponse = AssayResponse.fromEntity(assay);
         assertEquals("study", emptyResponse.studyAccession());
+        assertEquals("ILLUMINA", emptyResponse.sequencingPlatform());
+        assertEquals("Lab A", emptyResponse.sequencingLaboratory());
         assertNull(emptyResponse.experimentAccession());
         assertNull(emptyResponse.runAccession());
         assay.experimentAccession = " experiment ";
@@ -136,6 +140,34 @@ class AssayServiceTest {
     }
 
     @Test
+    void createStoresAndValidatesSequencingPlatformAndLaboratory() {
+        var service = serviceWithRules(Map.of(
+                "sequencing_platform", Set.of("ILLUMINA"),
+                "sequencing_laboratory", Set.of("Lab A")));
+        Project project = new Project();
+        try (MockedStatic<PanacheEntityBase> projects = mockStatic(PanacheEntityBase.class)) {
+            projects.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            Assay assay = service.createAssay(1L, "new", null, null, null, null, null, null, null, null,
+                    null, null, "ILLUMINA", "Lab A");
+            assertEquals("ILLUMINA", assay.sequencingPlatform);
+            assertEquals("Lab A", assay.sequencingLaboratory);
+            assertTrue(project.assays.contains(assay));
+
+            var exception = assertThrows(AssayVocabularyValidationException.class, () ->
+                    service.createAssay(1L, "invalid", null, null, null, null, null, null, null, null,
+                            null, null, "UNKNOWN", "Lab A"));
+            assertEquals("sequencing_platform", exception.violations().getFirst().field());
+            assertEquals(1, project.assays.size());
+
+            exception = assertThrows(AssayVocabularyValidationException.class, () ->
+                    service.createAssay(1L, "invalid", null, null, null, null, null, null, null, null,
+                            null, null, "ILLUMINA", "Unknown lab"));
+            assertEquals("sequencing_laboratory", exception.violations().getFirst().field());
+            assertEquals(1, project.assays.size());
+        }
+    }
+
+    @Test
     void createAllowsNullBlankAndUnconfiguredValues() {
         var service = serviceWithRules(Map.of("library_layout", Set.of("PAIRED")));
         Project project = new Project();
@@ -176,6 +208,48 @@ class AssayServiceTest {
             assertEquals("library", assay.libraryName);
             assertEquals("source", assay.librarySource);
             assertEquals("layout", assay.libraryLayout);
+        }
+    }
+
+    @Test
+    void patchStoresSequencingFieldsPreservesNullAndRejectsInvalidValuesBeforeMutation() {
+        Assay assay = new Assay();
+        assay.name = "existing";
+        assay.sequencingPlatform = "ILLUMINA";
+        assay.sequencingLaboratory = "Lab A";
+        assay.modifiedOn = Instant.EPOCH;
+        UUID id = UUID.randomUUID();
+        var service = serviceWithRules(Map.of(
+                "sequencing_platform", Set.of("ILLUMINA", "ONT"),
+                "sequencing_laboratory", Set.of("Lab A", "Lab B")));
+        try (MockedStatic<Assay> assays = mockStatic(Assay.class)) {
+            assays.when(() -> Assay.findByIdInProjectScope(1L, id)).thenReturn(Optional.of(assay));
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                    null, null, "ONT", "Lab B");
+            assertEquals("ONT", assay.sequencingPlatform);
+            assertEquals("Lab B", assay.sequencingLaboratory);
+
+            service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null);
+            assertEquals("ONT", assay.sequencingPlatform);
+            assertEquals("Lab B", assay.sequencingLaboratory);
+            Instant modifiedOn = assay.modifiedOn;
+
+            var exception = assertThrows(AssayVocabularyValidationException.class, () ->
+                    service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                            null, null, "UNKNOWN", "Lab A"));
+            assertEquals("sequencing_platform", exception.violations().getFirst().field());
+            assertEquals("ONT", assay.sequencingPlatform);
+            assertEquals("Lab B", assay.sequencingLaboratory);
+            assertEquals(modifiedOn, assay.modifiedOn);
+
+            var laboratoryException = assertThrows(AssayVocabularyValidationException.class, () ->
+                    service.updateAssay(1L, id, null, null, null, null, null, null, null, null, null,
+                            null, null, "ONT", "Unknown lab"));
+            assertEquals("sequencing_laboratory", laboratoryException.violations().getFirst().field());
+            assertEquals("ONT", assay.sequencingPlatform);
+            assertEquals("Lab B", assay.sequencingLaboratory);
+            assertEquals(modifiedOn, assay.modifiedOn);
         }
     }
 
