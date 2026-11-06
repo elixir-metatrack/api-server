@@ -115,7 +115,7 @@ class SpreadsheetImportPostgresTest {
     }
 
     @Test
-    void downloadsVersionedExcelTemplate() throws Exception {
+    void downloadsHeaderFirstExcelTemplate() throws Exception {
         try (HttpClient client = HttpClient.newHttpClient()) {
             var response = client.send(HttpRequest.newBuilder(server.resolve("/api/templates/excel/sample")).GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray());
@@ -124,7 +124,7 @@ class SpreadsheetImportPostgresTest {
                     response.headers().firstValue("Content-Type").orElseThrow().split(";")[0]);
             assertTrue(response.headers().firstValue("Content-Disposition").orElseThrow().contains("sample-v1.xlsx"));
             try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(response.body()))) {
-                assertEquals("1", workbook.getSheetAt(0).getRow(0).getCell(1).getStringCellValue());
+                assertEquals("Sample Name", workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
                 assertEquals("Vocabularies", workbook.getSheetName(1));
             }
             var missing = client.send(HttpRequest.newBuilder(server.resolve("/api/templates/excel/unknown")).GET().build(),

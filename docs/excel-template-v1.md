@@ -33,8 +33,8 @@ Select 1–10,000 distinct sample names. Names must belong to the requested proj
 be linked to the requested assay. A missing or inaccessible selected sample rejects the export instead
 of silently returning a subset. Responses are private (`Cache-Control: no-store`).
 
-The exported first sheet uses the version 1 import layout. Sample exports use canonical field keys,
-include active custom fields, and include configured custom TEXT vocabularies on a second sheet.
+The exported first sheet uses the same header-first layout as the CSV templates. Sample exports use
+canonical field keys, include active custom fields, and include configured custom TEXT vocabularies on a second sheet.
 Archived fields, database IDs, timestamps, storage paths and taxonomy display labels are not exported.
 Dates use ISO text, booleans remain booleans, and numeric values use Excel numbers where precision can
 be preserved. Higher precision decimals are stored as text. Identifiers and text beginning with `=`
@@ -59,16 +59,15 @@ export exceeds the limits. Downloads use `.xlsx`, while imports continue to acce
 ## First worksheet: data
 
 The first worksheet contains Sample or Experiment rows. Worksheet names are descriptive; their order determines
-their purpose. Downloaded templates contain:
+their purpose. Downloaded templates and exports use the CSV-compatible header-first layout:
 
-1. `TEMPLATE VERSION:` in A1 and `1` in B1.
-2. Requirements, examples and descriptions, which are instructions and are not imported.
-3. A `METADATA FIELDS:` row containing the column headers, starting in column B.
-4. Data rows below the headers, starting in column B. Column A contains instructions only.
+1. The first row contains the actual column headers, starting in cell A1.
+2. Data starts in the second row, with the first data column in column A.
+3. The first column contains the sample name (`Sample Name` in the current CSV templates).
 
-Keep these header rows when filling the template. Version 1 is checked during import; unsupported versions
-are rejected. Header-first workbooks without a version marker are also accepted, with headers and data starting
-in column A. Unversioned workbooks using the existing `METADATA FIELDS:` layout are accepted as well.
+Excel templates do not add a version or instruction row, or an instruction column. The importer continues to accept
+previously supported version 1 workbooks with a `TEMPLATE VERSION:` row and `METADATA FIELDS:` header, as well as
+unversioned workbooks using the older `METADATA FIELDS:` layout. Unsupported version numbers are rejected.
 
 The column names, required values and validations follow the existing CSV importer. For Samples, add custom
 attribute columns using keys from the project's custom attributes. These attributes must already exist.

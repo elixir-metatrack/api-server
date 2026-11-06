@@ -180,19 +180,15 @@ public class SpreadsheetExportWriter {
             text.setDataFormat(workbook.createDataFormat().getFormat("@"));
             number = workbook.createCellStyle();
             number.setDataFormat(workbook.createDataFormat().getFormat("General"));
-            Row version = sheet.createRow(0);
-            version.createCell(0).setCellValue(SpreadsheetImportSupport.VERSION_MARKER);
-            version.createCell(1).setCellValue(SpreadsheetImportSupport.VERSION);
-            Row header = sheet.createRow(1);
-            header.createCell(0).setCellValue("METADATA FIELDS:");
-            for (int i = 0; i < headers.size(); i++) header.createCell(i + 1).setCellValue(headers.get(i));
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < headers.size(); i++) header.createCell(i).setCellValue(headers.get(i));
             header.forEach(cell -> cell.setCellStyle(heading));
             header.setHeightInPoints(40);
-            for (int i = 0; i <= columns; i++) {
+            for (int i = 0; i < columns; i++) {
                 sheet.setColumnWidth(i, 24 * 256);
                 sheet.setDefaultColumnStyle(i, text);
             }
-            sheet.createFreezePane(1, 2);
+            sheet.createFreezePane(1, 1);
         }
 
         void checkSize(int rowIndex, int columns) {
@@ -204,9 +200,9 @@ public class SpreadsheetExportWriter {
 
         void append(List<Object> values) {
             int index = sheet.getLastRowNum() + 1;
-            checkSize(index, columns + 1);
+            checkSize(index, columns);
             Row row = sheet.createRow(index);
-            for (int i = 0; i < values.size(); i++) cell(row, i + 1, values.get(i));
+            for (int i = 0; i < values.size(); i++) cell(row, i, values.get(i));
         }
 
         void cell(Row row, int column, Object value) {
@@ -234,7 +230,7 @@ public class SpreadsheetExportWriter {
         }
 
         byte[] finish() throws IOException {
-            sheet.setAutoFilter(new CellRangeAddress(1, sheet.getLastRowNum(), 1, columns));
+            sheet.setAutoFilter(new CellRangeAddress(0, sheet.getLastRowNum(), 0, columns - 1));
             try (var output = new ByteArrayOutputStream()) {
                 workbook.write(output);
                 if (output.size() > 20 * 1024 * 1024) {
