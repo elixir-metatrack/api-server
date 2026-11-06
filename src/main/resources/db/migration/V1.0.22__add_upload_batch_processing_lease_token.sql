@@ -1,0 +1,1 @@
+ALTER TABLE upload_batch_entry ADD COLUMN processing_lease_token uuid;
