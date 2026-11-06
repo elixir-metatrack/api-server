@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.8.0](https://github.com/elixir-metatrack/api-server/compare/0.7.0...0.8.0) (2026-11-06)
+
+
+### Features
+
+* add recipient-based project invitation functionality and test coverage ([1ecf718](https://github.com/elixir-metatrack/api-server/commit/1ecf718552b5bd5757d006466e490c6d95bc65bf))
+* add test cases for user search service and controller ([5d5d4ae](https://github.com/elixir-metatrack/api-server/commit/5d5d4ae7afd1f55bb433877f60386eec313dac40))
+* add user search functionality with caching and API endpoints ([86d36e1](https://github.com/elixir-metatrack/api-server/commit/86d36e18b950b67c2e29fb18cf218f1a59f45176))
+* include membership role in project responses for authenticated users ([f69d222](https://github.com/elixir-metatrack/api-server/commit/f69d222f22a590aceaf88e68cfc69983c1c9a05d))
+
+
+### Bug Fixes
+
+* add sequencing platform and laboratory to assays ([8f3d0a2](https://github.com/elixir-metatrack/api-server/commit/8f3d0a2cada6d36ac1ff63695ac6c111db0c99a3))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.10 ([#125](https://github.com/elixir-metatrack/api-server/issues/125)) ([eef3b22](https://github.com/elixir-metatrack/api-server/commit/eef3b22fbbeee45d0685ffb5d56c9e8d1d094c17))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.6 ([#116](https://github.com/elixir-metatrack/api-server/issues/116)) ([d7ddf6c](https://github.com/elixir-metatrack/api-server/commit/d7ddf6cb0e73037c399abc8a81ceeae4dd2bb7ac))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.7 ([#119](https://github.com/elixir-metatrack/api-server/issues/119)) ([fc1ea2e](https://github.com/elixir-metatrack/api-server/commit/fc1ea2ef05b34a9716108b5981df62591db4fa20))
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.8 ([#121](https://github.com/elixir-metatrack/api-server/issues/121)) ([75a268d](https://github.com/elixir-metatrack/api-server/commit/75a268d982756c756ca5e8f90b4ca3e81b417c78))
+* **deps:** update dependency software.amazon.awssdk:s3 to v2.57.5 ([#109](https://github.com/elixir-metatrack/api-server/issues/109)) ([40a52e2](https://github.com/elixir-metatrack/api-server/commit/40a52e2b71d2cef740803ccdfbd21634f0468104))
+* **deps:** update dependency software.amazon.awssdk:s3 to v2.57.9 ([#124](https://github.com/elixir-metatrack/api-server/issues/124)) ([0805041](https://github.com/elixir-metatrack/api-server/commit/0805041ea943c3892b93a609c346d565475cb2a6))
+* ensure samples are associated correctly with assays during CSV imports ([261af8a](https://github.com/elixir-metatrack/api-server/commit/261af8aa0911ca87a0e104b772d1b3708c26d95b))
+* fix standardization of sample to sample name parsing ([3cd019e](https://github.com/elixir-metatrack/api-server/commit/3cd019efdfedf4e0c7a467b907ce831984dc307c))
+* flush EntityManager during CSV import to persist pending file associations ([26355d7](https://github.com/elixir-metatrack/api-server/commit/26355d705ad181142d59b34bf96eba7399a7f85a))
+
+
+### Documentation
+
+* document realm-wide user search API ([bf92bbc](https://github.com/elixir-metatrack/api-server/commit/bf92bbca07a0a5bc74bca24c3b31456760deab4b))
+
+
+### Miscellaneous Chores
+
+* add local compose stack and remote dev env example ([ba973a4](https://github.com/elixir-metatrack/api-server/commit/ba973a4e8842b399566e012174ab05d5d175ad26))
+* add local development environment setup ([fa95ea3](https://github.com/elixir-metatrack/api-server/commit/fa95ea36646ed7c584c84f23c317befe3fe232da))
+* add local Scalar Keycloak client ([04a337f](https://github.com/elixir-metatrack/api-server/commit/04a337fdd73fcc8b05e40d374aa3626abfbe8f85))
+* allow md5 to be blank even when filenames are provided ([4a5cfde](https://github.com/elixir-metatrack/api-server/commit/4a5cfde72c1f8b2cacaf3ed8ba06bdcbd3bc6b38))
+* Better OpenAPI annotations for API documentation across controllers and models ([f00e4be](https://github.com/elixir-metatrack/api-server/commit/f00e4bea7a7f49f27d57d95e078bebd70e48946c))
+* **deps:** update dependency java-jdk to v25 ([a779ca1](https://github.com/elixir-metatrack/api-server/commit/a779ca1c1bce3bd14228f708feb624b37a145bbd))
+* **deps:** update registry.access.redhat.com/ubi9/ubi-minimal docker tag to v9.8-1793253163 ([f323a96](https://github.com/elixir-metatrack/api-server/commit/f323a96a50bf6a3ce141e37a7712517fa984c087))
+* document local development workflow ([b31459f](https://github.com/elixir-metatrack/api-server/commit/b31459fbc2a352ad4f9ddb00d5f439a33de179e2))
+* ignore .env files while keeping examples ([c15eb41](https://github.com/elixir-metatrack/api-server/commit/c15eb4120809ef50daa9fa9f441675a4cb53963d))
+* Keep security-event configuration explicit across Quarkus test-profile restarts ([f2be9f7](https://github.com/elixir-metatrack/api-server/commit/f2be9f7d6408022cd6916efe30dbc7ccff8ff51c))
+* **main:** release 0.7.1-SNAPSHOT ([da3bbc4](https://github.com/elixir-metatrack/api-server/commit/da3bbc479f1ed8737c19f84e835e742099a56c1b))
+* standardize experiment templates and logic to use "Sample Name" header instead of "Sample" ([bddfdfd](https://github.com/elixir-metatrack/api-server/commit/bddfdfd260157256998089af05b9c472e88c69a5))
+* upgrade project to Java 25 across docs, dependencies, and Dockerfiles ([b6a2202](https://github.com/elixir-metatrack/api-server/commit/b6a22027d5ae8ffa7cc39c4ad439070bfbe9ae75))
+
 ## [0.7.0](https://github.com/elixir-metatrack/api-server/compare/0.6.0...0.7.0) (2026-10-27)
 
 
