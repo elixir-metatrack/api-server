@@ -1,0 +1,1 @@
+ALTER TABLE upload_batch_entry ADD COLUMN previous_object_key varchar(1024);

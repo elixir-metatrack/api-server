@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.PanacheQuery;
 import io.quarkus.panache.common.Page;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
@@ -18,19 +19,21 @@ public class UploadReconciliationWorker {
 
     @Transactional
     List<Long> pendingFileIds(long afterId, int batchSize) {
-        PanacheQuery<File> query = File.find("status = ?1 and id > ?2 order by id", UploadStatus.PENDING, afterId);
+        PanacheQuery<File> query = File.find(
+                "status = ?1 and uploadBatchEntry is null and id > ?2 order by id", UploadStatus.PENDING, afterId);
         return query.page(Page.ofSize(batchSize)).list().stream().map(file -> file.id).toList();
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     boolean reconcile(long fileId) {
-        File file = File.findById(fileId);
-        if (file == null || file.status != UploadStatus.PENDING) return false;
+        File file = File.findById(fileId, LockModeType.PESSIMISTIC_WRITE);
+        if (file == null || file.status != UploadStatus.PENDING || file.uploadBatchEntry != null) return false;
 
         return reconcile(file);
     }
 
     boolean reconcile(File file) {
+        if (file.uploadBatchEntry != null) return false;
         try {
             if (!objectStorage.objectExists(file.objectKey)) return false;
             file.status = UploadStatus.UPLOADED;

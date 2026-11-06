@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.assay.Assay;
 import no.metatrack.server.auth.UserService;
 import no.metatrack.server.sample.Sample;
@@ -27,11 +28,19 @@ public class PresignUrlService {
         Assay assay = findAssayForSample(projectId, assayId, sample.id);
 
         String virtualPath = virtualPath(sample.project.id, assayId, sampleName, fileName);
-        var existingFile = File.findByVirtualPathOptional(virtualPath);
+        var existingFile = File.findByVirtualPathForUpdate(virtualPath);
         String objectKey = objectKeyForUpload(existingFile, virtualPath);
         if (existingFile.isPresent()) {
             File file = existingFile.get();
             requireFileRelationship(file, sample, assayId);
+            if (file.status == UploadStatus.PENDING) {
+                if (file.uploadBatchEntry != null) {
+                    throw new WebApplicationException("File destination is reserved by an upload batch", 409);
+                }
+                if (file.uploadedBy == null) {
+                    file.uploadedBy = UUID.fromString(userService.requireCurrentUser().id());
+                }
+            }
 
             return presignUpload(objectKey, expiryInSeconds);
         }
@@ -86,7 +95,7 @@ public class PresignUrlService {
         }
     }
 
-    static String uploadObjectKey(String virtualPath) {
+    public static String uploadObjectKey(String virtualPath) {
         return virtualPath + "/" + UUID.randomUUID();
     }
 
