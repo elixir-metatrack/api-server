@@ -17,7 +17,9 @@ public record AssayResponse(
         Instant createdOn,
         Instant modifiedOn,
         String experimentAccession,
-        String runAccession) {
+        String runAccession,
+        String sequencingPlatform,
+        String sequencingLaboratory) {
 
     public static AssayResponse fromEntity(Assay assay) {
         return new AssayResponse(
@@ -34,6 +36,8 @@ public record AssayResponse(
                 assay.createdOn,
                 assay.modifiedOn,
                 assay.experimentAccession,
-                assay.runAccession);
+                assay.runAccession,
+                assay.sequencingPlatform,
+                assay.sequencingLaboratory);
     }
 }

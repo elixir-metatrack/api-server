@@ -19,4 +19,6 @@ public record CreateAssayRequest(
         @Positive(message = "Insert size can not be zero or negative")
         Integer insertSize,
         String experimentAccession,
-        String runAccession) {}
+        String runAccession,
+        String sequencingPlatform,
+        String sequencingLaboratory) {}
