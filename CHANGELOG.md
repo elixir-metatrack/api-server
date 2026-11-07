@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.1](https://github.com/elixir-metatrack/api-server/compare/0.8.0...0.8.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **deps:** update dependency software.amazon.awssdk:url-connection-client to v2.57.11 ([#133](https://github.com/elixir-metatrack/api-server/issues/133)) ([f8400c3](https://github.com/elixir-metatrack/api-server/commit/f8400c3f2bf88b9fcaf4dae9e85937c9d8fe9bfd))
+
+
+### Miscellaneous Chores
+
+* **main:** release 0.8.1-SNAPSHOT ([191c0d1](https://github.com/elixir-metatrack/api-server/commit/191c0d16295b004c901c50772dd6fa983a46e75f))
+
 ## [0.8.0](https://github.com/elixir-metatrack/api-server/compare/0.7.0...0.8.0) (2026-11-06)
 
 
