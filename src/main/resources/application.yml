@@ -111,6 +111,18 @@ keycloak:
       mock: true
       from: invitations@example.invalid
 
+"%remote-dev":
+  quarkus:
+    flyway:
+      migrate-at-start: false
+    mailer:
+      mock: true
+      from: invitations@example.invalid
+  metatrack:
+    invitation:
+      login-url: ${INVITATION_LOGIN_URL:http://localhost:3000/login}
+      registration-url: ${INVITATION_REGISTRATION_URL:http://localhost:3000/register}
+
 "%test":
   metatrack:
     invitation:

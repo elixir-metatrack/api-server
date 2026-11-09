@@ -1,6 +1,7 @@
 package no.metatrack.server.spreadsheet;
 
 import jakarta.ws.rs.BadRequestException;
+import org.apache.commons.csv.CSVFormat;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -11,6 +12,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -88,14 +91,19 @@ class SpreadsheetImportSupportTest {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
             assertEquals(experiment ? 1 : 2, workbook.getNumberOfSheets());
             Sheet data = workbook.getSheetAt(0);
-            Row header = data.getRow(1);
-            assertEquals("METADATA FIELDS:", header.getCell(0).getStringCellValue());
+            Row header = data.getRow(0);
+            assertNotNull(header);
+            List<String> actualHeaders = new java.util.ArrayList<>();
+            for (Cell cell : header) actualHeaders.add(cell.getStringCellValue());
+            assertEquals(csvHeaders(type), actualHeaders);
             int sampleColumn = -1;
             for (Cell cell : header) {
                 if (List.of("Sample", "Sample Name").contains(cell.getStringCellValue())) sampleColumn = cell.getColumnIndex();
             }
-            assertTrue(sampleColumn > 0);
-            data.getRow(2).createCell(sampleColumn).setCellValue("real-sample");
+            assertEquals(0, sampleColumn);
+            assertEquals(1, data.getPaneInformation().getHorizontalSplitPosition());
+            assertEquals(1, data.getPaneInformation().getVerticalSplitPosition());
+            data.getRow(1).createCell(sampleColumn).setCellValue("real-sample");
             try (var output = Files.newOutputStream(file)) { workbook.write(output); }
         }
         var filled = reader.read(file.toFile(), !experiment);
@@ -143,6 +151,18 @@ class SpreadsheetImportSupportTest {
         CellStyle style = workbook.createCellStyle();
         style.setDataFormat(workbook.createDataFormat().getFormat(format));
         cell.setCellStyle(style);
+    }
+
+    private List<String> csvHeaders(String type) throws Exception {
+        String folder = type.startsWith("experiment_") ? "experiments" : "samples";
+        try (var source = getClass().getResourceAsStream("/META-INF/resources/templates/" + folder + "/" + type + ".csv");
+             var parser = CSVFormat.DEFAULT.builder().setDelimiter(';').get()
+                     .parse(new InputStreamReader(source, StandardCharsets.UTF_8))) {
+            List<String> headers = new java.util.ArrayList<>();
+            parser.getRecords().getFirst().forEach(headers::add);
+            if (headers.getFirst().startsWith("\uFEFF")) headers.set(0, headers.getFirst().substring(1));
+            return headers;
+        }
     }
 
     @Test

@@ -105,7 +105,9 @@ public class AssayController {
                 request.libraryLayout(),
                 request.insertSize(),
                 request.experimentAccession(),
-                request.runAccession());
+                request.runAccession(),
+                request.sequencingPlatform(),
+                request.sequencingLaboratory());
 
         return AssayResponse.fromEntity(assay);
     }
@@ -141,7 +143,9 @@ public class AssayController {
                 request.libraryLayout(),
                 request.insertSize(),
                 request.experimentAccession(),
-                request.runAccession());
+                request.runAccession(),
+                request.sequencingPlatform(),
+                request.sequencingLaboratory());
 
         return Response.noContent().build();
     }

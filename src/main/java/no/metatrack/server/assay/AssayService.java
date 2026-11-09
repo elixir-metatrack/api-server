@@ -46,7 +46,7 @@ public class AssayService {
             String libraryLayout,
             Integer insertSize) {
         return createAssay(projectId, name, studyAccession, instrumentModel, libraryName, librarySource,
-                libraryStrategy, librarySelection, libraryLayout, insertSize, null, null);
+                libraryStrategy, librarySelection, libraryLayout, insertSize, null, null, null, null);
     }
 
     @Transactional
@@ -63,19 +63,42 @@ public class AssayService {
             Integer insertSize,
             String experimentAccession,
             String runAccession) {
+        return createAssay(projectId, name, studyAccession, instrumentModel, libraryName, librarySource,
+                libraryStrategy, librarySelection, libraryLayout, insertSize, experimentAccession, runAccession,
+                null, null);
+    }
+
+    @Transactional
+    public Assay createAssay(
+            Long projectId,
+            String name,
+            String studyAccession,
+            String instrumentModel,
+            String libraryName,
+            String librarySource,
+            String libraryStrategy,
+            String librarySelection,
+            String libraryLayout,
+            Integer insertSize,
+            String experimentAccession,
+            String runAccession,
+            String sequencingPlatform,
+            String sequencingLaboratory) {
         Project targetProject = (Project) Project.findByIdOptional(projectId).orElseThrow(NotFoundException::new);
         if (targetProject.isSubProject()) {
             throw new ForbiddenException("Create experiments in the parent project");
         }
         Project owningProject = targetProject;
         validate(name, studyAccession, instrumentModel, libraryName, librarySource,
-                librarySelection, libraryStrategy, libraryLayout);
+                librarySelection, libraryStrategy, libraryLayout, sequencingPlatform, sequencingLaboratory);
         Assay assay = new Assay();
         assay.name = name;
         assay.studyAccession = studyAccession;
         assay.experimentAccession = experimentAccession;
         assay.runAccession = runAccession;
         assay.instrumentModel = instrumentModel;
+        assay.sequencingPlatform = sequencingPlatform;
+        assay.sequencingLaboratory = sequencingLaboratory;
         assay.libraryName = libraryName;
         assay.librarySource = librarySource;
         assay.librarySelection = librarySelection;
@@ -104,7 +127,7 @@ public class AssayService {
             String libraryLayout,
             Integer insertSize) {
         updateAssay(projectId, assayId, name, studyAccession, instrumentModel, libraryName, librarySource,
-                librarySelection, libraryStrategy, libraryLayout, insertSize, null, null);
+                librarySelection, libraryStrategy, libraryLayout, insertSize, null, null, null, null);
     }
 
     @Transactional
@@ -122,14 +145,38 @@ public class AssayService {
             Integer insertSize,
             String experimentAccession,
             String runAccession) {
+        updateAssay(projectId, assayId, name, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout, insertSize, experimentAccession, runAccession,
+                null, null);
+    }
+
+    @Transactional
+    public void updateAssay(
+            Long projectId,
+            UUID assayId,
+            String name,
+            String studyAccession,
+            String instrumentModel,
+            String libraryName,
+            String librarySource,
+            String librarySelection,
+            String libraryStrategy,
+            String libraryLayout,
+            Integer insertSize,
+            String experimentAccession,
+            String runAccession,
+            String sequencingPlatform,
+            String sequencingLaboratory) {
         Assay assay = getAssayById(projectId, assayId);
         validate(name != null ? name : assay.name, studyAccession, instrumentModel, libraryName, librarySource,
-                librarySelection, libraryStrategy, libraryLayout);
+                librarySelection, libraryStrategy, libraryLayout, sequencingPlatform, sequencingLaboratory);
         if (name != null) assay.name = name;
         if (studyAccession != null) assay.studyAccession = studyAccession;
         if (experimentAccession != null) assay.experimentAccession = experimentAccession;
         if (runAccession != null) assay.runAccession = runAccession;
         if (instrumentModel != null) assay.instrumentModel = instrumentModel;
+        if (sequencingPlatform != null) assay.sequencingPlatform = sequencingPlatform;
+        if (sequencingLaboratory != null) assay.sequencingLaboratory = sequencingLaboratory;
         if (libraryName != null) assay.libraryName = libraryName;
         if (librarySource != null) assay.librarySource = librarySource;
         if (libraryStrategy != null) assay.libraryStrategy = libraryStrategy;
@@ -141,10 +188,13 @@ public class AssayService {
 
     private void validate(
             String name, String studyAccession, String instrumentModel, String libraryName,
-            String librarySource, String librarySelection, String libraryStrategy, String libraryLayout) {
+            String librarySource, String librarySelection, String libraryStrategy, String libraryLayout,
+            String sequencingPlatform, String sequencingLaboratory) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("study_accession", studyAccession);
         values.put("instrument_model", instrumentModel);
+        values.put("sequencing_platform", sequencingPlatform);
+        values.put("sequencing_laboratory", sequencingLaboratory);
         values.put("library_name", libraryName);
         values.put("library_source", librarySource);
         values.put("library_selection", librarySelection);
