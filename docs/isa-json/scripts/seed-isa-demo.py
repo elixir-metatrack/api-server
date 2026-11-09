@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Add synthetic ISA export data to the local dev setup without deleting existing projects."""
+"""Add synthetic ISA export data to the local dev stack (dev/dev.sh) without deleting existing projects.
+
+Settings are read from the same variables as .env.example; the defaults match it.
+"""
 import argparse
 import hashlib
 import json
@@ -32,13 +35,14 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("target/isa-demo.json"))
     args = parser.parse_args()
     api = os.environ.get("API_URL", "http://localhost:1234/api").rstrip("/")
-    realm = os.environ.get("KC_REALM_URL", "http://localhost:8180/realms/metatrack").rstrip("/")
+    realm = os.environ.get("KEYCLOAK_URL", "http://localhost:18081/realms/metatrack").rstrip("/")
     for url in (api, realm):
         if urlparse(url).hostname not in ("localhost", "127.0.0.1", "::1"):
             raise SystemExit("This demo seed only runs against localhost.")
     token = request(realm + "/protocol/openid-connect/token", "POST", urlencode({
-        "grant_type": "client_credentials", "client_id": "metatrack-admin",
-        "client_secret": os.environ.get("KEYCLOAK_ADMIN_SECRET", "local-admin-secret"),
+        "grant_type": "client_credentials",
+        "client_id": os.environ.get("KEYCLOAK_ADMIN_CLIENT_ID", "metatrack-api-admin"),
+        "client_secret": os.environ.get("KEYCLOAK_ADMIN_CLIENT_SECRET", "metatrack-local-admin-client-secret"),
     }).encode(), content_type="application/x-www-form-urlencoded")["access_token"]
 
     def api_request(path, method="GET", body=None):
@@ -120,15 +124,17 @@ def main():
             "sampleIds": [next(s["id"] for s in demo_samples if s["name"] == "ISA-DEMO-001")],
         })
 
-    # Reuse the local demo accounts; do not create users or reset their passwords.
+    # Reuse the seeded accounts of the dev stack; do not create users or reset their passwords.
     # Adding a member creates an invitation that the user accepts in the webapp (409: already invited).
     admin_realm = realm.replace("/realms/", "/admin/realms/", 1)
-    for username, project_id, role in (("testuser", project["id"], "ADMIN"),
-                                       ("testuser", child["id"], "ADMIN"),
-                                       ("testuser2", child["id"], "VIEWER")):
+    admin_user = os.environ.get("DEMO_ADMIN_USER", "dev-admin")
+    viewer_user = os.environ.get("DEMO_VIEWER_USER", "dev-user")
+    for username, project_id, role in ((admin_user, project["id"], "ADMIN"),
+                                       (admin_user, child["id"], "ADMIN"),
+                                       (viewer_user, child["id"], "VIEWER")):
         users = request(admin_realm + "/users?" + urlencode({"username": username, "exact": "true"}), token=token)
         if not users:
-            print(f"Local account {username} is missing; run the existing local seed first to create it.")
+            print(f"Account {username} is missing in Keycloak; skipped.")
             continue
         member_path = f'/projects/{project_id}/member/{users[0]["id"]}'
         members = api_request(f"/projects/{project_id}/members")
@@ -141,8 +147,8 @@ def main():
     export_request = Request(api + base + "/exports/isa-json", headers={"Authorization": "Bearer " + token})
     with urlopen(export_request, timeout=60) as response:
         args.output.write_bytes(response.read())
-    print(f'Project: http://localhost:5173/projects/{project["id"]}')
-    print(f'Subset: http://localhost:5173/projects/{child["id"]}')
+    print(f'Project: isa-json-demo (id {project["id"]})')
+    print(f'Subset: isa-json-demo-subset (id {child["id"]})')
     print(f"Export: {args.output.resolve()}")
 
 

@@ -23,13 +23,19 @@ Commands below are run from the `api-server` root.
 
 ## Try it locally
 
+Uses the local stack from [development.md](../development.md):
+
 ```sh
-make infra api          # from the workspace root
-API_URL=http://localhost:1235/api python3 docs/isa-json/scripts/seed-isa-demo.py
+cp .env.example .env    # once
+./dev/dev.sh api
+python3 docs/isa-json/scripts/seed-isa-demo.py
 ```
 
 The seed script creates `isa-json-demo` (two samples, all custom field types, one experiment, four pending
-FASTQ records) and `isa-json-demo-subset`, and saves an export to `target/isa-demo.json`.
+FASTQ records) and `isa-json-demo-subset`, and saves an export to `target/isa-demo.json`. It invites
+`dev-admin` (ADMIN) and `dev-user` (VIEWER on the subset); accept the invitations in the webapp to see the
+projects. Defaults match `.env.example`; `API_URL`, `KEYCLOAK_URL`, `KEYCLOAK_ADMIN_CLIENT_ID` and
+`KEYCLOAK_ADMIN_CLIENT_SECRET` override them. The script can be run again.
 
 | Endpoint | Role |
 | --- | --- |
