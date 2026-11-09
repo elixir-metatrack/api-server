@@ -74,8 +74,9 @@ class IsaJsonRoundTripTest {
         assay.sequencingLaboratory = "UNN, Tromsø";
         assay.addSample(sample);
         assay.persistAndFlush();
-        file(sample, assay, "NorPa_0001_R1.fastq.gz", ReadRole.FORWARD);
-        file(sample, assay, "NorPa_0001_R2.fastq.gz", ReadRole.REVERSE);
+        file(sample, assay, "NorPa_0001_R1.fastq.gz", "0123456789abcdef0123456789abcdef", ReadRole.FORWARD);
+        // md5 is optional, as in the CSV experiment import.
+        file(sample, assay, "NorPa_0001_R2.fastq.gz", null, ReadRole.REVERSE);
 
         JsonNode original = exporter.export(source.id, null);
         Project target = project("Round trip target");
@@ -151,8 +152,8 @@ class IsaJsonRoundTripTest {
         return project;
     }
 
-    private void file(Sample sample, Assay assay, String name, ReadRole role) {
-        File.importPending(sample.project.id, assay.id, sample, assay, name, "0123456789abcdef0123456789abcdef", null, role)
+    private void file(Sample sample, Assay assay, String name, String md5, ReadRole role) {
+        File.importPending(sample.project.id, assay.id, sample, assay, name, md5, null, role)
                 .ifPresent(message -> {
                     throw new AssertionError(message);
                 });

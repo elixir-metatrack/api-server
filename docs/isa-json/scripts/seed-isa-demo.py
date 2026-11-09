@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 
-def request(url, method="GET", body=None, token=None, content_type="application/json"):
+def request(url, method="GET", body=None, token=None, content_type="application/json", ignore=()):
     headers = {"Content-Type": content_type}
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -22,6 +22,8 @@ def request(url, method="GET", body=None, token=None, content_type="application/
             data = response.read()
             return json.loads(data) if data else None
     except HTTPError as error:
+        if error.code in ignore:
+            return None
         raise SystemExit(f"{method} {url}: HTTP {error.code}: {error.read().decode()}") from error
 
 
@@ -83,21 +85,25 @@ def main():
         assay = api_request(base + "/assays", "POST", {
             "name": "ISA demo sequencing", "libraryStrategy": "WGS", "librarySource": "GENOMIC",
             "librarySelection": "RANDOM", "libraryLayout": "PAIRED", "instrumentModel": "Illumina MiSeq",
+            # ENA (and therefore MARS) requires a sequencing platform.
+            "sequencingPlatform": "ILLUMINA", "sequencingLaboratory": "Metatrack demo lab",
         })
+    elif not assay.get("sequencingPlatform"):
+        api_request(base + f'/assays/{assay["id"]}', "PATCH",
+                    {"sequencingPlatform": "ILLUMINA", "sequencingLaboratory": "Metatrack demo lab"})
     assay_path = base + f'/assays/{assay["id"]}'
     current = api_request(assay_path + "/samples")
     missing = [s["name"] for s in demo_samples if not any(s["id"] == member["id"] for member in current)]
     if missing:
         api_request(assay_path + "/samples", "PUT", {"sampleNames": missing})
     existing_files = api_request(assay_path + "/files")
-    # ENA (and therefore MARS) requires a sequencing platform; it can only be set via the experiment import.
-    rows = ["Sample;Forward File Name;Forward File md5;Reverse File Name;Reverse File md5;Sequencing platform"]
+    rows = ["Sample;Forward File Name;Forward File md5;Reverse File Name;Reverse File md5"]
     checksum = hashlib.md5(b"@demo\nACGT\n+\n!!!!\n").hexdigest()
     for sample in demo_samples:
         names = [f'{sample["name"]}_R{read}.fastq' for read in (1, 2)]
         names = ["" if any(f["name"] == name for f in existing_files) else name for name in names]
         rows.append(";".join((sample["name"], names[0], checksum if names[0] else "",
-                              names[1], checksum if names[1] else "", "ILLUMINA")))
+                              names[1], checksum if names[1] else "")))
     if len(rows) > 1:
         boundary = "isa-demo-" + uuid4().hex
         body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="demo.csv"\r\n'
@@ -115,6 +121,7 @@ def main():
         })
 
     # Reuse the local demo accounts; do not create users or reset their passwords.
+    # Adding a member creates an invitation that the user accepts in the webapp (409: already invited).
     admin_realm = realm.replace("/realms/", "/admin/realms/", 1)
     for username, project_id, role in (("testuser", project["id"], "ADMIN"),
                                        ("testuser", child["id"], "ADMIN"),
@@ -126,7 +133,8 @@ def main():
         member_path = f'/projects/{project_id}/member/{users[0]["id"]}'
         members = api_request(f"/projects/{project_id}/members")
         if not any(m.get("memberId") == users[0]["id"] or m.get("id") == users[0]["id"] for m in members):
-            api_request(member_path, "POST", {"role": role})
+            request(api + member_path, "POST", {"role": role}, token, ignore=(409,))
+            print(f"Invited {username} to project {project_id} as {role}; accept it in the webapp notifications.")
 
     # Save the response bytes so even large decimal values retain their original precision.
     args.output.parent.mkdir(parents=True, exist_ok=True)

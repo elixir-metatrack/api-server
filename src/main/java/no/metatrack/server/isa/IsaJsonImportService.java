@@ -467,9 +467,8 @@ public class IsaJsonImportService {
                 }
                 SamplePlan sample = samplesByIsaId.get(lineage.iterator().next());
                 if (sample == null) continue; // the sample itself was rejected; that error is already reported
-                String md5 = comment(dataFile, "file checksum");
-                if (fileName == null || md5 == null) {
-                    skip("without name or md5 checksum", fileName);
+                if (fileName == null) {
+                    skip("without name", null);
                     continue;
                 }
                 if (!fileKeys.add(sample.sample.name + "/" + fileName)) {
@@ -477,7 +476,7 @@ public class IsaJsonImportService {
                     continue;
                 }
                 plan.members.add(sample);
-                plan.files.add(new FilePlan(sample, fileName, md5, comment(dataFile, "metatrack:unencryptedMd5"),
+                plan.files.add(new FilePlan(sample, fileName, comment(dataFile, "file checksum"), comment(dataFile, "metatrack:unencryptedMd5"),
                         readRole(comment(dataFile, "metatrack:readRole"), fileName, plan.libraryLayout)));
             }
             assays.add(plan);

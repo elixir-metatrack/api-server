@@ -126,6 +126,8 @@ files, two processes:
 **E7 · Files ← files of the assay.** `dataFiles[]`, each the output of exactly one sequencing process.
 `type: Raw Data File` for FASTQ/BAM/CRAM; comments `file type` (by extension), `file checksum` (md5),
 `checksum_method: MD5`, `metatrack:unencryptedMd5`, `metatrack:readRole`, `metatrack:uploadStatus`.
+Files without md5 are exported without checksum; MARS rejects such runs (`WebinRunXmlCreator`
+requires `file checksum`), so they must get an md5 before a submission.
 PENDING files are exported (status is visible in the comment).
 
 **E8 · Abort instead of guessing.** The export fails with a list of the affected records if
@@ -244,10 +246,10 @@ Assay fields are read from process parameter values by name (case-insensitive, a
 
 **I6 · Membership and files.** Each data file is traced back: file ← process output ← library/extract
 (`derivesFrom` or process input, repeated) ← sample. The sample becomes an assay member; the file
-becomes a PENDING file record of that sample × assay with name, md5 (`file checksum`), unencrypted md5
+becomes a PENDING file record of that sample × assay with name, md5 (`file checksum`, optional as in the CSV import), unencrypted md5
 and read role (comment `metatrack:readRole`; else `_R1`/`_1` → FORWARD, `_R2`/`_2` → REVERSE; else SINGLE
 for layout SINGLE; else empty). Files that lead to no sample or to several samples (e.g. pooled analysis results), and files without
-md5 checksum, are **not imported and listed** in the preview; the samples and experiments are still imported.
+a name, are **not imported and listed** in the preview; the samples and experiments are still imported.
 Samples in `assay.materials.samples` without files still become members. File contents are not
 transferred; uploading works as for files imported via the experiment CSV.
 
