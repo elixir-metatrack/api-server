@@ -544,4 +544,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## ISA-JSON (experimental)
 
 Export and import of ISA-JSON, shaped for submission via MARS.
-See [docs/isa-json.md](docs/isa-json.md) for the mapping, diagrams and local setup.
+See [docs/isa-json](docs/isa-json/README.md) for the mapping, diagrams and local setup.

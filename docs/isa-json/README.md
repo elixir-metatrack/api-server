@@ -6,18 +6,26 @@ BioSamples and ENA, and imports ISA-JSON from other tools. Checking exports agai
 
 | Diagram | Shows |
 | --- | --- |
-| [metatrack-schema.svg](metatrack-schema.svg) | the Metatrack entities involved |
-| [isa-json-schema.svg](isa-json-schema.svg) | the part of the ISA-JSON model we use |
-| [isa-json-mapping.svg](isa-json-mapping.svg) | which Metatrack field ends up where in ISA-JSON |
-| [isa-json-mars.svg](isa-json-mars.svg) | how MARS takes the export to BioSamples and ENA, and what has been tested |
+| [metatrack-schema.svg](diagrams/metatrack-schema.svg) | the Metatrack entities involved |
+| [isa-json-schema.svg](diagrams/isa-json-schema.svg) | the part of the ISA-JSON model we use |
+| [isa-json-mapping.svg](diagrams/isa-json-mapping.svg) | which Metatrack field ends up where in ISA-JSON |
+| [isa-json-mars.svg](diagrams/isa-json-mars.svg) | how MARS takes the export to BioSamples and ENA, and what has been tested |
 
-The PlantUML sources are next to the SVGs. [isa-json-example.json](isa-json-example.json) is a synthetic export.
+Everything for this topic is in this folder:
+
+- `diagrams/`: SVGs with their PlantUML sources
+- `example.json`: a synthetic export
+- `scripts/seed-isa-demo.py`: demo projects and an export on the local API
+- `scripts/validate-isa-json.py`: checks an export against the ISA and MARS schemas
+- `scripts/mars-offline-check/`: runs an export through MARS without submitting
+
+Commands below are run from the `api-server` root.
 
 ## Try it locally
 
 ```sh
 make infra api          # from the workspace root
-API_URL=http://localhost:1235/api python3 scripts/seed-isa-demo.py
+API_URL=http://localhost:1235/api python3 docs/isa-json/scripts/seed-isa-demo.py
 ```
 
 The seed script creates `isa-json-demo` (two samples, all custom field types, one experiment, four pending
@@ -38,7 +46,7 @@ git clone https://github.com/ISA-tools/isa-specs.git /tmp/isa-specs
 git -C /tmp/isa-specs checkout ed80675acb5ff98249e9821067eff83740d809d6
 git clone https://github.com/elixir-europe/MARS.git /tmp/mars
 git -C /tmp/mars checkout 8cc6fca592ff1695bd795144d7816bef984712df
-uv run --with jsonschema==4.25.1 python scripts/validate-isa-json.py target/isa-demo.json \
+uv run --with jsonschema==4.25.1 python docs/isa-json/scripts/validate-isa-json.py target/isa-demo.json \
   --isa-schema-dir /tmp/isa-specs/source/_static/isajson \
   --mars-schema /tmp/mars/schemas/isa_json.schema.json
 ```
@@ -46,7 +54,7 @@ uv run --with jsonschema==4.25.1 python scripts/validate-isa-json.py target/isa-
 To run an export through the MARS ENA adapter without submitting anything (needs Docker):
 
 ```sh
-scripts/mars-offline-check/run.sh target/isa-demo.json
+docs/isa-json/scripts/mars-offline-check/run.sh target/isa-demo.json
 ```
 
 The script builds MARS (pinned commit) in Docker and prints the ENA study/experiment/run XML that MARS
@@ -287,7 +295,7 @@ processes not on a file lineage, derived data files.
   parts are listed as not imported.
 
 
-- [isa-json-example.json](isa-json-example.json) (synthetic, values from the templates) passes
+- [example.json](example.json) (synthetic, values from the templates) passes
   the ISA schema, the MARS schema, internal references, unique definitions and "every file has a
   producing process" (`scripts/validate-isa-json.py`).
 - **MARS ENA adapter, offline (2026-10-29, repeated 2026-11-06 with `scripts/mars-offline-check`):** MARS `8cc6fca`

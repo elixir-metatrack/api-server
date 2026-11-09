@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Field register shared by ISA-JSON export and import (docs/isa-json.md).
+ * Field register shared by ISA-JSON export and import (docs/isa-json/README.md).
  * ISA names follow the ENA/BioSamples checklist labels where one exists, otherwise the Metatrack key.
  */
 public final class IsaSampleFields {

@@ -24,7 +24,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Writes the ISA-JSON profile described in docs/isa-json.md. */
+/** Writes the ISA-JSON profile described in docs/isa-json/README.md. */
 @ApplicationScoped
 public class IsaJsonExportWriter {
     public static final String PROFILE = "isa-v2";

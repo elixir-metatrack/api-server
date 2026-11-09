@@ -38,7 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Imports one ISA-JSON study into an existing root project (docs/isa-json.md, rules I1-I7).
+ * Imports one ISA-JSON study into an existing root project (docs/isa-json/README.md, rules I1-I7).
  * The same plan is used for the preview and the commit; the commit writes nothing if any error exists.
  */
 @ApplicationScoped

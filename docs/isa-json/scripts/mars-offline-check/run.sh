@@ -2,7 +2,7 @@
 # Runs an ISA-JSON export through the MARS ENA adapter without submitting anything:
 # MARS builds the ENA study/experiment/run XML, which is printed instead of sent to Webin.
 #
-# Usage: scripts/mars-offline-check/run.sh <export.json>
+# Usage: docs/isa-json/scripts/mars-offline-check/run.sh <export.json>
 # Needs git and Docker. MARS and mars-repository-lib are cloned into target/mars-offline.
 set -euo pipefail
 
@@ -15,7 +15,7 @@ MARS_COMMIT=8cc6fca592ff1695bd795144d7816bef984712df
 MARS_LIB_TAG=v0.0.2
 
 here=$(cd "$(dirname "$0")" && pwd)
-work=${MARS_WORK_DIR:-$here/../../target/mars-offline}
+work=${MARS_WORK_DIR:-$here/../../../../target/mars-offline}
 mkdir -p "$work"
 work=$(cd "$work" && pwd)
 
