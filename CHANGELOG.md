@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.9.0](https://github.com/elixir-metatrack/api-server/compare/0.8.0...0.9.0) (2026-11-10)
+
+
+### Features
+
+* **file:** add multipart copy and object identity ([490c75d](https://github.com/elixir-metatrack/api-server/commit/490c75d1e9f45458381dfe603a5ef5d1fa6234c2))
+* **upload:** add batch registration and ingestion ([18a7942](https://github.com/elixir-metatrack/api-server/commit/18a79420c6afdc87961759bfa85013e94f7e4187))
+* **upload:** integrate SFTPGo and batch lifecycle ([eeb0fa4](https://github.com/elixir-metatrack/api-server/commit/eeb0fa483a7524325e0189033baa7a0c845480cd))
+
+
+### Bug Fixes
+
+* **deps:** update dependency software.amazon.awssdk:url-connection-client to v2.57.11 ([#133](https://github.com/elixir-metatrack/api-server/issues/133)) ([f8400c3](https://github.com/elixir-metatrack/api-server/commit/f8400c3f2bf88b9fcaf4dae9e85937c9d8fe9bfd))
+* **deps:** update dependency software.amazon.awssdk:url-connection-client to v2.57.12 ([#135](https://github.com/elixir-metatrack/api-server/issues/135)) ([a95dc55](https://github.com/elixir-metatrack/api-server/commit/a95dc552878763b933418fa17101d6b7a9d13eb4))
+* **deps:** update quarkus ecosystem to v3.40.1.2 ([6c61e53](https://github.com/elixir-metatrack/api-server/commit/6c61e5335b9cb15beca110502e7c92006acfb767))
+
+
+### Code Refactoring
+
+* **project:** extract authorization service ([7adafe4](https://github.com/elixir-metatrack/api-server/commit/7adafe4cbfa50cf3f020742cb91982c1c0c210e7))
+
+
+### Documentation
+
+* document upload batches and SFTPGo setup ([2144695](https://github.com/elixir-metatrack/api-server/commit/21446950ecd2106fdd63a7b24feb9823e5ec5229))
+
+
+### Miscellaneous Chores
+
+* **dev:** add SFTPGo development setup ([8353565](https://github.com/elixir-metatrack/api-server/commit/8353565bb3628240b8e0fa3cefd132bc32e85f66))
+* **main:** release 0.8.1-SNAPSHOT ([191c0d1](https://github.com/elixir-metatrack/api-server/commit/191c0d16295b004c901c50772dd6fa983a46e75f))
+
 ## [0.8.0](https://github.com/elixir-metatrack/api-server/compare/0.7.0...0.8.0) (2026-11-06)
 
 
