@@ -55,14 +55,47 @@ curl --fail-with-body --silent --show-error \
   --header "Authorization: Bearer $API_TOKEN" \
   --form "manifest=@$MANIFEST;type=text/csv" \
   --form-string "sshPublicKey=$PUBLIC_KEY" \
-  "http://localhost:1234/api/projects/$PROJECT_ID/upload-batches"
+  "http://localhost:1234/api/projects/$PROJECT_ID/upload-batches" \
+  --output registration.json \
+  --write-out 'HTTP %{http_code}\n'
 ```
 
-A successful response contains `batchId`, `status`, `sftpUsername`, `sftpHost`, `sftpPort`, `expiresAt`, and per-entry
-details. A `201` means account provisioning completed; `202` means registration committed and recoverable SFTPGo
-provisioning is retrying. Do not retry registration blindly after a `202`; poll the returned batch ID.
+The HTTP response includes a JSON `UploadBatchReport` body; it is not status-code-only. It contains `batchId`, `status`,
+`sftpUsername`, `sftpHost`, `sftpPort`, `expiresAt`, and per-entry details. The command above saves that body in
+`registration.json` and prints the HTTP status. Inspect the returned connection details and save the batch ID:
 
-Connect with the private key that remains on the user's machine:
+```shell
+jq '{batchId, status, sftpUsername, sftpHost, sftpPort, expiresAt, entries}' registration.json
+BATCH_ID="$(jq -r '.batchId' registration.json)"
+SFTP_USERNAME="$(jq -r '.sftpUsername' registration.json)"
+SFTP_HOST="$(jq -r '.sftpHost' registration.json)"
+SFTP_PORT="$(jq -r '.sftpPort' registration.json)"
+```
+
+A `201` means account provisioning completed. A `202` means registration committed and recoverable SFTPGo provisioning
+is retrying; do not retry registration blindly or attempt SFTP login yet. Poll the batch endpoint using the returned
+`batchId` until `status` is `OPEN`:
+
+```shell
+while :; do
+  STATUS_RESPONSE="$(curl --fail-with-body --silent --show-error \
+    --header "Authorization: Bearer $API_TOKEN" \
+    "http://localhost:1234/api/projects/$PROJECT_ID/upload-batches/$BATCH_ID")"
+  STATUS="$(jq -r '.status' <<<"$STATUS_RESPONSE")"
+  if [ "$STATUS" = "OPEN" ]; then
+    break
+  fi
+  if [ "$STATUS" != "PROVISIONING" ]; then
+    printf 'Batch is not ready for SFTP (status: %s)\n' "$STATUS" >&2
+    exit 1
+  fi
+  sleep 5
+done
+```
+
+Connect with the private key that remains on the user's machine. The API bearer token is only for API requests; SFTP
+authentication uses the private key corresponding to the public key submitted during registration, and there is no SFTP
+password:
 
 ```shell
 sftp -i "$HOME/.ssh/metatrack-batch" -P "$SFTP_PORT" "$SFTP_USERNAME@$SFTP_HOST"
