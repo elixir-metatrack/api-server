@@ -40,6 +40,10 @@ public interface KeycloakAdminClient {
     );
 
     @GET
+    @Path("/count")
+    RestResponse<Integer> countUsers(@PathParam("realm") String realm);
+
+    @GET
     RestResponse<List<KeycloakProfileRepresentation>> searchUsers(
             @PathParam("realm") String realm,
             @QueryParam("search") String search,
