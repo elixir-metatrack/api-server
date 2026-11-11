@@ -7,66 +7,101 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import no.metatrack.server.project.Project;
-import no.metatrack.server.sample.metadata.CreateSampleMetadataFieldRequest;
-import no.metatrack.server.sample.metadata.SampleMetadataField;
-import no.metatrack.server.sample.metadata.SampleMetadataFieldService;
-import no.metatrack.server.sample.metadata.SampleMetadataFieldType;
-import no.metatrack.server.sample.metadata.SampleMetadataService;
-import no.metatrack.server.sample.vocabulary.SampleValidationViolation;
-import no.metatrack.server.sample.vocabulary.SampleVocabularyRules;
-import no.metatrack.server.sample.vocabulary.SampleVocabularyService;
-import no.metatrack.server.sample.vocabulary.SampleVocabularyValidationException;
-import no.metatrack.server.sample.vocabulary.SpreadsheetVocabularyImportService;
+import no.metatrack.server.sample.metadata.*;
+import no.metatrack.server.sample.vocabulary.*;
 import no.metatrack.server.spreadsheet.SpreadsheetImportSupport;
 import no.metatrack.server.spreadsheet.SpreadsheetTable;
 import no.metatrack.server.spreadsheet.TableUploadSupport;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.csv.DuplicateHeaderMode;
+import org.apache.commons.csv.*;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @ApplicationScoped
 public class CSVSampleSheetImportService {
 
     private static final Set<String> BUILT_IN_HEADERS = Set.of(
-            "name", "sample name", "alias", "tax_id", "tax id", "host_tax_id", "host tax id",
-            "isolation_source", "isolation source", "collection_date", "collection date", "location",
-            "geographic location", "sequencing_lab", "collected by", "institution", "collecting institution",
-            "host_health_state", "host health state", "project_title", "project title", "description", "isolate",
-            "collected_by", "latitude", "longitude", "environmental_sample", "environmental sample",
-            "host_associated", "host associated", "host_common_name", "host common name", "host_subject_id",
-            "host subject id", "collector_name", "collector name", "host_sex", "host sex", "influenza_test_method",
-            "influenza test method", "influenza_test_result", "influenza test result", "other_pathogens_tested",
-            "other pathogens tested", "other_pathogens_test_result", "other pathogens test result", "host_habitat",
-            "host habitat", "isolation_source_host_associated", "isolation source host-associated", "host_behaviour",
-            "host behaviour", "isolation_source_non_host_associated", "isolation source non-host-associated",
-            "influenza_virus_type", "influenza virus type", "influenza_sub_type", "influenza sub type", "serovar",
-            "strain", "host_age", "host age", "county", "commune", "hospital_health_institution",
-            "hospital/health institution", "collecting_institution", "project_accession", "project accession",
-            "study_accession", "study accession", "sample_accession", "sample accession",
-            "secondary_accession", "secondary accession");
+            "name",
+            "sample name",
+            "alias",
+            "tax_id",
+            "tax id",
+            "host_tax_id",
+            "host tax id",
+            "isolation_source",
+            "isolation source",
+            "collection_date",
+            "collection date",
+            "location",
+            "geographic location",
+            "sequencing_lab",
+            "collected by",
+            "institution",
+            "collecting institution",
+            "host_health_state",
+            "host health state",
+            "project_title",
+            "project title",
+            "description",
+            "isolate",
+            "collected_by",
+            "latitude",
+            "longitude",
+            "environmental_sample",
+            "environmental sample",
+            "host_associated",
+            "host associated",
+            "host_common_name",
+            "host common name",
+            "host_subject_id",
+            "host subject id",
+            "collector_name",
+            "collector name",
+            "host_sex",
+            "host sex",
+            "influenza_test_method",
+            "influenza test method",
+            "influenza_test_result",
+            "influenza test result",
+            "other_pathogens_tested",
+            "other pathogens tested",
+            "other_pathogens_test_result",
+            "other pathogens test result",
+            "host_habitat",
+            "host habitat",
+            "isolation_source_host_associated",
+            "isolation source host-associated",
+            "host_behaviour",
+            "host behaviour",
+            "isolation_source_non_host_associated",
+            "isolation source non-host-associated",
+            "influenza_virus_type",
+            "influenza virus type",
+            "influenza_sub_type",
+            "influenza sub type",
+            "serovar",
+            "strain",
+            "host_age",
+            "host age",
+            "county",
+            "commune",
+            "hospital_health_institution",
+            "hospital/health institution",
+            "collecting_institution",
+            "project_accession",
+            "project accession",
+            "study_accession",
+            "study accession",
+            "sample_accession",
+            "sample accession",
+            "secondary_accession",
+            "secondary accession");
 
     @Inject
     SampleMetadataService metadataService;
@@ -104,10 +139,10 @@ public class CSVSampleSheetImportService {
         int acceptedCount = 0;
         Project targetProject = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
         Project project = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
-        List<SampleMetadataField> customFields = SampleMetadataField.list(
-                "project.id = ?1 and archivedOn is null order by key", project.id);
-        List<SampleMetadataField> archivedFields = SampleMetadataField.list(
-                "project.id = ?1 and archivedOn is not null order by key", project.id);
+        List<SampleMetadataField> customFields =
+                SampleMetadataField.list("project.id = ?1 and archivedOn is null order by key", project.id);
+        List<SampleMetadataField> archivedFields =
+                SampleMetadataField.list("project.id = ?1 and archivedOn is not null order by key", project.id);
         Set<String> customNumberHeaders = new HashSet<>();
         for (SampleMetadataField field : customFields) {
             if (field.type == SampleMetadataFieldType.NUMBER) {
@@ -115,8 +150,8 @@ public class CSVSampleSheetImportService {
                 if (!isAmbiguousLabel(field, customFields)) customNumberHeaders.add(field.label);
             }
         }
-        SpreadsheetTable spreadsheet = TableUploadSupport.isWorkbook(file)
-                ? spreadsheetSupport.read(file, true, customNumberHeaders) : null;
+        SpreadsheetTable spreadsheet =
+                TableUploadSupport.isWorkbook(file) ? spreadsheetSupport.read(file, true, customNumberHeaders) : null;
         List<CSVRecord> records;
         List<String> headers;
         if (spreadsheet != null) {
@@ -136,16 +171,13 @@ public class CSVSampleSheetImportService {
 
         for (CSVRecord rec : records) {
             String name = getMappedValue(rec, "name", "Sample Name");
-            String row = spreadsheet == null
-                    ? "Row " + rec.getRecordNumber()
-                    : spreadsheet.location(rec);
+            String row = spreadsheet == null ? "Row " + rec.getRecordNumber() : spreadsheet.location(rec);
             String rowLabel = name == null || name.isBlank() || spreadsheet == null
                     ? (name == null || name.isBlank() ? row : name)
                     : name + " (" + row + ")";
 
             if (name == null || name.isBlank()) {
-                errors.add(new SampleValidationViolation(
-                        row, "name", name, "Name column is missing or empty"));
+                errors.add(new SampleValidationViolation(row, "name", name, "Name column is missing or empty"));
                 continue;
             }
 
@@ -161,8 +193,7 @@ public class CSVSampleSheetImportService {
             sample.name = name;
             sample.alias = getMappedValue(rec, "alias");
             sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, rowLabel, rowErrors);
-            sample.hostTaxId =
-                    parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, rowLabel, rowErrors);
+            sample.hostTaxId = parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, rowLabel, rowErrors);
             sample.isolationSource = getMappedValue(rec, "isolation_source", "Isolation Source");
 
             String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
@@ -190,28 +221,25 @@ public class CSVSampleSheetImportService {
             sample.isolate = getMappedValue(rec, "isolate", "Isolate");
             sample.collectedBy = getMappedValue(rec, "collected_by", "Collected By");
             sample.latitude = parseOptionalDouble(rec, new String[] {"latitude", "Latitude"}, rowLabel, rowErrors);
-            sample.longitude =
-                    parseOptionalDouble(rec, new String[] {"longitude", "Longitude"}, rowLabel, rowErrors);
+            sample.longitude = parseOptionalDouble(rec, new String[] {"longitude", "Longitude"}, rowLabel, rowErrors);
             sample.environmentalSample = getMappedValue(rec, "environmental_sample", "Environmental Sample");
             sample.hostAssociated = getMappedValue(rec, "host_associated", "Host Associated");
             sample.hostCommonName = getMappedValue(rec, "host_common_name", "Host Common Name");
             sample.hostSubjectId = getMappedValue(rec, "host_subject_id", "Host Subject ID");
             sample.collectorName = getMappedValue(rec, "collector_name", "Collector Name");
-            sample.collectingInstitution =
-                    getMappedValue(rec, "collecting_institution", "Collecting Institution");
+            sample.collectingInstitution = getMappedValue(rec, "collecting_institution", "Collecting Institution");
             sample.hostSex = getMappedValue(rec, "host_sex", "Host Sex");
             sample.influenzaTestMethod = getMappedValue(rec, "influenza_test_method", "Influenza Test Method");
             sample.influenzaTestResult = getMappedValue(rec, "influenza_test_result", "Influenza Test Result");
-            sample.otherPathogensTested =
-                    getMappedValue(rec, "other_pathogens_tested", "Other Pathogens Tested");
+            sample.otherPathogensTested = getMappedValue(rec, "other_pathogens_tested", "Other Pathogens Tested");
             sample.otherPathogensTestResult =
                     getMappedValue(rec, "other_pathogens_test_result", "Other Pathogens Test Result");
             sample.hostHabitat = getMappedValue(rec, "host_habitat", "Host Habitat");
             sample.isolationSourceHostAssociated =
                     getMappedValue(rec, "isolation_source_host_associated", "Isolation Source Host-Associated");
             sample.hostBehaviour = getMappedValue(rec, "host_behaviour", "Host Behaviour");
-            sample.isolationSourceNonHostAssociated = getMappedValue(
-                    rec, "isolation_source_non_host_associated", "Isolation Source Non-Host-Associated");
+            sample.isolationSourceNonHostAssociated =
+                    getMappedValue(rec, "isolation_source_non_host_associated", "Isolation Source Non-Host-Associated");
             sample.influenzaVirusType = getMappedValue(rec, "influenza_virus_type", "Influenza Virus Type");
             sample.influenzaSubType = getMappedValue(rec, "influenza_sub_type", "Influenza Sub Type");
             sample.serovar = getMappedValue(rec, "serovar", "Serovar");
@@ -232,10 +260,11 @@ public class CSVSampleSheetImportService {
                 if (rawValue == null || rawValue.isBlank()) continue;
                 try {
                     if (column.field() != null) {
-                        customMetadata.put(column.field().key,
-                                metadataService.parseCsvValue(column.field().type, rawValue));
+                        customMetadata.put(
+                                column.field().key, metadataService.parseCsvValue(column.field().type, rawValue));
                     } else {
-                        customMetadata.put(column.generatedKey(),
+                        customMetadata.put(
+                                column.generatedKey(),
                                 metadataService.parseCsvValue(SampleMetadataFieldType.TEXT, rawValue));
                     }
                 } catch (BadRequestException e) {
@@ -257,16 +286,19 @@ public class CSVSampleSheetImportService {
                         continue;
                     }
                     try {
-                        metadataFieldService.create(project.id,
+                        metadataFieldService.create(
+                                project.id,
                                 new CreateSampleMetadataFieldRequest(
                                         key, column.header().trim(), SampleMetadataFieldType.TEXT, null));
                         createdMetadataFields.add(key);
                     } catch (WebApplicationException e) {
                         if (e.getResponse().getStatus() < 400 || e.getResponse().getStatus() >= 500) throw e;
-                        errors.add(new SampleValidationViolation(rowLabel, key,
+                        errors.add(new SampleValidationViolation(
+                                rowLabel,
+                                key,
                                 customMetadata.get(key).toString(),
-                                "Unable to create custom metadata field for column '" + column.header()
-                                        + "': " + e.getMessage()));
+                                "Unable to create custom metadata field for column '" + column.header() + "': "
+                                        + e.getMessage()));
                         metadataCreationFailed = true;
                         break;
                     }
@@ -281,8 +313,8 @@ public class CSVSampleSheetImportService {
                     }
                 } catch (WebApplicationException e) {
                     if (e.getResponse().getStatus() != 409) throw e;
-                    errors.add(new SampleValidationViolation(rowLabel, "name", name,
-                            "Sample name '" + name + "' already exists in this project"));
+                    errors.add(new SampleValidationViolation(
+                            rowLabel, "name", name, "Sample name '" + name + "' already exists in this project"));
                 }
             } else {
                 errors.addAll(rowErrors);
@@ -296,31 +328,101 @@ public class CSVSampleSheetImportService {
         Optional<Sample> existing = sampleService.findSampleByName(sample.name, projectId);
         if (existing.isPresent()) {
             Sample existingSample = existing.get();
-            return sampleService.updateSample(projectId, existingSample.id, sample.name, sample.alias, sample.taxId,
-                    sample.hostTaxId, sample.location, sample.sequencingLab, sample.institution,
-                    sample.isolationSource, sample.collectionDate, sample.hostHealthState, sample.projectTitle,
-                    sample.description, sample.isolate, sample.collectedBy, sample.latitude, sample.longitude,
-                    sample.environmentalSample, sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
-                    sample.collectorName, sample.collectingInstitution, sample.hostSex, sample.influenzaTestMethod,
-                    sample.influenzaTestResult, sample.otherPathogensTested, sample.otherPathogensTestResult,
-                    sample.hostHabitat, sample.isolationSourceHostAssociated, sample.hostBehaviour,
-                    sample.isolationSourceNonHostAssociated, sample.influenzaVirusType, sample.influenzaSubType,
-                    sample.serovar, sample.strain, sample.hostAge, sample.county, sample.commune,
-                    sample.hospitalHealthInstitution, sample.projectAccession, sample.studyAccession,
-                    sample.sampleAccession, sample.secondaryAccession, customMetadata);
+            return sampleService.updateSample(
+                    projectId,
+                    existingSample.id,
+                    sample.name,
+                    sample.alias,
+                    sample.taxId,
+                    sample.hostTaxId,
+                    sample.location,
+                    sample.sequencingLab,
+                    sample.institution,
+                    sample.isolationSource,
+                    sample.collectionDate,
+                    sample.hostHealthState,
+                    sample.projectTitle,
+                    sample.description,
+                    sample.isolate,
+                    sample.collectedBy,
+                    sample.latitude,
+                    sample.longitude,
+                    sample.environmentalSample,
+                    sample.hostAssociated,
+                    sample.hostCommonName,
+                    sample.hostSubjectId,
+                    sample.collectorName,
+                    sample.collectingInstitution,
+                    sample.hostSex,
+                    sample.influenzaTestMethod,
+                    sample.influenzaTestResult,
+                    sample.otherPathogensTested,
+                    sample.otherPathogensTestResult,
+                    sample.hostHabitat,
+                    sample.isolationSourceHostAssociated,
+                    sample.hostBehaviour,
+                    sample.isolationSourceNonHostAssociated,
+                    sample.influenzaVirusType,
+                    sample.influenzaSubType,
+                    sample.serovar,
+                    sample.strain,
+                    sample.hostAge,
+                    sample.county,
+                    sample.commune,
+                    sample.hospitalHealthInstitution,
+                    sample.projectAccession,
+                    sample.studyAccession,
+                    sample.sampleAccession,
+                    sample.secondaryAccession,
+                    customMetadata);
         }
 
-        sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId, sample.hostTaxId,
-                sample.location, sample.sequencingLab, sample.institution, sample.isolationSource,
-                sample.collectionDate, sample.hostHealthState, sample.projectTitle, sample.description,
-                sample.isolate, sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
-                sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId, sample.collectorName,
-                sample.collectingInstitution, sample.hostSex, sample.influenzaTestMethod, sample.influenzaTestResult,
-                sample.otherPathogensTested, sample.otherPathogensTestResult, sample.hostHabitat,
-                sample.isolationSourceHostAssociated, sample.hostBehaviour, sample.isolationSourceNonHostAssociated,
-                sample.influenzaVirusType, sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
-                sample.county, sample.commune, sample.hospitalHealthInstitution, sample.projectAccession,
-                sample.studyAccession, sample.sampleAccession, sample.secondaryAccession, customMetadata);
+        sampleService.createSample(
+                projectId,
+                sample.name,
+                sample.alias,
+                sample.taxId,
+                sample.hostTaxId,
+                sample.location,
+                sample.sequencingLab,
+                sample.institution,
+                sample.isolationSource,
+                sample.collectionDate,
+                sample.hostHealthState,
+                sample.projectTitle,
+                sample.description,
+                sample.isolate,
+                sample.collectedBy,
+                sample.latitude,
+                sample.longitude,
+                sample.environmentalSample,
+                sample.hostAssociated,
+                sample.hostCommonName,
+                sample.hostSubjectId,
+                sample.collectorName,
+                sample.collectingInstitution,
+                sample.hostSex,
+                sample.influenzaTestMethod,
+                sample.influenzaTestResult,
+                sample.otherPathogensTested,
+                sample.otherPathogensTestResult,
+                sample.hostHabitat,
+                sample.isolationSourceHostAssociated,
+                sample.hostBehaviour,
+                sample.isolationSourceNonHostAssociated,
+                sample.influenzaVirusType,
+                sample.influenzaSubType,
+                sample.serovar,
+                sample.strain,
+                sample.hostAge,
+                sample.county,
+                sample.commune,
+                sample.hospitalHealthInstitution,
+                sample.projectAccession,
+                sample.studyAccession,
+                sample.sampleAccession,
+                sample.secondaryAccession,
+                customMetadata);
         return true;
     }
 
@@ -355,9 +457,7 @@ public class CSVSampleSheetImportService {
     }
 
     private List<MetadataColumn> resolveMetadataColumns(
-            List<String> headers,
-            List<SampleMetadataField> activeFields,
-            List<SampleMetadataField> archivedFields) {
+            List<String> headers, List<SampleMetadataField> activeFields, List<SampleMetadataField> archivedFields) {
         List<SampleMetadataField> allFields = new ArrayList<>(activeFields);
         allFields.addAll(archivedFields);
         List<MetadataColumn> columns = new ArrayList<>();
@@ -418,10 +518,12 @@ public class CSVSampleSheetImportService {
             } catch (BadRequestException e) {
                 String guidance = e.getMessage().contains("reserved")
                         ? "Rename it so the generated key is not reserved."
-                        : "Rename it to use an ASCII letter first, followed by ASCII letters, numbers, or spaces.";
-                throw new BadRequestException("Column '" + header
-                        + "' cannot be imported as custom metadata: " + e.getMessage()
-                        + ". " + guidance, e);
+                        : "Rename it to start with a letter and use letters, numbers, or spaces.";
+                throw new BadRequestException(
+                        "Column '" + header
+                                + "' cannot be imported as custom metadata: " + e.getMessage()
+                                + ". " + guidance,
+                        e);
             }
 
             SampleMetadataField keyCollision = findFieldByKey(allFields, key);
@@ -452,34 +554,52 @@ public class CSVSampleSheetImportService {
     }
 
     private BadRequestException archivedFieldError(String header, SampleMetadataField field) {
-        return new BadRequestException("Column '" + header + "' matches archived custom metadata field '"
-                + field.key + "' ('" + field.label + "'). Restore this field or rename the column.");
+        return new BadRequestException("Column '" + header + "' matches archived custom metadata field '" + field.key
+                + "' ('" + field.label + "'). Restore this field or rename the column.");
     }
 
     private String generateMetadataKey(String header) {
         StringBuilder key = new StringBuilder();
         boolean underscorePending = false;
-        for (int i = 0; i < header.length(); i++) {
-            char character = header.charAt(i);
-            if (character > 0x7f) {
-                throw new BadRequestException("Column '" + header
-                        + "' contains non-ASCII characters and cannot be converted to a metadata key."
-                        + " Rename it using ASCII letters and numbers.");
-            }
-            char lower = Character.toLowerCase(character);
-            if ((lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9')) {
-                if (underscorePending && key.length() > 0) key.append('_');
-                key.append(lower);
+        int previousCodePoint = -1;
+        for (int i = 0; i < header.length(); ) {
+            int codePoint = header.codePointAt(i);
+            i += Character.charCount(codePoint);
+            if (Character.isLetter(codePoint)) {
+                if (underscorePending && !key.isEmpty()) key.append('_');
+                key.appendCodePoint(codePoint);
                 underscorePending = false;
+            } else if (codePoint >= '0' && codePoint <= '9') {
+                if (underscorePending && !key.isEmpty()) key.append('_');
+                key.appendCodePoint(codePoint);
+                underscorePending = false;
+            } else if (isCombiningMark(codePoint)
+                    && !underscorePending
+                    && previousCodePoint >= 0
+                    && (Character.isLetter(previousCodePoint) || isCombiningMark(previousCodePoint))) {
+                key.appendCodePoint(codePoint);
+            } else if (codePoint > 0x7f) {
+                throw new BadRequestException("Column '" + header
+                        + "' contains non-letter Unicode characters and cannot be converted to a metadata key."
+                        + " Rename it using letters and numbers.");
             } else {
                 underscorePending = true;
             }
+            previousCodePoint = codePoint;
         }
-        if (key.length() > 0 && key.length() > 64) {
+        String normalizedKey = key.toString().toLowerCase(Locale.ROOT);
+        if (normalizedKey.codePointCount(0, normalizedKey.length()) > 64) {
             throw new BadRequestException("Column '" + header
-                    + "' generates a metadata key longer than 64 characters. Shorten the column header.");
+                    + "' generates a metadata key longer than 64 code points. Shorten the column header.");
         }
-        return key.toString();
+        return normalizedKey;
+    }
+
+    private static boolean isCombiningMark(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.NON_SPACING_MARK
+                || type == Character.COMBINING_SPACING_MARK
+                || type == Character.ENCLOSING_MARK;
     }
 
     private boolean hasHeader(List<String> headers, String... expectedHeaders) {
@@ -493,7 +613,8 @@ public class CSVSampleSheetImportService {
     }
 
     private ParsedRecords prepareRecordsWithHeaders(Reader reader, char delimiter) throws IOException {
-        CSVFormat inputFormat = CSVFormat.DEFAULT.builder()
+        CSVFormat inputFormat = CSVFormat.DEFAULT
+                .builder()
                 .setDelimiter(delimiter)
                 .setTrim(true)
                 .get();
@@ -515,17 +636,19 @@ public class CSVSampleSheetImportService {
         return parseMappedRecords(headers, allRecords.subList(1, allRecords.size()), delimiter);
     }
 
-    private ParsedRecords parseMappedRecords(
-            List<String> headers, List<CSVRecord> dataRecords, char delimiter) throws IOException {
+    private ParsedRecords parseMappedRecords(List<String> headers, List<CSVRecord> dataRecords, char delimiter)
+            throws IOException {
         StringWriter content = new StringWriter();
-        try (CSVPrinter printer = new CSVPrinter(content, CSVFormat.DEFAULT.builder().setDelimiter(delimiter).get())) {
+        try (CSVPrinter printer = new CSVPrinter(
+                content, CSVFormat.DEFAULT.builder().setDelimiter(delimiter).get())) {
             printer.printRecord(headers);
             for (CSVRecord dataRecord : dataRecords) {
                 printer.printRecord(dataRecord.toList());
             }
         }
 
-        CSVFormat mappedFormat = CSVFormat.DEFAULT.builder()
+        CSVFormat mappedFormat = CSVFormat.DEFAULT
+                .builder()
                 .setDelimiter(delimiter)
                 .setHeader()
                 .setSkipHeaderRecord(true)
@@ -599,8 +722,7 @@ public class CSVSampleSheetImportService {
         return getCustomMetadataValue(rec, field, List.of(field));
     }
 
-    String getCustomMetadataValue(
-            CSVRecord rec, SampleMetadataField field, List<SampleMetadataField> customFields) {
+    String getCustomMetadataValue(CSVRecord rec, SampleMetadataField field, List<SampleMetadataField> customFields) {
         Integer keyIndex = findHeaderIndex(rec, field.key);
         if (keyIndex != null) return valueAt(rec, keyIndex);
 

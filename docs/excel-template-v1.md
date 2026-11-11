@@ -70,7 +70,9 @@ previously supported version 1 workbooks with a `TEMPLATE VERSION:` row and `MET
 unversioned workbooks using the older `METADATA FIELDS:` layout. Unsupported version numbers are rejected.
 
 The column names, required values and validations follow the existing CSV importer. For Samples, add custom
-attribute columns using keys from the project's custom attributes. These attributes must already exist.
+attribute columns using keys from the project's custom attributes. Keys are lowercase-normalized, start with a Unicode
+letter, and may contain Unicode letters, attached combining marks, ASCII digits, and underscores up to 64 code points.
+These attributes must already exist.
 Experiment rows reference samples already linked to the selected assay.
 
 Blank data rows are ignored. Duplicate headers, values without a header, formula cells and Excel error cells

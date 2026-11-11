@@ -6,7 +6,9 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 @Schema(description = "Definition of a project-specific custom sample metadata field.")
 public record CreateSampleMetadataFieldRequest(
-        @Schema(description = "Stable key used in custom metadata objects")
+        @Schema(description = "Stable key used in custom metadata objects; starts with a Unicode letter and contains "
+                + "Unicode letters (including æ, ø, å), attached combining marks, ASCII digits, or underscores "
+                + "(maximum 64 code points)")
         @NotBlank String key,
         @Schema(description = "Human-readable field label")
         @NotBlank String label,

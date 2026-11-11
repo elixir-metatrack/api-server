@@ -12,11 +12,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @ApplicationScoped
 public class SampleMetadataFieldService {
-    private static final Pattern KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{0,63}");
+    private static final int MAX_KEY_CODE_POINTS = 64;
     private static final Set<String> RESERVED_KEYS = Set.of(
             "id", "name", "sample_name", "alias", "tax_id", "host_tax_id", "isolation_source",
             "collection_date", "location", "geographic_location", "sequencing_lab", "institution",
@@ -91,11 +90,34 @@ public class SampleMetadataFieldService {
     public static String validateKey(String rawKey) {
         if (rawKey == null) throw new BadRequestException("Metadata field key is required");
         String key = rawKey.trim().toLowerCase(Locale.ROOT);
-        if (!KEY_PATTERN.matcher(key).matches()) {
-            throw new BadRequestException("Metadata field key must start with a letter and contain only lowercase letters, numbers, and underscores");
+        int[] codePoints = key.codePoints().toArray();
+        if (codePoints.length == 0 || codePoints.length > MAX_KEY_CODE_POINTS || !Character.isLetter(codePoints[0])) {
+            throw invalidKeyException();
+        }
+        for (int i = 1; i < codePoints.length; i++) {
+            int codePoint = codePoints[i];
+            if (Character.isLetter(codePoint) || isAsciiDigit(codePoint) || codePoint == '_') continue;
+            if (isCombiningMark(codePoint)
+                    && (Character.isLetter(codePoints[i - 1]) || isCombiningMark(codePoints[i - 1]))) continue;
+            throw invalidKeyException();
         }
         if (RESERVED_KEYS.contains(key)) throw new BadRequestException("Metadata field key '" + key + "' is reserved");
         return key;
+    }
+
+    private static BadRequestException invalidKeyException() {
+        return new BadRequestException("Metadata field key must start with a letter and contain only Unicode letters, "
+                + "combining marks, ASCII digits, and underscores (maximum 64 code points)");
+    }
+
+    private static boolean isAsciiDigit(int codePoint) {
+        return codePoint >= '0' && codePoint <= '9';
+    }
+
+    private static boolean isCombiningMark(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.NON_SPACING_MARK || type == Character.COMBINING_SPACING_MARK
+                || type == Character.ENCLOSING_MARK;
     }
 
     static String validateLabel(String rawLabel) {
