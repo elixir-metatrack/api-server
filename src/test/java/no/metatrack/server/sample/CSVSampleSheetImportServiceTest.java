@@ -774,6 +774,69 @@ class CSVSampleSheetImportServiceTest {
         assertTrue(error.getMessage().contains("no data rows"));
     }
 
+    @Test
+    void importsLegacyMlstColumnsAsCustomMetadataFromCsvAndWorkbooks() throws Exception {
+        for (String format : List.of("csv", "xls", "xlsx")) {
+            CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+            service.vocabularyService = mock(SampleVocabularyService.class);
+            when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+            service.sampleService = mock(SampleService.class);
+            service.metadataService = new SampleMetadataService();
+            service.metadataFieldService = mock(SampleMetadataFieldService.class);
+            when(service.metadataFieldService.create(eq(1L), any(CreateSampleMetadataFieldRequest.class)))
+                    .thenAnswer(invocation -> {
+                        CreateSampleMetadataFieldRequest request = invocation.getArgument(1);
+                        return metadataField(request.key(), request.label());
+                    });
+            service.spreadsheetSupport = new SpreadsheetImportSupport();
+            service.spreadsheetVocabularies = mock(SpreadsheetVocabularyImportService.class);
+            Path path = mlstImportFile(format);
+
+            try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+                Project project = new Project();
+                project.id = 1L;
+                entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+                entities.when(() -> SampleMetadataField.list(
+                        "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+                entities.when(() -> SampleMetadataField.list(
+                        "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+                assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty(), format);
+
+                var call = mockingDetails(service.sampleService).getInvocations().stream()
+                        .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
+                        .findFirst().orElseThrow();
+                Object[] arguments = call.getArguments();
+                assertEquals(Map.of("mlst", "ST-42"), arguments[arguments.length - 1], format);
+                var fieldRequest = mockingDetails(service.metadataFieldService).getInvocations().stream()
+                        .filter(invocation -> invocation.getMethod().getName().equals("create"))
+                        .findFirst().orElseThrow()
+                        .getArgument(1, CreateSampleMetadataFieldRequest.class);
+                assertEquals("mlst", fieldRequest.key(), format);
+                assertEquals("MLST", fieldRequest.label(), format);
+            }
+        }
+    }
+
+    private Path mlstImportFile(String format) throws Exception {
+        Path path = directory.resolve("mlst." + format);
+        if (format.equals("csv")) {
+            return Files.writeString(path, "Sample Name,MLST\nsample-1,ST-42\n");
+        }
+        try (Workbook workbook = format.equals("xls") ? new HSSFWorkbook() : new XSSFWorkbook();
+             var output = Files.newOutputStream(path)) {
+            var sheet = workbook.createSheet("Samples");
+            var headers = sheet.createRow(0);
+            headers.createCell(0).setCellValue("Sample Name");
+            headers.createCell(1).setCellValue("MLST");
+            var sample = sheet.createRow(1);
+            sample.createCell(0).setCellValue("sample-1");
+            sample.createCell(1).setCellValue("ST-42");
+            workbook.write(output);
+        }
+        return path;
+    }
+
     private SpreadsheetTable spreadsheet(CSVSampleSheetImportService service, String contents) throws Exception {
         List<CSVRecord> records = service.prepareRecords(new StringReader(contents), ',');
         return new SpreadsheetTable(
