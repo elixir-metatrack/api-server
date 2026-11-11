@@ -143,10 +143,11 @@ class SpreadsheetImportPostgresTest {
             row(data, 1, "valid", "control");
             row(data, 2, "invalid", "other");
             vocabulary(workbook, "group", "control");
-            var errors = samples.importNewSamples(project.id, write(workbook, format).toFile());
-            assertEquals(1, errors.size(), errors.toString());
-            assertTrue(errors.getFirst().sample().contains("Samples!row 3"));
-            assertEquals("group", errors.getFirst().fieldKey());
+            var result = samples.importNewSamples(project.id, write(workbook, format).toFile());
+            assertEquals(1, result.acceptedCount());
+            assertEquals(1, result.errors().size(), result.errors().toString());
+            assertTrue(result.errors().getFirst().sample().contains("Samples!row 3"));
+            assertEquals("group", result.errors().getFirst().fieldKey());
             assertEquals(1, Sample.count("project.id", project.id));
             Sample sample = Sample.findBySampleNameInProject("valid", project.id).orElseThrow();
             assertEquals(Map.of("group", "control"), metadata.getActiveMetadata(sample));
@@ -177,7 +178,9 @@ class SpreadsheetImportPostgresTest {
         try (Workbook workbook = sampleWorkbook("new", "group", "control")) {
             Sheet vocabulary = vocabulary(workbook, "group", "treated");
             row(vocabulary, 2, "group", "control");
-            assertTrue(samples.importNewSamples(project.id, write(workbook, "xlsx").toFile()).isEmpty());
+            var result = samples.importNewSamples(project.id, write(workbook, "xlsx").toFile());
+            assertTrue(result.errors().isEmpty());
+            assertEquals(1, result.acceptedCount());
             assertEquals(1, SampleVocabulary.count("project.id", project.id));
         }
     }
@@ -249,7 +252,11 @@ class SpreadsheetImportPostgresTest {
             }
         }
         FileUpload upload = upload(path, format);
-        assertEquals(400, sampleController.importCSV(project.id, upload).getStatus());
+        var response = sampleController.importCSV(project.id, upload);
+        assertEquals(400, response.getStatus());
+        var result = (no.metatrack.server.sample.SampleImportResult) response.getEntity();
+        assertEquals(1, result.acceptedCount());
+        assertEquals(1, result.errors().size());
         assertTrue(Sample.findBySampleNameInProject("valid", project.id).isPresent());
         assertTrue(Sample.findBySampleNameInProject("invalid", project.id).isEmpty());
         assertEquals(List.of("female"), globals.get("host_sex").terms());
@@ -308,8 +315,9 @@ class SpreadsheetImportPostgresTest {
             } else {
                 path = write(workbook, format);
             }
-            var errors = experiments.importIntoAssay(project.id, assay.id, path.toFile());
-            assertTrue(errors.isEmpty(), errors.toString());
+            var result = experiments.importIntoAssay(project.id, assay.id, path.toFile());
+            assertTrue(result.errors().isEmpty(), result.errors().toString());
+            assertEquals(1, result.acceptedCount());
             assertEquals(6, File.count("assay.id", assay.id));
             assertEquals(2L, ((Number) em.createNativeQuery("select count(*) from {h-schema}assay_sample where assay_id = :assay")
                     .setParameter("assay", assay.id).getSingleResult()).longValue());
@@ -340,11 +348,12 @@ class SpreadsheetImportPostgresTest {
                     eq("conflict.fastq"), eq("md5"), isNull(), eq(ReadRole.SINGLE)))
                     .thenReturn(java.util.Optional.of("Conflicting file metadata"));
 
-            var errors = experiments.importIntoAssay(project.id, assay.id, path.toFile());
+            var result = experiments.importIntoAssay(project.id, assay.id, path.toFile());
 
-            assertEquals(1, errors.size(), errors.toString());
-            assertEquals("File Name", errors.getFirst().field());
-            assertEquals("Conflicting file metadata", errors.getFirst().message());
+            assertEquals(0, result.acceptedCount());
+            assertEquals(1, result.errors().size(), result.errors().toString());
+            assertEquals("File Name", result.errors().getFirst().field());
+            assertEquals("Conflicting file metadata", result.errors().getFirst().message());
         }
 
         assertEquals(0L, ((Number) em.createNativeQuery("select count(*) from {h-schema}assay_sample where assay_id = :assay")

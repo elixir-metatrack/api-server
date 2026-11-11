@@ -182,6 +182,16 @@ class SubProjectScopeTest {
         return committedFixture;
     }
 
+    private void addCommittedVisibleSample(Fixture fixture, String name) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            Project root = Project.<Project>findByIdOptional(fixture.root.id).orElseThrow();
+            Project subProject = Project.<Project>findByIdOptional(fixture.sub.id).orElseThrow();
+            Sample sample = sample(root, name);
+            subProject.linkedSamples.add(sample);
+            entityManager.flush();
+        });
+    }
+
     @BeforeEach
     void mockExternalServices() {
         users = mock(UserService.class);
@@ -497,9 +507,10 @@ class SubProjectScopeTest {
     void sampleCsvUsesRootMetadataAndOwnershipAndLinksOnlyNewSamples() throws Exception {
         Fixture f = committedFixture(true);
         Path csv = Files.writeString(directory.resolve("samples.csv"), "name,custom_status\nnew-sample,known\nhidden,known\ninvalid,unknown\n");
-        var errors = sampleImport.importNewSamples(f.sub.id, csv.toFile());
+        var result = sampleImport.importNewSamples(f.sub.id, csv.toFile());
         entityManager.flush();
-        assertEquals(2, errors.size());
+        assertEquals(1, result.acceptedCount());
+        assertEquals(2, result.errors().size());
         Sample created = sampleService.getSampleByName("new-sample", f.sub.id);
         assertEquals(f.root.id, created.project.id);
         assertEquals(Map.of("custom_status", "known"), metadataService.getActiveMetadata(List.of(created)).get(created.id));
@@ -550,15 +561,18 @@ class SubProjectScopeTest {
     @Test
     void experimentCsvImportsOnlyVisibleSamplesUsingRootFilePaths() throws Exception {
         Fixture f = committedFixture(false);
+        addCommittedVisibleSample(f, "new-visible");
         Path csv = Files.writeString(directory.resolve("experiments.csv"),
                 "Sample,File Name,File md5,Forward File Name,Forward File md5,Reverse File Name,Reverse File md5\n"
+                        + "new-visible,,,,,,\n"
                         + "visible,import.fastq,abc,forward.fastq,def,reverse.fastq,ghi\n"
                         + "hidden,secret.fastq,abc,secret-forward.fastq,def,secret-reverse.fastq,ghi\n"
                         + "visible,import.fastq,abc,duplicate-row.fastq,def,,\n"
                         + "visible,rollback.fastq,abc,reads.fastq,conflicting,,\n");
-        var errors = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
+        var result = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
         entityManager.flush();
-        assertEquals(3, errors.size());
+        assertEquals(1, result.acceptedCount());
+        assertEquals(3, result.errors().size());
         File imported = File.findByVirtualPathOptional(
                 PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "import.fastq")).orElseThrow();
         assertEquals(f.visible.id, imported.sample.id);
@@ -569,6 +583,8 @@ class SubProjectScopeTest {
                 PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "forward.fastq")).orElseThrow().readRole);
         assertEquals(ReadRole.REVERSE, File.findByVirtualPathOptional(
                 PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "reverse.fastq")).orElseThrow().readRole);
+        assertTrue(assayService.getAllSamplesInAssay(f.sub.id, f.shared.id).stream()
+                .anyMatch(associated -> associated.name.equals("new-visible")));
         for (String rejected : List.of("duplicate-row.fastq", "rollback.fastq")) {
             assertTrue(File.findByVirtualPathOptional(
                     PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", rejected)).isEmpty());
@@ -582,6 +598,7 @@ class SubProjectScopeTest {
     @Test
     void experimentCsvVocabularyFailureDoesNotMutateRowAndLaterValidRowCommits() throws Exception {
         Fixture f = committedFixture(false);
+        addCommittedVisibleSample(f, "new-visible");
         committedVocabulary = QuarkusTransaction.requiringNew().call(() -> {
             GlobalAssayVocabulary vocabulary = new GlobalAssayVocabulary();
             vocabulary.fieldKey = "sequencing_platform";
@@ -596,21 +613,23 @@ class SubProjectScopeTest {
         });
         Path csv = Files.writeString(directory.resolve("vocabulary-experiments.csv"),
                 "Sample,Sequencing platform,Insert Size,File Name,File md5\n"
-                        + "visible,unknown,999,rejected.fastq,abc\n"
-                        + "visible,known,100,accepted.fastq,def\n");
-        var errors = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
-        assertEquals(1, errors.size());
-        assertEquals("Row 1", errors.getFirst().row());
-        assertEquals("Sequencing platform", errors.getFirst().field());
+                        + "new-visible,unknown,999,rejected.fastq,abc\n"
+                        + "new-visible,known,100,accepted.fastq,def\n");
+        var result = experimentImport.importIntoAssay(f.sub.id, f.shared.id, csv.toFile());
+        assertEquals(1, result.acceptedCount());
+        assertEquals(1, result.errors().size());
+        assertEquals("Row 1", result.errors().getFirst().row());
+        assertEquals("Sequencing platform", result.errors().getFirst().field());
         Assay updated = assayService.getAssayById(f.sub.id, f.shared.id);
         assertEquals("known", updated.sequencingPlatform);
         assertEquals(100, updated.insertSize);
         assertTrue(File.findByVirtualPathOptional(
-                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "rejected.fastq")).isEmpty());
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "new-visible", "rejected.fastq")).isEmpty());
         File accepted = File.findByVirtualPathOptional(
-                PresignUrlService.virtualPath(f.root.id, f.shared.id, "visible", "accepted.fastq")).orElseThrow();
+                PresignUrlService.virtualPath(f.root.id, f.shared.id, "new-visible", "accepted.fastq")).orElseThrow();
         assertEquals(ReadRole.SINGLE, accepted.readRole);
         assertEquals(f.root.id, accepted.sample.project.id);
+        assertTrue(updated.samples.stream().anyMatch(associated -> associated.name.equals("new-visible")));
     }
 
     @Test
@@ -639,11 +658,12 @@ class SubProjectScopeTest {
         configureMetadata(f.root);
         asUser(EDITOR);
         assertTrue(roleCheck.isAtLeast(f.sub.id, ProjectRole.EDITOR));
-        updateSampleWithMetadata(f.sub.id, f.visible.id);
+        assertTrue(updateSampleWithMetadata(f.sub.id, f.visible.id));
         entityManager.flush();
         assertEquals("edited", f.visible.alias);
         assertNull(f.hidden.alias);
         assertEquals(Map.of("custom_status", "known"), metadataService.getActiveMetadata(List.of(f.visible)).get(f.visible.id));
+        assertFalse(updateSampleWithMetadata(f.sub.id, f.visible.id));
     }
 
     @Test
@@ -664,8 +684,8 @@ class SubProjectScopeTest {
                 null, null, null, null, null, Map.of("custom_status", "known"));
     }
 
-    private void updateSampleWithMetadata(Long projectId, UUID sampleId) {
-        sampleService.updateSample(
+    private boolean updateSampleWithMetadata(Long projectId, UUID sampleId) {
+        return sampleService.updateSample(
                 projectId, sampleId, null, "edited", null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
