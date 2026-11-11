@@ -95,6 +95,8 @@ metatrack:
     max-manifest-bytes: ${UPLOAD_BATCH_MAX_MANIFEST_BYTES:1048576}
     upload-window: ${UPLOAD_BATCH_UPLOAD_WINDOW:P7D}
     failed-staging-retention: ${UPLOAD_BATCH_FAILED_STAGING_RETENTION:P7D}
+  admin:
+    stalled-upload-threshold: ${ADMIN_STALLED_UPLOAD_THRESHOLD:PT2H}
 taxon-api/mp-rest/url: ${TAXON_API_URL:http://localhost:8080}
 sftpgo-api/mp-rest/url: ${SFTPGO_API_URL:http://localhost:18082}
 keycloak-admin-api/mp-rest/url: ${KEYCLOAK_BASE_URL}

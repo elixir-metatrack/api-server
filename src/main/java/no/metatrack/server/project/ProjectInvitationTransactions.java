@@ -8,6 +8,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
+import no.metatrack.server.auth.UserService;
 import no.metatrack.server.auth.VerifiedEmailIdentity;
 import no.metatrack.server.notification.Notification;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -25,6 +26,9 @@ public class ProjectInvitationTransactions {
     private final ProjectService projectService;
     private final Duration expiry;
     private final Clock clock;
+
+    @Inject
+    UserService userService;
 
     @Inject
     public ProjectInvitationTransactions(EntityManager entityManager, ProjectService projectService,
@@ -65,6 +69,7 @@ public class ProjectInvitationTransactions {
         invitation.recipientEmail = email;
         invitation.recipientId = recipient;
         invitation.inviterId = inviter;
+        invitation.inviterSystemAdmin = isCurrentSystemAdmin(inviter);
         invitation.inviterDisplayName = displayName == null ? inviter.toString() : displayName;
         invitation.role = role;
         invitation.createdOn = now;
@@ -118,7 +123,9 @@ public class ProjectInvitationTransactions {
             throw conflict("Invitation is not pending or has expired");
         }
         if (decision == InvitationStatus.ACCEPTED) {
-            requireAuthority(projectId, invitation.inviterId, invitation.role);
+            if (!invitation.inviterSystemAdmin) {
+                requireAuthority(projectId, invitation.inviterId, invitation.role);
+            }
             if (!isMember(projectId, identity.subject())) {
                 projectService.addMember(projectId, identity.subject(), invitation.role);
             }
@@ -144,12 +151,28 @@ public class ProjectInvitationTransactions {
         if (offered == null || offered == ProjectRole.OWNER) {
             throw new jakarta.ws.rs.BadRequestException("Invalid invitation role");
         }
+        if (isCurrentSystemAdmin(memberId)) {
+            return;
+        }
         // Scalar query avoids a membership entity cached by an earlier controller authorization check.
         ProjectRole role = entityManager.createQuery("select role from ProjectMember where project.id = :project and memberId = :member", ProjectRole.class)
                 .setParameter("project", projectId).setParameter("member", memberId)
                 .getResultStream().findFirst().orElseThrow(ForbiddenException::new);
         if (role != ProjectRole.OWNER && role != ProjectRole.ADMIN) {
             throw new ForbiddenException("Inviter no longer has sufficient authority");
+        }
+    }
+
+    private boolean isCurrentSystemAdmin(UUID userId) {
+        if (userService == null) {
+            return false;
+        }
+        try {
+            var currentUser = userService.requireCurrentUser();
+            return currentUser.roles().contains("system-admin")
+                    && UUID.fromString(currentUser.id()).equals(userId);
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 

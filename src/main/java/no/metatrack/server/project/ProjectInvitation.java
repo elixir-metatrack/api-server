@@ -30,6 +30,9 @@ public class ProjectInvitation extends PanacheEntityBase {
     public UUID inviterId;
 
     @Column(nullable = false)
+    public boolean inviterSystemAdmin;
+
+    @Column(nullable = false)
     public String inviterDisplayName;
 
     @Enumerated(EnumType.STRING)
