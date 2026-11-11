@@ -44,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @ApplicationScoped
@@ -98,8 +99,9 @@ public class CSVSampleSheetImportService {
     private record MetadataColumn(String header, int index, SampleMetadataField field, String generatedKey) {}
 
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
-    public List<SampleValidationViolation> importNewSamples(Long projectId, File file) {
+    public SampleImportResult importNewSamples(Long projectId, File file) {
         List<SampleValidationViolation> errors = new ArrayList<>();
+        int acceptedCount = 0;
         Project targetProject = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
         Project project = targetProject.isSubProject() ? targetProject.parentProject : targetProject;
         List<SampleMetadataField> customFields = SampleMetadataField.list(
@@ -271,21 +273,7 @@ public class CSVSampleSheetImportService {
                 }
                 if (metadataCreationFailed) continue;
                 try {
-                    sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
-                            sample.hostTaxId, sample.location, sample.sequencingLab,
-                            sample.institution, sample.isolationSource, sample.collectionDate,
-                            sample.hostHealthState, sample.projectTitle, sample.description, sample.isolate,
-                            sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
-                            sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
-                            sample.collectorName, sample.collectingInstitution, sample.hostSex,
-                            sample.influenzaTestMethod, sample.influenzaTestResult, sample.otherPathogensTested,
-                            sample.otherPathogensTestResult, sample.hostHabitat,
-                            sample.isolationSourceHostAssociated, sample.hostBehaviour,
-                            sample.isolationSourceNonHostAssociated, sample.influenzaVirusType,
-                            sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
-                            sample.county, sample.commune, sample.hospitalHealthInstitution,
-                            sample.projectAccession, sample.studyAccession, sample.sampleAccession,
-                            sample.secondaryAccession, customMetadata);
+                    if (saveSample(projectId, sample, customMetadata)) acceptedCount++;
                 } catch (SampleVocabularyValidationException e) {
                     for (SampleValidationViolation violation : e.violations()) {
                         errors.add(new SampleValidationViolation(
@@ -301,7 +289,39 @@ public class CSVSampleSheetImportService {
             }
         }
 
-        return errors;
+        return new SampleImportResult(acceptedCount, errors);
+    }
+
+    private boolean saveSample(Long projectId, Sample sample, Map<String, Object> customMetadata) {
+        Optional<Sample> existing = sampleService.findSampleByName(sample.name, projectId);
+        if (existing.isPresent()) {
+            Sample existingSample = existing.get();
+            return sampleService.updateSample(projectId, existingSample.id, sample.name, sample.alias, sample.taxId,
+                    sample.hostTaxId, sample.location, sample.sequencingLab, sample.institution,
+                    sample.isolationSource, sample.collectionDate, sample.hostHealthState, sample.projectTitle,
+                    sample.description, sample.isolate, sample.collectedBy, sample.latitude, sample.longitude,
+                    sample.environmentalSample, sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId,
+                    sample.collectorName, sample.collectingInstitution, sample.hostSex, sample.influenzaTestMethod,
+                    sample.influenzaTestResult, sample.otherPathogensTested, sample.otherPathogensTestResult,
+                    sample.hostHabitat, sample.isolationSourceHostAssociated, sample.hostBehaviour,
+                    sample.isolationSourceNonHostAssociated, sample.influenzaVirusType, sample.influenzaSubType,
+                    sample.serovar, sample.strain, sample.hostAge, sample.county, sample.commune,
+                    sample.hospitalHealthInstitution, sample.projectAccession, sample.studyAccession,
+                    sample.sampleAccession, sample.secondaryAccession, customMetadata);
+        }
+
+        sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId, sample.hostTaxId,
+                sample.location, sample.sequencingLab, sample.institution, sample.isolationSource,
+                sample.collectionDate, sample.hostHealthState, sample.projectTitle, sample.description,
+                sample.isolate, sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
+                sample.hostAssociated, sample.hostCommonName, sample.hostSubjectId, sample.collectorName,
+                sample.collectingInstitution, sample.hostSex, sample.influenzaTestMethod, sample.influenzaTestResult,
+                sample.otherPathogensTested, sample.otherPathogensTestResult, sample.hostHabitat,
+                sample.isolationSourceHostAssociated, sample.hostBehaviour, sample.isolationSourceNonHostAssociated,
+                sample.influenzaVirusType, sample.influenzaSubType, sample.serovar, sample.strain, sample.hostAge,
+                sample.county, sample.commune, sample.hospitalHealthInstitution, sample.projectAccession,
+                sample.studyAccession, sample.sampleAccession, sample.secondaryAccession, customMetadata);
+        return true;
     }
 
     private LocalDate parseCollectionDate(String value) {

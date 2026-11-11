@@ -253,10 +253,11 @@ public class SampleController {
     @Authenticated
     @Path("/samplesheet")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Operation(summary = "Import samples from a spreadsheet", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX sample sheet in multipart field `file`. Rows are processed independently: valid rows may be saved even when the response is 400 with row-level validation violations. Row failures return a list of violations; upload-level 400 responses use the framework's bad-request body.")
-    @APIResponse(responseCode = "200", description = "All rows imported; no response body")
+    @Operation(summary = "Import samples from a spreadsheet", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX sample sheet in multipart field `file`. Rows are processed independently: valid rows may be saved even when the response is 400 with row-level validation violations. The response includes acceptedCount and errors; upload-level 400 responses use the framework's bad-request body.")
+    @APIResponse(responseCode = "200", description = "Import result with accepted row count and no row errors",
+            content = @Content(schema = @Schema(implementation = SampleImportResult.class)))
     @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
-            content = @Content(schema = @Schema(type = SchemaType.ARRAY, implementation = SampleValidationViolation.class)))
+            content = @Content(schema = @Schema(implementation = SampleImportResult.class)))
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project not found")
     public Response importCSV(@PathParam("projectId") Long projectId,
@@ -268,14 +269,12 @@ public class SampleController {
 
         TableUploadSupport.validate(file);
 
-        List<SampleValidationViolation> errors = csvSampleSheetImportService.importNewSamples(
+        SampleImportResult result = csvSampleSheetImportService.importNewSamples(
                 projectId, file.filePath().toFile());
 
-        if (errors == null || errors.isEmpty()) {
-            return Response.ok().build();
-        }
-
-        return Response.status(400).entity(errors).build();
+        return result.errors().isEmpty()
+                ? Response.ok(result).build()
+                : Response.status(400).entity(result).build();
     }
 
     @PATCH
