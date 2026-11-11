@@ -322,7 +322,7 @@ class CSVSampleSheetImportServiceTest {
     }
 
     @Test
-    void discoversUnknownColumnsInTsvAndSemicolonDelimitedFiles() throws Exception {
+    void discoversUnknownColumnsInTsvSemicolonDelimitedAndUnicodeCsvFiles() throws Exception {
         CSVSampleSheetImportService service = new CSVSampleSheetImportService();
         service.vocabularyService = mock(SampleVocabularyService.class);
         when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
@@ -338,6 +338,8 @@ class CSVSampleSheetImportServiceTest {
                 "Sample Name\tGenome Build\nsample-tsv\t00123\n");
         Path semicolon = Files.writeString(directory.resolve("custom-columns-semicolon.csv"),
                 "Sample Name;Sequencing Platform\nsample-semicolon;00123\n");
+        Path unicode = Files.writeString(directory.resolve("custom-columns-unicode.csv"),
+                "Sample Name,Årgang Café\nsample-unicode,2024\n");
 
         try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
             Project project = new Project();
@@ -350,13 +352,20 @@ class CSVSampleSheetImportServiceTest {
 
             assertTrue(service.importNewSamples(1L, tsv.toFile()).errors().isEmpty());
             assertTrue(service.importNewSamples(1L, semicolon.toFile()).errors().isEmpty());
+            assertTrue(service.importNewSamples(1L, unicode.toFile()).errors().isEmpty());
 
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
                     .toList();
             assertEquals(Map.of("genome_build", "00123"), calls.getFirst().getArguments()[44]);
             assertEquals(Map.of("sequencing_platform", "00123"), calls.get(1).getArguments()[44]);
-            verify(service.metadataFieldService, times(2)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
+            assertEquals(Map.of("årgang_café", "2024"), calls.get(2).getArguments()[44]);
+            verify(service.metadataFieldService, times(3)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
+            var unicodeRequest = mockingDetails(service.metadataFieldService).getInvocations().stream()
+                    .map(invocation -> invocation.getArgument(1, CreateSampleMetadataFieldRequest.class))
+                    .filter(request -> request.label().equals("Årgang Café"))
+                    .findFirst().orElseThrow();
+            assertEquals("årgang_café", unicodeRequest.key());
         }
     }
 

@@ -19,6 +19,17 @@ class SampleMetadataFieldServiceTest {
     }
 
     @Test
+    void acceptsUnicodeLettersAndCombiningMarksWithinCodePointLimit() {
+        assertEquals("æøå", SampleMetadataFieldService.validateKey("ÆØÅ"));
+        assertEquals("über_東京", SampleMetadataFieldService.validateKey("ÜBER_東京"));
+        assertEquals("cafe\u0301", SampleMetadataFieldService.validateKey("CAFE\u0301"));
+        assertEquals("a".repeat(63) + "𐐨",
+                SampleMetadataFieldService.validateKey("A".repeat(63) + "𐐀"));
+        assertThrows(BadRequestException.class,
+                () -> SampleMetadataFieldService.validateKey("A".repeat(64) + "𐐀"));
+    }
+
+    @Test
     void acceptsMlstAsAUserDefinedMetadataKey() {
         assertEquals("mlst", SampleMetadataFieldService.validateKey("MLST"));
         assertTrue(SampleVocabularyBuiltInCatalog.find("mlst").isEmpty());
@@ -29,6 +40,8 @@ class SampleMetadataFieldServiceTest {
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("1priority"));
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("collection_date"));
         assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("has space"));
+        assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("\u0301priority"));
+        assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey("priority😀"));
         for (String key : new String[]{"project_accession", "study_accession", "sample_accession", "secondary_accession"}) {
             assertThrows(BadRequestException.class, () -> SampleMetadataFieldService.validateKey(key));
         }
