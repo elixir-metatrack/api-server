@@ -4,16 +4,24 @@ import jakarta.ws.rs.BadRequestException;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import no.metatrack.server.sample.vocabulary.SampleVocabularyBuiltInCatalog;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SampleMetadataFieldServiceTest {
     @Test
     void normalizesValidKeys() {
         assertEquals("priority_level", SampleMetadataFieldService.validateKey(" Priority_Level "));
+    }
+
+    @Test
+    void acceptsMlstAsAUserDefinedMetadataKey() {
+        assertEquals("mlst", SampleMetadataFieldService.validateKey("MLST"));
+        assertTrue(SampleVocabularyBuiltInCatalog.find("mlst").isEmpty());
     }
 
     @Test

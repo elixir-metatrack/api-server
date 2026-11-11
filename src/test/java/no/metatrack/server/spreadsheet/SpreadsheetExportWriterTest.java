@@ -47,11 +47,13 @@ class SpreadsheetExportWriterTest {
         }
         sample.description = "=HYPERLINK(\"https://example.invalid\")\n\"quoted\"\ttext";
         expected.put("description", sample.description);
-        var fields = List.of(field("group", SampleMetadataFieldType.TEXT),
+        var fields = List.of(field("mlst", SampleMetadataFieldType.TEXT),
+                field("group", SampleMetadataFieldType.TEXT),
                 field("amount", SampleMetadataFieldType.NUMBER), field("flag", SampleMetadataFieldType.BOOLEAN),
                 field("date", SampleMetadataFieldType.DATE), field("archived", SampleMetadataFieldType.TEXT));
         fields.getLast().archivedOn = java.time.Instant.EPOCH;
-        var values = Map.<String, Object>of("group", "=control", "amount", new BigDecimal("12345678901234567890.12345"),
+        var values = Map.<String, Object>of("mlst", "ST-42", "group", "=control",
+                "amount", new BigDecimal("12345678901234567890.12345"),
                 "flag", false, "date", LocalDate.of(2026, 10, 13), "archived", "do not export");
         byte[] bytes = writer.samples(List.of(sample), fields, Map.of(sample.id, values),
                 List.of(vocabulary("group", "=control", "treated"), vocabulary("archived", "old"),
@@ -60,9 +62,11 @@ class SpreadsheetExportWriterTest {
         assertEquals(1, table.records().size());
         var record = table.records().getFirst();
         expected.forEach((key, value) -> assertEquals(value, record.get(key), key));
-        for (String key : List.of("group", "amount", "flag", "date")) assertEquals(values.get(key).toString(), record.get(key));
+        for (String key : List.of("mlst", "group", "amount", "flag", "date")) {
+            assertEquals(values.get(key).toString(), record.get(key));
+        }
         assertFalse(table.headers().contains("archived"));
-        assertEquals(expected.size() + 4, table.headers().size());
+        assertEquals(expected.size() + 5, table.headers().size());
         assertEquals(Map.of("group", List.of("=control", "treated")), table.vocabularies());
         try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
             var sheet = (XSSFSheet) workbook.getSheetAt(0);
@@ -71,6 +75,13 @@ class SpreadsheetExportWriterTest {
             assertEquals(CellType.STRING, sheet.getRow(1).getCell(table.headers().indexOf("amount")).getCellType());
             assertEquals(CellType.NUMERIC, sheet.getRow(1).getCell(table.headers().indexOf("latitude")).getCellType());
         }
+    }
+
+    @Test
+    void doesNotExportMlstAsABuiltInSampleColumn() throws Exception {
+        byte[] bytes = writer.samples(List.of(sample("sample")), List.of(), Map.of(), List.of());
+
+        assertFalse(read(bytes, true, Set.of()).headers().contains("mlst"));
     }
 
     @Test
