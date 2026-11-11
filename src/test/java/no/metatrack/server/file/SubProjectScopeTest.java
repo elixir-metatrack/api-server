@@ -656,7 +656,7 @@ class SubProjectScopeTest {
 
     private Sample createSampleWithMetadata(Long projectId) {
         return sampleService.createSample(
-                projectId, "single-created", null, null, null, null, null, null,
+                projectId, "single-created", null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -666,7 +666,7 @@ class SubProjectScopeTest {
 
     private void updateSampleWithMetadata(Long projectId, UUID sampleId) {
         sampleService.updateSample(
-                projectId, sampleId, null, "edited", null, null, null, null,
+                projectId, sampleId, null, "edited", null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,

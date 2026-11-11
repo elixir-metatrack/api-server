@@ -13,7 +13,6 @@ public final class SampleVocabularyBuiltInCatalog {
             column("study_accession", "Study accession"),
             column("sample_accession", "Sample accession"),
             column("secondary_accession", "Secondary accession"),
-            column("mlst", "MLST"),
             column("project_title", "Project title"),
             column("description", "Description"),
             column("isolate", "Isolate"),

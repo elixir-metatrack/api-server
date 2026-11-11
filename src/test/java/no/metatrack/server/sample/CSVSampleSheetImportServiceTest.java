@@ -85,12 +85,12 @@ class CSVSampleSheetImportServiceTest {
             assertEquals(1, calls.size());
             var call = calls.getFirst();
             assertEquals(source.name, call.getArgument(1));
-            assertEquals(source.sequencingLab, call.getArgument(7));
-            assertEquals(source.institution, call.getArgument(8));
-            assertEquals(source.collectionDate, call.getArgument(10));
-            assertEquals(source.collectedBy, call.getArgument(15));
-            assertEquals(source.latitude, call.getArgument(16));
-            assertEquals(source.collectingInstitution, call.getArgument(23));
+            assertEquals(source.sequencingLab, call.getArgument(6));
+            assertEquals(source.institution, call.getArgument(7));
+            assertEquals(source.collectionDate, call.getArgument(9));
+            assertEquals(source.collectedBy, call.getArgument(14));
+            assertEquals(source.latitude, call.getArgument(15));
+            assertEquals(source.collectingInstitution, call.getArgument(22));
             Object[] arguments = call.getArguments();
             assertEquals(values, arguments[arguments.length - 1]);
         }
@@ -172,11 +172,11 @@ class CSVSampleSheetImportServiceTest {
                     .toList();
             assertEquals(1, calls.size());
             Object[] arguments = calls.getFirst().getArguments();
-            assertEquals(46, arguments.length);
+            assertEquals(45, arguments.length);
             for (int i = 0; i < expectedAccessions.size(); i++) {
-                assertEquals(expectedAccessions.get(i), arguments[41 + i]);
+                assertEquals(expectedAccessions.get(i), arguments[40 + i]);
             }
-            assertEquals(Map.of(), arguments[45]);
+            assertEquals(Map.of(), arguments[44]);
         }
     }
 
@@ -222,7 +222,7 @@ class CSVSampleSheetImportServiceTest {
             assertEquals(List.of("first", "second"), calls.stream()
                     .map(invocation -> (String) invocation.getArgument(1)).toList());
             assertEquals(Integer.valueOf(287), calls.getFirst().getArgument(3));
-            assertEquals("female", calls.getFirst().getArgument(24));
+            assertEquals("female", calls.getFirst().getArgument(23));
         }
     }
 
@@ -262,8 +262,8 @@ class CSVSampleSheetImportServiceTest {
             assertEquals(List.of("sample-1", "sample-2"), calls.stream()
                     .map(invocation -> (String) invocation.getArgument(1)).toList());
             assertEquals(Map.of("instrument_code", "00123"),
-                    calls.getFirst().getArguments()[45]);
-            assertEquals(Map.of(), calls.get(1).getArguments()[45]);
+                    calls.getFirst().getArguments()[44]);
+            assertEquals(Map.of(), calls.get(1).getArguments()[44]);
             verify(service.metadataFieldService, times(1)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
             var request = mockingDetails(service.metadataFieldService).getInvocations().stream().findFirst().orElseThrow()
                     .getArgument(1, CreateSampleMetadataFieldRequest.class);
@@ -306,8 +306,8 @@ class CSVSampleSheetImportServiceTest {
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
                     .toList();
-            assertEquals(Map.of("genome_build", "00123"), calls.getFirst().getArguments()[45]);
-            assertEquals(Map.of("sequencing_platform", "00123"), calls.get(1).getArguments()[45]);
+            assertEquals(Map.of("genome_build", "00123"), calls.getFirst().getArguments()[44]);
+            assertEquals(Map.of("sequencing_platform", "00123"), calls.get(1).getArguments()[44]);
             verify(service.metadataFieldService, times(2)).create(eq(1L), any(CreateSampleMetadataFieldRequest.class));
         }
     }
@@ -471,7 +471,7 @@ class CSVSampleSheetImportServiceTest {
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
                     .findFirst().orElseThrow();
             Object[] arguments = call.getArguments();
-            assertEquals(Map.of("sequencing_platform", "00123"), arguments[45]);
+            assertEquals(Map.of("sequencing_platform", "00123"), arguments[44]);
             var request = mockingDetails(service.metadataFieldService).getInvocations().stream().findFirst().orElseThrow()
                     .getArgument(1, CreateSampleMetadataFieldRequest.class);
             assertEquals("Sequencing Platform", request.label());
@@ -537,7 +537,7 @@ class CSVSampleSheetImportServiceTest {
                 var calls = mockingDetails(service.sampleService).getInvocations().stream()
                         .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
                 assertEquals(1, calls.size());
-                assertEquals(LocalDate.parse(expected), calls.getFirst().getArgument(10));
+                assertEquals(LocalDate.parse(expected), calls.getFirst().getArgument(9));
             }
         }
     }

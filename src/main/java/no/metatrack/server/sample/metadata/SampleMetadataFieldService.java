@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public class SampleMetadataFieldService {
     private static final Pattern KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{0,63}");
     private static final Set<String> RESERVED_KEYS = Set.of(
-            "id", "name", "sample_name", "alias", "tax_id", "host_tax_id", "mlst", "isolation_source",
+            "id", "name", "sample_name", "alias", "tax_id", "host_tax_id", "isolation_source",
             "collection_date", "location", "geographic_location", "sequencing_lab", "institution",
             "host_health_state", "project_title", "description", "isolate", "collected_by", "latitude",
             "longitude", "environmental_sample", "host_associated", "host_common_name", "host_subject_id",

@@ -50,7 +50,7 @@ import java.util.Set;
 public class CSVSampleSheetImportService {
 
     private static final Set<String> BUILT_IN_HEADERS = Set.of(
-            "name", "sample name", "alias", "mlst", "tax_id", "tax id", "host_tax_id", "host tax id",
+            "name", "sample name", "alias", "tax_id", "tax id", "host_tax_id", "host tax id",
             "isolation_source", "isolation source", "collection_date", "collection date", "location",
             "geographic location", "sequencing_lab", "collected by", "institution", "collecting institution",
             "host_health_state", "host health state", "project_title", "project title", "description", "isolate",
@@ -161,7 +161,6 @@ public class CSVSampleSheetImportService {
             sample.taxId = parseOptionalInt(rec, new String[] {"tax_id", "Tax ID"}, rowLabel, rowErrors);
             sample.hostTaxId =
                     parseOptionalInt(rec, new String[] {"host_tax_id", "Host Tax ID"}, rowLabel, rowErrors);
-            sample.mlst = getMappedValue(rec, "mlst", "MLST");
             sample.isolationSource = getMappedValue(rec, "isolation_source", "Isolation Source");
 
             String rawDate = getMappedValue(rec, "collection_date", "Collection Date");
@@ -273,7 +272,7 @@ public class CSVSampleSheetImportService {
                 if (metadataCreationFailed) continue;
                 try {
                     sampleService.createSample(projectId, sample.name, sample.alias, sample.taxId,
-                            sample.hostTaxId, sample.mlst, sample.location, sample.sequencingLab,
+                            sample.hostTaxId, sample.location, sample.sequencingLab,
                             sample.institution, sample.isolationSource, sample.collectionDate,
                             sample.hostHealthState, sample.projectTitle, sample.description, sample.isolate,
                             sample.collectedBy, sample.latitude, sample.longitude, sample.environmentalSample,
@@ -634,7 +633,6 @@ public class CSVSampleSheetImportService {
     static Map<String, String> builtInValues(Sample sample) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("alias", sample.alias);
-        values.put("mlst", sample.mlst);
         values.put("project_title", sample.projectTitle);
         values.put("description", sample.description);
         values.put("isolate", sample.isolate);
