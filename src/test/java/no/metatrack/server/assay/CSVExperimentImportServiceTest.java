@@ -55,10 +55,19 @@ class CSVExperimentImportServiceTest {
     }
 
     private List<CSVExperimentRowError> importFile(Map<String, Set<String>> terms, Path path) throws Exception {
-        return importFile(terms, path, Optional.of(sample));
+        return importResult(terms, path, Optional.of(sample)).errors();
     }
 
     private List<CSVExperimentRowError> importFile(Map<String, Set<String>> terms, Path path,
+            Optional<Sample> projectSample) throws Exception {
+        return importResult(terms, path, projectSample).errors();
+    }
+
+    private ExperimentImportResult importResult(Map<String, Set<String>> terms, Path path) throws Exception {
+        return importResult(terms, path, Optional.of(sample));
+    }
+
+    private ExperimentImportResult importResult(Map<String, Set<String>> terms, Path path,
             Optional<Sample> projectSample) throws Exception {
         if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
@@ -139,8 +148,26 @@ class CSVExperimentImportServiceTest {
     void importsLegacySampleHeader() throws Exception {
         Path path = Files.writeString(directory.resolve("legacy-sample-header.csv"), "Sample\nsample\n");
 
-        assertTrue(importFile(Map.of(), path).isEmpty());
+        ExperimentImportResult result = importResult(Map.of(), path);
+        assertTrue(result.errors().isEmpty());
+        assertEquals(1, result.acceptedCount());
         assertEquals(Set.of(sample), assay.samples);
+
+        ExperimentImportResult duplicate = importResult(Map.of(), path);
+        assertTrue(duplicate.errors().isEmpty());
+        assertEquals(0, duplicate.acceptedCount());
+    }
+
+    @Test
+    void countsNewSampleAssociationsAlongsideRowFailures() throws Exception {
+        Path path = Files.writeString(directory.resolve("mixed-experiment-rows.csv"),
+                "Sample Name\nmissing\nsample\n");
+
+        ExperimentImportResult result = importResult(Map.of(), path);
+
+        assertEquals(1, result.acceptedCount());
+        assertEquals(1, result.errors().size());
+        assertEquals("Row 1", result.errors().getFirst().row());
     }
 
     @Test
