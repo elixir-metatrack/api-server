@@ -11,20 +11,24 @@ import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @ApplicationScoped
 public class SampleMetadataService {
     @Transactional
-    public void apply(Long projectId, Sample sample, Map<String, Object> metadata) {
-        if (metadata == null) return;
+    public boolean apply(Long projectId, Sample sample, Map<String, Object> metadata) {
+        if (metadata == null) return false;
+        boolean changed = false;
         for (Map.Entry<String, Object> entry : metadata.entrySet()) {
             SampleMetadataField field = findActiveField(projectId, entry.getKey());
             SampleMetadataValue value = findValue(sample, field);
-            if (entry.getValue() == null) {
+            Object normalized = normalize(field.type, entry.getValue());
+            if (normalized == null) {
                 if (value != null) {
                     sample.metadataValues.remove(value);
                     value.delete();
+                    changed = true;
                 }
                 continue;
             }
@@ -33,10 +37,16 @@ public class SampleMetadataService {
                 value.sample = sample;
                 value.field = field;
                 sample.metadataValues.add(value);
+            } else if (sameValue(valueOf(value), normalized)) {
+                continue;
+            } else {
+                changed = true;
             }
-            setValue(value, field.type, entry.getValue());
+            setValue(value, field.type, normalized);
             if (!value.isPersistent()) value.persist();
+            changed = true;
         }
+        return changed;
     }
 
     public Map<String, Object> getActiveMetadata(Sample sample) {
@@ -134,6 +144,13 @@ public class SampleMetadataService {
             case BOOLEAN -> value.booleanValue;
             case DATE -> value.dateValue;
         };
+    }
+
+    private boolean sameValue(Object current, Object updated) {
+        if (current instanceof BigDecimal currentNumber && updated instanceof BigDecimal updatedNumber) {
+            return currentNumber.compareTo(updatedNumber) == 0;
+        }
+        return Objects.equals(current, updated);
     }
 
     private BigDecimal normalizeNumber(Object rawValue) {

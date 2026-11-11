@@ -79,7 +79,9 @@ class CSVSampleSheetImportServiceTest {
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
-            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+            var result = service.importNewSamples(1L, path.toFile());
+            assertTrue(result.errors().isEmpty());
+            assertEquals(1, result.acceptedCount());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
             assertEquals(1, calls.size());
@@ -165,8 +167,10 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-            assertTrue(service.importNewSamples(1L, csv.toFile()).isEmpty());
+            var result = service.importNewSamples(1L, csv.toFile());
 
+            assertTrue(result.errors().isEmpty());
+            assertEquals(1, result.acceptedCount());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
                     .toList();
@@ -193,6 +197,7 @@ class CSVSampleSheetImportServiceTest {
                     return metadataField(request.key(), request.label());
                 });
         service.sampleService = mock(SampleService.class, invocation -> {
+            if ("findSampleByName".equals(invocation.getMethod().getName())) return Optional.empty();
             if ("second".equals(invocation.getArgument(1))) {
                 throw new SampleVocabularyValidationException(List.of(new SampleValidationViolation(
                         "second", "host_sex", "male", "Invalid vocabulary value")));
@@ -212,10 +217,11 @@ class CSVSampleSheetImportServiceTest {
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
-            var errors = service.importNewSamples(1L, csv.toFile());
-            assertEquals(2, errors.size());
-            assertEquals("tax_id", errors.get(0).fieldKey());
-            assertEquals("host_sex", errors.get(1).fieldKey());
+            var result = service.importNewSamples(1L, csv.toFile());
+            assertEquals(1, result.acceptedCount());
+            assertEquals(2, result.errors().size());
+            assertEquals("tax_id", result.errors().get(0).fieldKey());
+            assertEquals("host_sex", result.errors().get(1).fieldKey());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
                     .toList();
@@ -223,6 +229,46 @@ class CSVSampleSheetImportServiceTest {
                     .map(invocation -> (String) invocation.getArgument(1)).toList());
             assertEquals(Integer.valueOf(287), calls.getFirst().getArgument(3));
             assertEquals("female", calls.getFirst().getArgument(23));
+        }
+    }
+
+    @Test
+    void countsOnlyExistingSampleRowsThatActuallyChangeValues() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        Sample existing = new Sample();
+        existing.id = java.util.UUID.randomUUID();
+        existing.name = "existing";
+        existing.location = "Oslo";
+        java.util.concurrent.atomic.AtomicBoolean changed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        service.sampleService = mock(SampleService.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "findSampleByName" -> Optional.of(existing);
+            case "updateSample" -> changed.get();
+            default -> null;
+        });
+        Path noOp = Files.writeString(directory.resolve("existing-no-op.csv"),
+                "Sample Name,Location\nexisting,Oslo\n");
+        Path update = Files.writeString(directory.resolve("existing-update.csv"),
+                "Sample Name,Location\nexisting,Bergen\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            SampleImportResult noOpResult = service.importNewSamples(1L, noOp.toFile());
+            assertEquals(0, noOpResult.acceptedCount());
+            assertTrue(noOpResult.errors().isEmpty());
+
+            changed.set(true);
+            SampleImportResult updateResult = service.importNewSamples(1L, update.toFile());
+            assertEquals(1, updateResult.acceptedCount());
+            assertTrue(updateResult.errors().isEmpty());
         }
     }
 
@@ -254,7 +300,9 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-            assertEquals(1, service.importNewSamples(1L, csv.toFile()).size());
+            var result = service.importNewSamples(1L, csv.toFile());
+            assertEquals(1, result.errors().size());
+            assertEquals(2, result.acceptedCount());
 
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
@@ -300,8 +348,8 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-            assertTrue(service.importNewSamples(1L, tsv.toFile()).isEmpty());
-            assertTrue(service.importNewSamples(1L, semicolon.toFile()).isEmpty());
+            assertTrue(service.importNewSamples(1L, tsv.toFile()).errors().isEmpty());
+            assertTrue(service.importNewSamples(1L, semicolon.toFile()).errors().isEmpty());
 
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
@@ -465,7 +513,7 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+            assertTrue(service.importNewSamples(1L, path.toFile()).errors().isEmpty());
 
             var call = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample"))
@@ -498,11 +546,12 @@ class CSVSampleSheetImportServiceTest {
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-            List<SampleValidationViolation> errors = service.importNewSamples(1L, csv.toFile());
+            SampleImportResult result = service.importNewSamples(1L, csv.toFile());
 
-            assertEquals(1, errors.size());
-            assertEquals("host_sex", errors.getFirst().fieldKey());
-            assertEquals("male", errors.getFirst().rejectedValue());
+            assertEquals(1, result.errors().size());
+            assertEquals(0, result.acceptedCount());
+            assertEquals("host_sex", result.errors().getFirst().fieldKey());
+            assertEquals("male", result.errors().getFirst().rejectedValue());
             verifyNoInteractions(service.sampleService);
         }
     }
@@ -526,14 +575,16 @@ class CSVSampleSheetImportServiceTest {
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
-            var errors = service.importNewSamples(1L, csv.toFile());
+            var result = service.importNewSamples(1L, csv.toFile());
             if (expected == null) {
-                assertEquals(1, errors.size());
-                assertEquals("collection_date", errors.getFirst().fieldKey());
-                assertEquals(input, errors.getFirst().rejectedValue());
+                assertEquals(1, result.errors().size());
+                assertEquals(0, result.acceptedCount());
+                assertEquals("collection_date", result.errors().getFirst().fieldKey());
+                assertEquals(input, result.errors().getFirst().rejectedValue());
                 verifyNoInteractions(service.sampleService);
             } else {
-                assertTrue(errors.isEmpty(), errors.toString());
+                assertTrue(result.errors().isEmpty(), result.errors().toString());
+                assertEquals(1, result.acceptedCount());
                 var calls = mockingDetails(service.sampleService).getInvocations().stream()
                         .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
                 assertEquals(1, calls.size());
@@ -577,7 +628,7 @@ class CSVSampleSheetImportServiceTest {
                     "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
             entities.when(() -> SampleMetadataField.list(
                     "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
-            assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty());
+            assertTrue(service.importNewSamples(1L, path.toFile()).errors().isEmpty());
             var calls = mockingDetails(service.sampleService).getInvocations().stream()
                     .filter(invocation -> invocation.getMethod().getName().equals("createSample")).toList();
             assertEquals(1, calls.size());
@@ -801,7 +852,7 @@ class CSVSampleSheetImportServiceTest {
                 entities.when(() -> SampleMetadataField.list(
                         "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
 
-                assertTrue(service.importNewSamples(1L, path.toFile()).isEmpty(), format);
+                assertTrue(service.importNewSamples(1L, path.toFile()).errors().isEmpty(), format);
 
                 var call = mockingDetails(service.sampleService).getInvocations().stream()
                         .filter(invocation -> invocation.getMethod().getName().equals("createSample"))

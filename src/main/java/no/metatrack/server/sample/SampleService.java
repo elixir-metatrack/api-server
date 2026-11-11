@@ -21,8 +21,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @ApplicationScoped
 public class SampleService {
@@ -80,6 +82,10 @@ public class SampleService {
 
     public Sample getSampleByName(String name, Long projectId) {
         return Sample.findBySampleNameInProject(name, projectId).orElseThrow(NotFoundException::new);
+    }
+
+    public Optional<Sample> findSampleByName(String name, Long projectId) {
+        return Sample.findBySampleNameInProject(name, projectId);
     }
 
     @Transactional
@@ -207,7 +213,7 @@ public class SampleService {
     }
 
     @Transactional
-    public void updateSample(
+    public boolean updateSample(
             Long projectId,
             UUID sampleId,
             String name,
@@ -264,53 +270,54 @@ public class SampleService {
                 hostBehaviour, isolationSourceNonHostAssociated, influenzaVirusType, influenzaSubType, serovar,
                 strain, hostAge, county, commune, hospitalHealthInstitution,
                 projectAccession, studyAccession, sampleAccession, secondaryAccession), customMetadata);
-        if (name != null) sample.name = name;
-        if (alias != null) sample.alias = trim(alias);
-        if (taxId != null) sample.taxId = taxId;
-        if (hostTaxId != null) sample.hostTaxId = hostTaxId;
-        if (location != null) sample.location = trim(location);
-        if (sequencingLab != null) sample.sequencingLab = trim(sequencingLab);
-        if (institution != null) sample.institution = trim(institution);
-        if (isolationSource != null) sample.isolationSource = trim(isolationSource);
-        if (collectionDate != null) sample.collectionDate = collectionDate;
-        if (hostHealthState != null) sample.hostHealthState = trim(hostHealthState);
-        if (projectTitle != null) sample.projectTitle = trim(projectTitle);
-        if (description != null) sample.description = trim(description);
-        if (isolate != null) sample.isolate = trim(isolate);
-        if (collectedBy != null) sample.collectedBy = trim(collectedBy);
-        if (latitude != null) sample.latitude = latitude;
-        if (longitude != null) sample.longitude = longitude;
-        if (environmentalSample != null) sample.environmentalSample = trim(environmentalSample);
-        if (hostAssociated != null) sample.hostAssociated = trim(hostAssociated);
-        if (hostCommonName != null) sample.hostCommonName = trim(hostCommonName);
-        if (hostSubjectId != null) sample.hostSubjectId = trim(hostSubjectId);
-        if (collectorName != null) sample.collectorName = trim(collectorName);
-        if (collectingInstitution != null) sample.collectingInstitution = trim(collectingInstitution);
-        if (hostSex != null) sample.hostSex = trim(hostSex);
-        if (influenzaTestMethod != null) sample.influenzaTestMethod = trim(influenzaTestMethod);
-        if (influenzaTestResult != null) sample.influenzaTestResult = trim(influenzaTestResult);
-        if (otherPathogensTested != null) sample.otherPathogensTested = trim(otherPathogensTested);
-        if (otherPathogensTestResult != null) sample.otherPathogensTestResult = trim(otherPathogensTestResult);
-        if (hostHabitat != null) sample.hostHabitat = trim(hostHabitat);
-        if (isolationSourceHostAssociated != null) sample.isolationSourceHostAssociated = trim(isolationSourceHostAssociated);
-        if (hostBehaviour != null) sample.hostBehaviour = trim(hostBehaviour);
-        if (isolationSourceNonHostAssociated != null) sample.isolationSourceNonHostAssociated = trim(isolationSourceNonHostAssociated);
-        if (influenzaVirusType != null) sample.influenzaVirusType = trim(influenzaVirusType);
-        if (influenzaSubType != null) sample.influenzaSubType = trim(influenzaSubType);
-        if (serovar != null) sample.serovar = trim(serovar);
-        if (strain != null) sample.strain = trim(strain);
-        if (hostAge != null) sample.hostAge = trim(hostAge);
-        if (county != null) sample.county = trim(county);
-        if (commune != null) sample.commune = trim(commune);
-        if (hospitalHealthInstitution != null) sample.hospitalHealthInstitution = trim(hospitalHealthInstitution);
-        if (projectAccession != null) sample.projectAccession = trim(projectAccession);
-        if (studyAccession != null) sample.studyAccession = trim(studyAccession);
-        if (sampleAccession != null) sample.sampleAccession = trim(sampleAccession);
-        if (secondaryAccession != null) sample.secondaryAccession = trim(secondaryAccession);
+        boolean changed = false;
+        changed |= setIfChanged(sample.name, name, value -> sample.name = value);
+        changed |= setStringIfChanged(sample.alias, alias, value -> sample.alias = value);
+        changed |= setIfChanged(sample.taxId, taxId, value -> sample.taxId = value);
+        changed |= setIfChanged(sample.hostTaxId, hostTaxId, value -> sample.hostTaxId = value);
+        changed |= setStringIfChanged(sample.location, location, value -> sample.location = value);
+        changed |= setStringIfChanged(sample.sequencingLab, sequencingLab, value -> sample.sequencingLab = value);
+        changed |= setStringIfChanged(sample.institution, institution, value -> sample.institution = value);
+        changed |= setStringIfChanged(sample.isolationSource, isolationSource, value -> sample.isolationSource = value);
+        changed |= setIfChanged(sample.collectionDate, collectionDate, value -> sample.collectionDate = value);
+        changed |= setStringIfChanged(sample.hostHealthState, hostHealthState, value -> sample.hostHealthState = value);
+        changed |= setStringIfChanged(sample.projectTitle, projectTitle, value -> sample.projectTitle = value);
+        changed |= setStringIfChanged(sample.description, description, value -> sample.description = value);
+        changed |= setStringIfChanged(sample.isolate, isolate, value -> sample.isolate = value);
+        changed |= setStringIfChanged(sample.collectedBy, collectedBy, value -> sample.collectedBy = value);
+        changed |= setIfChanged(sample.latitude, latitude, value -> sample.latitude = value);
+        changed |= setIfChanged(sample.longitude, longitude, value -> sample.longitude = value);
+        changed |= setStringIfChanged(sample.environmentalSample, environmentalSample, value -> sample.environmentalSample = value);
+        changed |= setStringIfChanged(sample.hostAssociated, hostAssociated, value -> sample.hostAssociated = value);
+        changed |= setStringIfChanged(sample.hostCommonName, hostCommonName, value -> sample.hostCommonName = value);
+        changed |= setStringIfChanged(sample.hostSubjectId, hostSubjectId, value -> sample.hostSubjectId = value);
+        changed |= setStringIfChanged(sample.collectorName, collectorName, value -> sample.collectorName = value);
+        changed |= setStringIfChanged(sample.collectingInstitution, collectingInstitution, value -> sample.collectingInstitution = value);
+        changed |= setStringIfChanged(sample.hostSex, hostSex, value -> sample.hostSex = value);
+        changed |= setStringIfChanged(sample.influenzaTestMethod, influenzaTestMethod, value -> sample.influenzaTestMethod = value);
+        changed |= setStringIfChanged(sample.influenzaTestResult, influenzaTestResult, value -> sample.influenzaTestResult = value);
+        changed |= setStringIfChanged(sample.otherPathogensTested, otherPathogensTested, value -> sample.otherPathogensTested = value);
+        changed |= setStringIfChanged(sample.otherPathogensTestResult, otherPathogensTestResult, value -> sample.otherPathogensTestResult = value);
+        changed |= setStringIfChanged(sample.hostHabitat, hostHabitat, value -> sample.hostHabitat = value);
+        changed |= setStringIfChanged(sample.isolationSourceHostAssociated, isolationSourceHostAssociated, value -> sample.isolationSourceHostAssociated = value);
+        changed |= setStringIfChanged(sample.hostBehaviour, hostBehaviour, value -> sample.hostBehaviour = value);
+        changed |= setStringIfChanged(sample.isolationSourceNonHostAssociated, isolationSourceNonHostAssociated, value -> sample.isolationSourceNonHostAssociated = value);
+        changed |= setStringIfChanged(sample.influenzaVirusType, influenzaVirusType, value -> sample.influenzaVirusType = value);
+        changed |= setStringIfChanged(sample.influenzaSubType, influenzaSubType, value -> sample.influenzaSubType = value);
+        changed |= setStringIfChanged(sample.serovar, serovar, value -> sample.serovar = value);
+        changed |= setStringIfChanged(sample.strain, strain, value -> sample.strain = value);
+        changed |= setStringIfChanged(sample.hostAge, hostAge, value -> sample.hostAge = value);
+        changed |= setStringIfChanged(sample.county, county, value -> sample.county = value);
+        changed |= setStringIfChanged(sample.commune, commune, value -> sample.commune = value);
+        changed |= setStringIfChanged(sample.hospitalHealthInstitution, hospitalHealthInstitution, value -> sample.hospitalHealthInstitution = value);
+        changed |= setStringIfChanged(sample.projectAccession, projectAccession, value -> sample.projectAccession = value);
+        changed |= setStringIfChanged(sample.studyAccession, studyAccession, value -> sample.studyAccession = value);
+        changed |= setStringIfChanged(sample.sampleAccession, sampleAccession, value -> sample.sampleAccession = value);
+        changed |= setStringIfChanged(sample.secondaryAccession, secondaryAccession, value -> sample.secondaryAccession = value);
 
-        sample.modifiedOn = Instant.now();
-
-        metadataService.apply(sample.project.id, sample, customMetadata);
+        changed |= metadataService.apply(sample.project.id, sample, customMetadata);
+        if (changed) sample.modifiedOn = Instant.now();
+        return changed;
     }
 
     @Transactional
@@ -477,4 +484,14 @@ public class SampleService {
         return value.trim();
     }
 
+    private boolean setStringIfChanged(String current, String updated, Consumer<String> setter) {
+        if (updated == null) return false;
+        return setIfChanged(current, trim(updated), setter);
+    }
+
+    private <T> boolean setIfChanged(T current, T updated, Consumer<T> setter) {
+        if (updated == null || Objects.equals(current, updated)) return false;
+        setter.accept(updated);
+        return true;
+    }
 }
