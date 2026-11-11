@@ -37,6 +37,7 @@ the corresponding values explicitly (the remote-development workflow is document
 | `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | S3 API endpoint and signing credentials |
 | `S3_BUCKET_NAME` | API-managed object bucket; defaults to `metatrack` |
 | `S3_PATH_STYLE_ACCESS` | Use path-style addressing; defaults to `true` |
+| `ADMIN_STALLED_UPLOAD_THRESHOLD` | Age before an active upload batch is reported as stalled; defaults to `PT2H` |
 | `FILE_RECONCILIATION_INTERVAL` | Pending-upload polling interval; defaults to `10s` |
 | `SFTPGO_ENABLED`, `SFTPGO_API_URL`, `SFTPGO_ADMIN_USERNAME`, `SFTPGO_ADMIN_PASSWORD` | Enable the private SFTPGo management API integration |
 | `SFTPGO_SFTP_HOST`, `SFTPGO_SFTP_PORT`, `SFTPGO_SFTP_HOST_PORT`, `SFTPGO_HTTP_HOST_PORT` | SFTP endpoint returned to users and local Compose host ports |
@@ -461,6 +462,32 @@ The webapp's **XLS** button downloads an XLSX file with selected rows, or filter
 nothing is selected. Exports include all importable fields, active custom sample metadata and custom
 text vocabularies. Sample exports include `project_accession`, `study_accession`, `sample_accession`,
 and `secondary_accession`. See the format document for reimport requirements and size limits.
+
+## System Administration
+
+The `system-admin` role can oversee all projects and has project-owner-equivalent access to project data and
+operations, including private samples, assays, and files. System-admins can use existing project routes even when
+they are not project members. This role does not provide user deletion or Keycloak offboarding operations.
+
+The system-admin API is under `/api/admin` and is restricted to that role:
+
+- `GET /api/admin/projects?page=0&size=50` lists project metadata and flags projects whose designated owner does not
+  have an `OWNER` membership. Pages are limited to 100 projects.
+- `GET /api/admin/projects/ownership-risks` lists those ownership-risk projects.
+- `POST /api/admin/projects/{projectId}/members/{memberId}` adds an existing Keycloak user immediately with a
+  requested non-owner role. Missing Keycloak users are rejected.
+- `POST /api/admin/projects/{projectId}/ownership` transfers ownership, adding or promoting the replacement to
+  `OWNER` and setting the previous designated owner's role to `ADMIN`, `EDITOR`, or `VIEWER` as requested. Other
+  project co-owners are unchanged.
+- `GET /api/admin/overview` returns user/project/sample/assay/file totals, ownership risks, failed or stalled upload
+  batches, and `available`/`unavailable` integration status for PostgreSQL, Keycloak, and object storage. Counts are
+  `null` when the backing service cannot provide them; the response includes up to 100 failed or stalled batches.
+  Upload stalls use `ADMIN_STALLED_UPLOAD_THRESHOLD` (default `PT2H`).
+- `GET /api/admin/audit?page=0&size=50` returns paged audit events for mutating requests by system-admins.
+
+Audit events store actor ID, HTTP method, request path, response status, and timestamp; request/response bodies and
+justifications are not recorded. Ownership recovery uses the project lock and validates replacement users against
+Keycloak before committing membership changes.
 
 ## Tests
 
