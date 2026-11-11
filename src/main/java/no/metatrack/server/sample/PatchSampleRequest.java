@@ -11,7 +11,6 @@ public record PatchSampleRequest(
         String alias,
         Integer taxId,
         Integer hostTaxId,
-        String mlst,
         String isolationSource,
         LocalDate collectionDate,
         String location,

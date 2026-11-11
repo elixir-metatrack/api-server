@@ -35,8 +35,6 @@ public class Sample extends PanacheEntityBase {
 
     public Integer hostTaxId;
 
-    public String mlst;
-
     public String projectTitle;
 
     public String description;

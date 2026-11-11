@@ -29,7 +29,6 @@ public class SpreadsheetExportWriter {
             new SampleColumn("alias", s -> s.alias),
             new SampleColumn("tax_id", s -> s.taxId),
             new SampleColumn("host_tax_id", s -> s.hostTaxId),
-            new SampleColumn("mlst", s -> s.mlst),
             new SampleColumn("isolation_source", s -> s.isolationSource),
             new SampleColumn("collection_date", s -> s.collectionDate),
             new SampleColumn("location", s -> s.location),

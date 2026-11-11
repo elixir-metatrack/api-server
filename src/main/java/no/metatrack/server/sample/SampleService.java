@@ -89,7 +89,6 @@ public class SampleService {
             String alias,
             Integer taxId,
             Integer hostTaxId,
-            String mlst,
             String location,
             String sequencingLab,
             String institution,
@@ -141,7 +140,7 @@ public class SampleService {
             throw new WebApplicationException("Sample with name " + name + " already exists", Response.Status.CONFLICT);
 
         validate(owningProject.id, name, builtInValues(
-                alias, mlst, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
+                alias, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
                 description, isolate, collectedBy, environmentalSample, hostAssociated, hostCommonName, hostSubjectId,
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
                 otherPathogensTested, otherPathogensTestResult, hostHabitat, isolationSourceHostAssociated,
@@ -154,7 +153,6 @@ public class SampleService {
         if (alias != null) sample.alias = trim(alias);
         if (taxId != null) sample.taxId = taxId;
         if (hostTaxId != null) sample.hostTaxId = hostTaxId;
-        if (mlst != null) sample.mlst = trim(mlst);
         if (location != null) sample.location = trim(location);
         if (sequencingLab != null) sample.sequencingLab = trim(sequencingLab);
         if (institution != null) sample.institution = trim(institution);
@@ -216,7 +214,6 @@ public class SampleService {
             String alias,
             Integer taxId,
             Integer hostTaxId,
-            String mlst,
             String location,
             String sequencingLab,
             String institution,
@@ -260,7 +257,7 @@ public class SampleService {
 
         Sample sample = Sample.findByIdInProjectScope(sampleId, projectId).orElseThrow(NotFoundException::new);
         validate(sample.project.id, sample.name, builtInValues(
-                alias, mlst, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
+                alias, location, sequencingLab, institution, isolationSource, hostHealthState, projectTitle,
                 description, isolate, collectedBy, environmentalSample, hostAssociated, hostCommonName, hostSubjectId,
                 collectorName, collectingInstitution, hostSex, influenzaTestMethod, influenzaTestResult,
                 otherPathogensTested, otherPathogensTestResult, hostHabitat, isolationSourceHostAssociated,
@@ -271,7 +268,6 @@ public class SampleService {
         if (alias != null) sample.alias = trim(alias);
         if (taxId != null) sample.taxId = taxId;
         if (hostTaxId != null) sample.hostTaxId = hostTaxId;
-        if (mlst != null) sample.mlst = trim(mlst);
         if (location != null) sample.location = trim(location);
         if (sequencingLab != null) sample.sequencingLab = trim(sequencingLab);
         if (institution != null) sample.institution = trim(institution);
@@ -354,7 +350,6 @@ public class SampleService {
             if (data.alias() != null) sample.alias = trim(data.alias());
             if (data.taxId() != null) sample.taxId = data.taxId();
             if (data.hostTaxId() != null) sample.hostTaxId = data.hostTaxId();
-            if (data.mlst() != null) sample.mlst = trim(data.mlst());
             if (data.location() != null) sample.location = trim(data.location());
             if (data.sequencingLab() != null) sample.sequencingLab = trim(data.sequencingLab());
             if (data.institution() != null) sample.institution = trim(data.institution());
@@ -414,7 +409,7 @@ public class SampleService {
 
     private Map<String, String> builtInValues(BulkPatchSampleRequest.SampleRequestData data) {
         return builtInValues(
-                data.alias(), data.mlst(), data.location(), data.sequencingLab(), data.institution(),
+                data.alias(), data.location(), data.sequencingLab(), data.institution(),
                 data.isolationSource(), data.hostHealthState(), data.projectTitle(), data.description(), data.isolate(),
                 data.collectedBy(), data.environmentalSample(), data.hostAssociated(), data.hostCommonName(),
                 data.hostSubjectId(), data.collectorName(), data.collectingInstitution(), data.hostSex(),
@@ -427,7 +422,7 @@ public class SampleService {
     }
 
     private Map<String, String> builtInValues(
-            String alias, String mlst, String location, String sequencingLab, String institution,
+            String alias, String location, String sequencingLab, String institution,
             String isolationSource, String hostHealthState, String projectTitle, String description, String isolate,
             String collectedBy, String environmentalSample, String hostAssociated, String hostCommonName,
             String hostSubjectId, String collectorName, String collectingInstitution, String hostSex,
@@ -439,7 +434,6 @@ public class SampleService {
             String sampleAccession, String secondaryAccession) {
         Map<String, String> values = new java.util.LinkedHashMap<>();
         values.put("alias", alias);
-        values.put("mlst", mlst);
         values.put("location", location);
         values.put("sequencing_lab", sequencingLab);
         values.put("institution", institution);
