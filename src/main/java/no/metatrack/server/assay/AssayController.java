@@ -154,10 +154,11 @@ public class AssayController {
     @Authenticated
     @Path("/{assayId}/experiments")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Operation(summary = "Import experiments into an assay", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field `file`. Rows are processed independently, so successful rows may be committed even when the response is 400 with row-level errors. Row failures return a list of row errors; upload-level 400 responses use the framework's bad-request body.")
-    @APIResponse(responseCode = "200", description = "All rows imported; no response body")
+    @Operation(summary = "Import experiments into an assay", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field `file`. Rows are processed independently, so successful rows may be committed even when the response is 400 with row-level errors. The response includes acceptedCount and errors; upload-level 400 responses use the framework's bad-request body.")
+    @APIResponse(responseCode = "200", description = "Import result with newly linked sample row count and no row errors",
+            content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
     @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
-            content = @Content(schema = @Schema(type = SchemaType.ARRAY, implementation = CSVExperimentRowError.class)))
+            content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or assay not found")
     public Response importExperiments(
@@ -170,9 +171,11 @@ public class AssayController {
 
         TableUploadSupport.validate(file);
 
-        List<CSVExperimentRowError> errors = csvExperimentImportService.importIntoAssay(
+        ExperimentImportResult result = csvExperimentImportService.importIntoAssay(
                 projectId, assayId, file.filePath().toFile());
-        return errors.isEmpty() ? Response.ok().build() : Response.status(400).entity(errors).build();
+        return result.errors().isEmpty()
+                ? Response.ok(result).build()
+                : Response.status(400).entity(result).build();
     }
 
     @DELETE

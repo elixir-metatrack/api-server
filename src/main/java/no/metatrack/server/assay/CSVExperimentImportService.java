@@ -77,7 +77,7 @@ public class CSVExperimentImportService {
     SpreadsheetImportSupport spreadsheetSupport;
 
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
-    public List<CSVExperimentRowError> importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
+    public ExperimentImportResult importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
         Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
         if (file == null || !file.isFile()) {
             throw new BadRequestException("Import file is missing");
@@ -88,14 +88,15 @@ public class CSVExperimentImportService {
         if (spreadsheet != null) validateSpreadsheet(spreadsheet);
         List<CSVRecord> records = spreadsheet == null ? readCsvRecords(file) : spreadsheet.records();
         List<CSVExperimentRowError> errors = new ArrayList<>();
+        int acceptedCount = 0;
         Set<String> importedReferences = new HashSet<>();
         AssayVocabularyRules rules = vocabularyService.loadRules();
 
         for (CSVRecord record : records) {
             String row = spreadsheet == null ? "Row " + record.getRecordNumber() : spreadsheet.location(record);
-            importRecord(projectId, assay, record, errors, importedReferences, rules, row);
+            if (importRecord(projectId, assay, record, errors, importedReferences, rules, row)) acceptedCount++;
         }
-        return errors;
+        return new ExperimentImportResult(acceptedCount, errors);
     }
 
     private List<CSVRecord> readCsvRecords(java.io.File file) {
@@ -124,7 +125,7 @@ public class CSVExperimentImportService {
         }
     }
 
-    private void importRecord(
+    private boolean importRecord(
             Long projectId,
             Assay assay,
             CSVRecord record,
@@ -136,14 +137,14 @@ public class CSVExperimentImportService {
         if (sampleName == null || sampleName.isBlank()) {
             errors.add(new CSVExperimentRowError(
                     row, "Sample Name", sampleName, "Sample Name column is missing or empty"));
-            return;
+            return false;
         }
 
         Optional<Sample> sample = Sample.findBySampleNameInProject(sampleName.trim(), projectId);
         if (sample.isEmpty()) {
             errors.add(
                     new CSVExperimentRowError(row, "Sample Name", sampleName, "Sample does not exist in the project"));
-            return;
+            return false;
         }
 
         Map<String, String> metadata = new LinkedHashMap<>();
@@ -155,7 +156,7 @@ public class CSVExperimentImportService {
                     VOCABULARY_HEADERS.get(violation.field()),
                     metadata.get(violation.field()),
                     violation.message())));
-            return;
+            return false;
         }
 
         Integer insertSize = parseInteger(record, row, errors);
@@ -163,7 +164,7 @@ public class CSVExperimentImportService {
                 assay.experimentAccession, value(record, "Experiment Accession"), "Experiment Accession", row, errors);
         accessionConflict |=
                 hasAccessionConflict(assay.runAccession, value(record, "Run Accession"), "Run Accession", row, errors);
-        if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return;
+        if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return false;
         int rowErrorCount = errors.size();
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
@@ -210,10 +211,11 @@ public class CSVExperimentImportService {
                 rowReferences,
                 pendingFiles,
                 errors);
-        if (errors.size() > rowErrorCount || hasError(errors, row)) return;
+        if (errors.size() > rowErrorCount || hasError(errors, row)) return false;
 
+        boolean newlyAssociated;
         try {
-            rowWriter.write(
+            newlyAssociated = rowWriter.write(
                     projectId,
                     assay.id,
                     sampleName.trim(),
@@ -237,12 +239,13 @@ public class CSVExperimentImportService {
                             VOCABULARY_HEADERS.getOrDefault(violation.field(), violation.field()),
                             metadata.get(violation.field()),
                             violation.message())));
-            return;
+            return false;
         } catch (CSVExperimentRowWriter.FileConflictException e) {
             errors.add(new CSVExperimentRowError(row, e.field(), e.fileName(), e.getMessage()));
-            return;
+            return false;
         }
         importedReferences.addAll(rowReferences);
+        return newlyAssociated;
     }
 
     private void prepareFile(
