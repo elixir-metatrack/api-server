@@ -277,6 +277,33 @@ public class SampleController {
                 : Response.status(400).entity(result).build();
     }
 
+    @POST
+    @Authenticated
+    @Path("/samplesheet/overwrite")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Operation(summary = "Import samples and overwrite populated fields", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX sample sheet in multipart field `file`. Existing populated values provided by the sheet are replaced; blank cells are unchanged. Parsing and vocabulary validation still apply, and rows are processed independently.")
+    @APIResponse(responseCode = "200", description = "Import result with accepted row count and no row errors",
+            content = @Content(schema = @Schema(implementation = SampleImportResult.class)))
+    @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
+            content = @Content(schema = @Schema(implementation = SampleImportResult.class)))
+    @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
+    @APIResponse(responseCode = "404", description = "Project not found")
+    public Response importCSVOverwrite(@PathParam("projectId") Long projectId,
+            @Parameter(description = "CSV, TSV, XLS, or XLSX sample sheet", required = true) @RestForm("file") FileUpload file) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+        if (file == null) throw new BadRequestException("No file uploaded");
+
+        TableUploadSupport.validate(file);
+
+        SampleImportResult result = csvSampleSheetImportService.importNewSamples(
+                projectId, file.filePath().toFile(), true);
+
+        return result.errors().isEmpty()
+                ? Response.ok(result).build()
+                : Response.status(400).entity(result).build();
+    }
+
     @PATCH
     @Authenticated
     @Operation(summary = "Bulk update samples", description = "Requires EDITOR membership. Each sample entry is validated and processed independently; valid updates are retained when other entries fail, with violations returned as a 400 response.")

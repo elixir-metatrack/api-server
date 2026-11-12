@@ -7,4 +7,9 @@ public record SampleValidationViolation(
         String sample,
         String fieldKey,
         Object rejectedValue,
-        String message) {}
+        String message,
+        String code) {
+    public SampleValidationViolation(String sample, String fieldKey, Object rejectedValue, String message) {
+        this(sample, fieldKey, rejectedValue, message, "VALIDATION_ERROR");
+    }
+}

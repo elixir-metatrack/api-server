@@ -135,6 +135,11 @@ public class CSVSampleSheetImportService {
 
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public SampleImportResult importNewSamples(Long projectId, File file) {
+        return importNewSamples(projectId, file, false);
+    }
+
+    @Transactional(Transactional.TxType.NOT_SUPPORTED)
+    public SampleImportResult importNewSamples(Long projectId, File file, boolean overwrite) {
         List<SampleValidationViolation> errors = new ArrayList<>();
         int acceptedCount = 0;
         Project targetProject = Project.<Project>findByIdOptional(projectId).orElseThrow(NotFoundException::new);
@@ -273,9 +278,17 @@ public class CSVSampleSheetImportService {
                 }
             }
 
+            Optional<Sample> existingSample = Optional.empty();
             if (rowErrors.isEmpty()) {
                 rowErrors.addAll(SampleVocabularyService.validate(
                         vocabularyRules, rowLabel, builtInValues(sample), customMetadata));
+                if (rowErrors.isEmpty()) {
+                    existingSample = sampleService.findSampleByName(sample.name, projectId);
+                    if (existingSample.isPresent()) normalizeBlankStrings(sample);
+                    if (!overwrite && existingSample.isPresent()) {
+                        rowErrors.addAll(overwriteConflicts(rowLabel, existingSample.get(), sample, customMetadata));
+                    }
+                }
             }
 
             if (rowErrors.isEmpty()) {
@@ -305,7 +318,7 @@ public class CSVSampleSheetImportService {
                 }
                 if (metadataCreationFailed) continue;
                 try {
-                    if (saveSample(projectId, sample, customMetadata)) acceptedCount++;
+                    if (saveSample(projectId, sample, customMetadata, existingSample)) acceptedCount++;
                 } catch (SampleVocabularyValidationException e) {
                     for (SampleValidationViolation violation : e.violations()) {
                         errors.add(new SampleValidationViolation(
@@ -324,8 +337,8 @@ public class CSVSampleSheetImportService {
         return new SampleImportResult(acceptedCount, errors);
     }
 
-    private boolean saveSample(Long projectId, Sample sample, Map<String, Object> customMetadata) {
-        Optional<Sample> existing = sampleService.findSampleByName(sample.name, projectId);
+    private boolean saveSample(
+            Long projectId, Sample sample, Map<String, Object> customMetadata, Optional<Sample> existing) {
         if (existing.isPresent()) {
             Sample existingSample = existing.get();
             return sampleService.updateSample(
@@ -424,6 +437,150 @@ public class CSVSampleSheetImportService {
                 sample.secondaryAccession,
                 customMetadata);
         return true;
+    }
+
+    private List<SampleValidationViolation> overwriteConflicts(
+            String rowLabel, Sample existing, Sample incoming, Map<String, Object> customMetadata) {
+        Map<String, Object> existingValues = importValues(existing);
+        Map<String, Object> incomingValues = importValues(incoming);
+        List<SampleValidationViolation> conflicts = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : incomingValues.entrySet()) {
+            Object incomingValue = entry.getValue();
+            Object existingValue = existingValues.get(entry.getKey());
+            if (isPopulated(incomingValue) && isPopulated(existingValue)
+                    && !sameImportValue(existingValue, incomingValue)) {
+                conflicts.add(new SampleValidationViolation(
+                        rowLabel,
+                        entry.getKey(),
+                        incomingValue,
+                        "Cannot replace existing value '" + existingValue + "' with '" + incomingValue + "'",
+                        "OVERWRITE_CONFLICT"));
+            }
+        }
+
+        if (!customMetadata.isEmpty()) {
+            Map<String, Object> existingMetadata = metadataService.getActiveMetadata(existing);
+            for (Map.Entry<String, Object> entry : customMetadata.entrySet()) {
+                Object existingValue = existingMetadata.get(entry.getKey());
+                Object incomingValue = entry.getValue();
+                if (isPopulated(existingValue) && isPopulated(incomingValue)
+                        && !sameImportValue(existingValue, incomingValue)) {
+                    conflicts.add(new SampleValidationViolation(
+                            rowLabel,
+                            entry.getKey(),
+                            incomingValue,
+                            "Cannot replace existing value '" + existingValue + "' with '" + incomingValue + "'",
+                            "OVERWRITE_CONFLICT"));
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    private Map<String, Object> importValues(Sample sample) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("alias", sample.alias);
+        values.put("tax_id", sample.taxId);
+        values.put("host_tax_id", sample.hostTaxId);
+        values.put("location", sample.location);
+        values.put("sequencing_lab", sample.sequencingLab);
+        values.put("institution", sample.institution);
+        values.put("isolation_source", sample.isolationSource);
+        values.put("collection_date", sample.collectionDate);
+        values.put("host_health_state", sample.hostHealthState);
+        values.put("project_title", sample.projectTitle);
+        values.put("description", sample.description);
+        values.put("isolate", sample.isolate);
+        values.put("collected_by", sample.collectedBy);
+        values.put("latitude", sample.latitude);
+        values.put("longitude", sample.longitude);
+        values.put("environmental_sample", sample.environmentalSample);
+        values.put("host_associated", sample.hostAssociated);
+        values.put("host_common_name", sample.hostCommonName);
+        values.put("host_subject_id", sample.hostSubjectId);
+        values.put("collector_name", sample.collectorName);
+        values.put("collecting_institution", sample.collectingInstitution);
+        values.put("host_sex", sample.hostSex);
+        values.put("influenza_test_method", sample.influenzaTestMethod);
+        values.put("influenza_test_result", sample.influenzaTestResult);
+        values.put("other_pathogens_tested", sample.otherPathogensTested);
+        values.put("other_pathogens_test_result", sample.otherPathogensTestResult);
+        values.put("host_habitat", sample.hostHabitat);
+        values.put("isolation_source_host_associated", sample.isolationSourceHostAssociated);
+        values.put("host_behaviour", sample.hostBehaviour);
+        values.put("isolation_source_non_host_associated", sample.isolationSourceNonHostAssociated);
+        values.put("influenza_virus_type", sample.influenzaVirusType);
+        values.put("influenza_sub_type", sample.influenzaSubType);
+        values.put("serovar", sample.serovar);
+        values.put("strain", sample.strain);
+        values.put("host_age", sample.hostAge);
+        values.put("county", sample.county);
+        values.put("commune", sample.commune);
+        values.put("hospital_health_institution", sample.hospitalHealthInstitution);
+        values.put("project_accession", sample.projectAccession);
+        values.put("study_accession", sample.studyAccession);
+        values.put("sample_accession", sample.sampleAccession);
+        values.put("secondary_accession", sample.secondaryAccession);
+        return values;
+    }
+
+    private boolean isPopulated(Object value) {
+        return value != null && (!(value instanceof String text) || !text.isBlank());
+    }
+
+    private boolean sameImportValue(Object existing, Object incoming) {
+        if (existing instanceof java.math.BigDecimal existingNumber
+                && incoming instanceof java.math.BigDecimal incomingNumber) {
+            return existingNumber.compareTo(incomingNumber) == 0;
+        }
+        if (existing instanceof String existingText && incoming instanceof String incomingText) {
+            return existingText.trim().equals(incomingText.trim());
+        }
+        return Objects.equals(existing, incoming);
+    }
+
+    private void normalizeBlankStrings(Sample sample) {
+        sample.alias = blankToNull(sample.alias);
+        sample.location = blankToNull(sample.location);
+        sample.sequencingLab = blankToNull(sample.sequencingLab);
+        sample.institution = blankToNull(sample.institution);
+        sample.isolationSource = blankToNull(sample.isolationSource);
+        sample.hostHealthState = blankToNull(sample.hostHealthState);
+        sample.projectTitle = blankToNull(sample.projectTitle);
+        sample.description = blankToNull(sample.description);
+        sample.isolate = blankToNull(sample.isolate);
+        sample.collectedBy = blankToNull(sample.collectedBy);
+        sample.environmentalSample = blankToNull(sample.environmentalSample);
+        sample.hostAssociated = blankToNull(sample.hostAssociated);
+        sample.hostCommonName = blankToNull(sample.hostCommonName);
+        sample.hostSubjectId = blankToNull(sample.hostSubjectId);
+        sample.collectorName = blankToNull(sample.collectorName);
+        sample.collectingInstitution = blankToNull(sample.collectingInstitution);
+        sample.hostSex = blankToNull(sample.hostSex);
+        sample.influenzaTestMethod = blankToNull(sample.influenzaTestMethod);
+        sample.influenzaTestResult = blankToNull(sample.influenzaTestResult);
+        sample.otherPathogensTested = blankToNull(sample.otherPathogensTested);
+        sample.otherPathogensTestResult = blankToNull(sample.otherPathogensTestResult);
+        sample.hostHabitat = blankToNull(sample.hostHabitat);
+        sample.isolationSourceHostAssociated = blankToNull(sample.isolationSourceHostAssociated);
+        sample.hostBehaviour = blankToNull(sample.hostBehaviour);
+        sample.isolationSourceNonHostAssociated = blankToNull(sample.isolationSourceNonHostAssociated);
+        sample.influenzaVirusType = blankToNull(sample.influenzaVirusType);
+        sample.influenzaSubType = blankToNull(sample.influenzaSubType);
+        sample.serovar = blankToNull(sample.serovar);
+        sample.strain = blankToNull(sample.strain);
+        sample.hostAge = blankToNull(sample.hostAge);
+        sample.county = blankToNull(sample.county);
+        sample.commune = blankToNull(sample.commune);
+        sample.hospitalHealthInstitution = blankToNull(sample.hospitalHealthInstitution);
+        sample.projectAccession = blankToNull(sample.projectAccession);
+        sample.studyAccession = blankToNull(sample.studyAccession);
+        sample.sampleAccession = blankToNull(sample.sampleAccession);
+        sample.secondaryAccession = blankToNull(sample.secondaryAccession);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private LocalDate parseCollectionDate(String value) {
