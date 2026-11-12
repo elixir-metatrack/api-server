@@ -178,6 +178,34 @@ public class AssayController {
                 : Response.status(400).entity(result).build();
     }
 
+    @POST
+    @Authenticated
+    @Path("/{assayId}/experiments/overwrite")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Operation(summary = "Import experiments and overwrite populated fields", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field `file`. Existing assay metadata provided by the sheet is replaced; blank cells are unchanged. Parsing, vocabulary, sample, and file upload validation still apply, and rows are processed independently.")
+    @APIResponse(responseCode = "200", description = "Import result with newly linked sample row count and no row errors",
+            content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
+    @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
+            content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
+    @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
+    @APIResponse(responseCode = "404", description = "Project or assay not found")
+    public Response importExperimentsOverwrite(
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            @Parameter(description = "CSV, TSV, XLS, or XLSX experiment sheet", required = true) @RestForm("file") FileUpload file) {
+        if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
+        if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
+        if (file == null) throw new BadRequestException("No file uploaded");
+
+        TableUploadSupport.validate(file);
+
+        ExperimentImportResult result = csvExperimentImportService.importIntoAssay(
+                projectId, assayId, file.filePath().toFile(), true);
+        return result.errors().isEmpty()
+                ? Response.ok(result).build()
+                : Response.status(400).entity(result).build();
+    }
+
     @DELETE
     @Authenticated
     @Path("/{assayId}")

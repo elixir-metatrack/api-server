@@ -25,6 +25,17 @@ public class CSVExperimentRowWriter {
             Integer insertSize, String sequencingPlatform, String sequencingLaboratory,
             List<CSVExperimentImportService.PendingFile> pendingFiles,
             String experimentAccession, String runAccession) {
+        return write(projectId, assayId, sampleName, studyAccession, instrumentModel, libraryName, librarySource,
+                librarySelection, libraryStrategy, libraryLayout, insertSize, sequencingPlatform, sequencingLaboratory,
+                pendingFiles, experimentAccession, runAccession, false);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public boolean write(Long projectId, UUID assayId, String sampleName, String studyAccession, String instrumentModel, String libraryName,
+            String librarySource, String librarySelection, String libraryStrategy, String libraryLayout,
+            Integer insertSize, String sequencingPlatform, String sequencingLaboratory,
+            List<CSVExperimentImportService.PendingFile> pendingFiles,
+            String experimentAccession, String runAccession, boolean overwrite) {
         assayService.updateAssay(projectId, assayId, null, studyAccession, instrumentModel, libraryName, librarySource,
                 librarySelection, libraryStrategy, libraryLayout, insertSize, experimentAccession, runAccession);
         Assay assay = assayService.getAssayById(projectId, assayId);
@@ -35,8 +46,12 @@ public class CSVExperimentRowWriter {
         assayService.associateSample(assay, sample);
         if (!pendingFiles.isEmpty()) entityManager.flush();
         for (var pendingFile : pendingFiles) {
-            File.importPending(assay.project.id, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
-                    pendingFile.unencryptedMd5(), pendingFile.readRole()).ifPresent(message -> {
+            var validationError = overwrite
+                    ? File.importPending(assay.project.id, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
+                            pendingFile.unencryptedMd5(), pendingFile.readRole(), true)
+                    : File.importPending(assay.project.id, assayId, sample, assay, pendingFile.fileName(), pendingFile.md5(),
+                            pendingFile.unencryptedMd5(), pendingFile.readRole());
+            validationError.ifPresent(message -> {
                 throw new FileConflictException(pendingFile.field(), pendingFile.fileName(), message);
             });
         }

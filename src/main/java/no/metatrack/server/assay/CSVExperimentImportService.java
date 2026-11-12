@@ -78,6 +78,11 @@ public class CSVExperimentImportService {
 
     @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public ExperimentImportResult importIntoAssay(Long projectId, UUID assayId, java.io.File file) {
+        return importIntoAssay(projectId, assayId, file, false);
+    }
+
+    @Transactional(Transactional.TxType.NOT_SUPPORTED)
+    public ExperimentImportResult importIntoAssay(Long projectId, UUID assayId, java.io.File file, boolean overwrite) {
         Assay assay = Assay.findByIdInProjectScope(projectId, assayId).orElseThrow(NotFoundException::new);
         if (file == null || !file.isFile()) {
             throw new BadRequestException("Import file is missing");
@@ -94,7 +99,7 @@ public class CSVExperimentImportService {
 
         for (CSVRecord record : records) {
             String row = spreadsheet == null ? "Row " + record.getRecordNumber() : spreadsheet.location(record);
-            if (importRecord(projectId, assay, record, errors, importedReferences, rules, row)) acceptedCount++;
+            if (importRecord(projectId, assay, record, errors, importedReferences, rules, row, overwrite)) acceptedCount++;
         }
         return new ExperimentImportResult(acceptedCount, errors);
     }
@@ -132,7 +137,8 @@ public class CSVExperimentImportService {
             List<CSVExperimentRowError> errors,
             Set<String> importedReferences,
             AssayVocabularyRules rules,
-            String row) {
+            String row,
+            boolean overwrite) {
         String sampleName = value(record, "Sample Name");
         if (sampleName == null || sampleName.isBlank()) {
             errors.add(new CSVExperimentRowError(
@@ -160,11 +166,13 @@ public class CSVExperimentImportService {
         }
 
         Integer insertSize = parseInteger(record, row, errors);
-        boolean accessionConflict = hasAccessionConflict(
-                assay.experimentAccession, value(record, "Experiment Accession"), "Experiment Accession", row, errors);
-        accessionConflict |=
-                hasAccessionConflict(assay.runAccession, value(record, "Run Accession"), "Run Accession", row, errors);
-        if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return false;
+        if (!overwrite) {
+            boolean accessionConflict = hasAccessionConflict(
+                    assay.experimentAccession, value(record, "Experiment Accession"), "Experiment Accession", row, errors);
+            accessionConflict |= hasAccessionConflict(
+                    assay.runAccession, value(record, "Run Accession"), "Run Accession", row, errors);
+            if (hasMetadataConflict(assay, metadata, insertSize, row, errors) || accessionConflict) return false;
+        }
         int rowErrorCount = errors.size();
         Set<String> rowReferences = new HashSet<>();
         List<PendingFile> pendingFiles = new ArrayList<>();
@@ -182,7 +190,8 @@ public class CSVExperimentImportService {
                 importedReferences,
                 rowReferences,
                 pendingFiles,
-                errors);
+                errors,
+                overwrite);
         prepareFile(
                 owningProjectId,
                 assay,
@@ -196,7 +205,8 @@ public class CSVExperimentImportService {
                 importedReferences,
                 rowReferences,
                 pendingFiles,
-                errors);
+                errors,
+                overwrite);
         prepareFile(
                 owningProjectId,
                 assay,
@@ -210,11 +220,14 @@ public class CSVExperimentImportService {
                 importedReferences,
                 rowReferences,
                 pendingFiles,
-                errors);
+                errors,
+                overwrite);
         if (errors.size() > rowErrorCount || hasError(errors, row)) return false;
 
         boolean newlyAssociated;
         try {
+            String experimentAccession = patchValue(record, "Experiment Accession");
+            String runAccession = patchValue(record, "Run Accession");
             newlyAssociated = rowWriter.write(
                     projectId,
                     assay.id,
@@ -230,8 +243,10 @@ public class CSVExperimentImportService {
                     patchValue(record, "Sequencing platform"),
                     patchValue(record, "Sequencing Laboratory"),
                     pendingFiles,
-                    patchValue(record, "Experiment Accession"),
-                    patchValue(record, "Run Accession"));
+                    experimentAccession,
+                    runAccession,
+                    overwrite);
+            applyImportedAssayValues(assay, metadata, insertSize, experimentAccession, runAccession);
         } catch (AssayVocabularyValidationException e) {
             e.violations()
                     .forEach(violation -> errors.add(new CSVExperimentRowError(
@@ -248,6 +263,30 @@ public class CSVExperimentImportService {
         return newlyAssociated;
     }
 
+    private void applyImportedAssayValues(
+            Assay assay,
+            Map<String, String> metadata,
+            Integer insertSize,
+            String experimentAccession,
+            String runAccession) {
+        assay.studyAccession = populatedOrExisting(metadata.get("study_accession"), assay.studyAccession);
+        assay.instrumentModel = populatedOrExisting(metadata.get("instrument_model"), assay.instrumentModel);
+        assay.libraryName = populatedOrExisting(metadata.get("library_name"), assay.libraryName);
+        assay.librarySource = populatedOrExisting(metadata.get("library_source"), assay.librarySource);
+        assay.librarySelection = populatedOrExisting(metadata.get("library_selection"), assay.librarySelection);
+        assay.libraryStrategy = populatedOrExisting(metadata.get("library_strategy"), assay.libraryStrategy);
+        assay.libraryLayout = populatedOrExisting(metadata.get("library_layout"), assay.libraryLayout);
+        assay.sequencingPlatform = populatedOrExisting(metadata.get("sequencing_platform"), assay.sequencingPlatform);
+        assay.sequencingLaboratory = populatedOrExisting(metadata.get("sequencing_laboratory"), assay.sequencingLaboratory);
+        if (insertSize != null) assay.insertSize = insertSize;
+        assay.experimentAccession = populatedOrExisting(experimentAccession, assay.experimentAccession);
+        assay.runAccession = populatedOrExisting(runAccession, assay.runAccession);
+    }
+
+    private String populatedOrExisting(String incoming, String existing) {
+        return incoming == null || incoming.isBlank() ? existing : incoming;
+    }
+
     private void prepareFile(
             Long projectId,
             Assay assay,
@@ -261,7 +300,8 @@ public class CSVExperimentImportService {
             Set<String> importedReferences,
             Set<String> rowReferences,
             List<PendingFile> pendingFiles,
-            List<CSVExperimentRowError> errors) {
+            List<CSVExperimentRowError> errors,
+            boolean overwrite) {
         if (fileName == null || fileName.isBlank()) return;
         String normalizedMd5 = md5 == null || md5.isBlank() ? null : md5;
         String normalizedUnencryptedMd5 = unencryptedMd5 == null || unencryptedMd5.isBlank()
@@ -275,9 +315,18 @@ public class CSVExperimentImportService {
         }
         if (!valid) return;
 
-        File.validateImportPending(
-                        projectId, assay.id, sample, assay, fileName, normalizedMd5, normalizedUnencryptedMd5, readRole)
-                .ifPresent(message -> errors.add(new CSVExperimentRowError(row, field, fileName, message)));
+        Optional<String> validationError = overwrite
+                ? File.validateImportPending(
+                        projectId, assay.id, sample, assay, fileName, normalizedMd5, normalizedUnencryptedMd5, readRole,
+                        true)
+                : File.validateImportPending(
+                        projectId, assay.id, sample, assay, fileName, normalizedMd5, normalizedUnencryptedMd5, readRole);
+        validationError.ifPresent(message -> errors.add(new CSVExperimentRowError(
+                row,
+                field,
+                fileName,
+                message,
+                message.startsWith("Conflicting file metadata") ? "OVERWRITE_CONFLICT" : "VALIDATION_ERROR")));
         if (errors.stream()
                 .anyMatch(error -> error.row().equals(row) && error.field().equals(field))) {
             valid = false;
@@ -323,7 +372,8 @@ public class CSVExperimentImportService {
                         row,
                         VOCABULARY_HEADERS.get(entry.getKey()),
                         incoming,
-                        "Cannot replace existing value '" + existing + "' with '" + incoming + "'"));
+                        "Cannot replace existing value '" + existing + "' with '" + incoming + "'",
+                        "OVERWRITE_CONFLICT"));
                 hasConflict = true;
             }
         }
@@ -332,7 +382,8 @@ public class CSVExperimentImportService {
                     row,
                     "Insert Size",
                     insertSize.toString(),
-                    "Cannot replace existing value '" + assay.insertSize + "' with '" + insertSize + "'"));
+                    "Cannot replace existing value '" + assay.insertSize + "' with '" + insertSize + "'",
+                    "OVERWRITE_CONFLICT"));
             hasConflict = true;
         }
         return hasConflict;
@@ -346,7 +397,11 @@ public class CSVExperimentImportService {
                 || existing.isBlank()
                 || existing.equals(incoming)) return false;
         errors.add(new CSVExperimentRowError(
-                row, field, incoming, "Cannot replace existing value '" + existing + "' with '" + incoming + "'"));
+                row,
+                field,
+                incoming,
+                "Cannot replace existing value '" + existing + "' with '" + incoming + "'",
+                "OVERWRITE_CONFLICT"));
         return true;
     }
 
