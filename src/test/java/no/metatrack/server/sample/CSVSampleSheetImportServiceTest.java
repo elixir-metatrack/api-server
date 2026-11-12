@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -266,9 +267,158 @@ class CSVSampleSheetImportServiceTest {
             assertTrue(noOpResult.errors().isEmpty());
 
             changed.set(true);
-            SampleImportResult updateResult = service.importNewSamples(1L, update.toFile());
+            SampleImportResult updateResult = service.importNewSamples(1L, update.toFile(), true);
             assertEquals(1, updateResult.acceptedCount());
             assertTrue(updateResult.errors().isEmpty());
+        }
+    }
+
+    @Test
+    void defaultImportRejectsReplacingAnExistingPopulatedBuiltInField() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        Sample existing = new Sample();
+        existing.id = java.util.UUID.randomUUID();
+        existing.name = "existing";
+        existing.location = "Oslo";
+        service.sampleService = mock(SampleService.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "findSampleByName" -> Optional.of(existing);
+            case "updateSample" -> true;
+            default -> null;
+        });
+        service.metadataService = new SampleMetadataService();
+        Path csv = Files.writeString(directory.resolve("existing-conflict.csv"),
+                "Sample Name,Location\nexisting,Bergen\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            SampleImportResult result = service.importNewSamples(1L, csv.toFile());
+
+            assertEquals(0, result.acceptedCount());
+            assertEquals(1, result.errors().size());
+            assertEquals("location", result.errors().getFirst().fieldKey());
+            assertEquals("OVERWRITE_CONFLICT", result.errors().getFirst().code());
+            assertTrue(mockingDetails(service.sampleService).getInvocations().stream()
+                    .noneMatch(invocation -> invocation.getMethod().getName().equals("updateSample")));
+        }
+    }
+
+    @Test
+    void overwriteImportReplacesPopulatedValuesAndLeavesBlankCellsUnchanged() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        Sample existing = new Sample();
+        existing.id = java.util.UUID.randomUUID();
+        existing.name = "existing";
+        existing.location = "Oslo";
+        existing.alias = "old alias";
+        service.sampleService = mock(SampleService.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "findSampleByName" -> Optional.of(existing);
+            case "updateSample" -> true;
+            default -> null;
+        });
+        service.metadataService = new SampleMetadataService();
+        Path csv = Files.writeString(directory.resolve("existing-overwrite.csv"),
+                "Sample Name,Location,Alias\nexisting,Bergen,\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            SampleImportResult result = service.importNewSamples(1L, csv.toFile(), true);
+
+            assertEquals(1, result.acceptedCount());
+            assertTrue(result.errors().isEmpty());
+            var update = mockingDetails(service.sampleService).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("updateSample"))
+                    .findFirst().orElseThrow();
+            assertNull(update.getArgument(3));
+            assertEquals("Bergen", update.getArgument(6));
+        }
+    }
+
+    @Test
+    void defaultImportAllowsBackfillingAnEmptyExistingField() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        Sample existing = new Sample();
+        existing.id = java.util.UUID.randomUUID();
+        existing.name = "existing";
+        service.sampleService = mock(SampleService.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "findSampleByName" -> Optional.of(existing);
+            case "updateSample" -> true;
+            default -> null;
+        });
+        service.metadataService = new SampleMetadataService();
+        Path csv = Files.writeString(directory.resolve("existing-backfill.csv"),
+                "Sample Name,Location\nexisting,Bergen\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of());
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            SampleImportResult result = service.importNewSamples(1L, csv.toFile());
+
+            assertEquals(1, result.acceptedCount());
+            assertTrue(result.errors().isEmpty());
+        }
+    }
+
+    @Test
+    void defaultImportRejectsCustomMetadataReplacementButOverwriteAcceptsIt() throws Exception {
+        CSVSampleSheetImportService service = new CSVSampleSheetImportService();
+        service.vocabularyService = mock(SampleVocabularyService.class);
+        when(service.vocabularyService.loadRules(1L)).thenReturn(new SampleVocabularyRules(Set.of(), Map.of()));
+        Sample existing = new Sample();
+        existing.id = java.util.UUID.randomUUID();
+        existing.name = "existing";
+        service.sampleService = mock(SampleService.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "findSampleByName" -> Optional.of(existing);
+            case "updateSample" -> true;
+            default -> null;
+        });
+        service.metadataService = spy(new SampleMetadataService());
+        doReturn(Map.of("source_code", "old value")).when(service.metadataService).getActiveMetadata(existing);
+        SampleMetadataField field = metadataField("source_code", "Source Code");
+        Path csv = Files.writeString(directory.resolve("existing-custom-overwrite.csv"),
+                "Sample Name,Source Code\nexisting,new value\n");
+
+        try (MockedStatic<PanacheEntityBase> entities = mockStatic(PanacheEntityBase.class)) {
+            Project project = new Project();
+            project.id = 1L;
+            entities.when(() -> Project.findByIdOptional(1L)).thenReturn(Optional.of(project));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is null order by key", 1L)).thenReturn(List.of(field));
+            entities.when(() -> SampleMetadataField.list(
+                    "project.id = ?1 and archivedOn is not null order by key", 1L)).thenReturn(List.of());
+
+            SampleImportResult safeResult = service.importNewSamples(1L, csv.toFile());
+            assertEquals(0, safeResult.acceptedCount());
+            assertEquals("OVERWRITE_CONFLICT", safeResult.errors().getFirst().code());
+
+            SampleImportResult overwriteResult = service.importNewSamples(1L, csv.toFile(), true);
+            assertEquals(1, overwriteResult.acceptedCount());
+            assertTrue(overwriteResult.errors().isEmpty());
         }
     }
 
