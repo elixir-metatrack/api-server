@@ -444,10 +444,21 @@ when an accepted column alias was present in the uploaded file, and `sample` con
 ## Excel Table Imports and Exports
 
 Sample and experiment uploads accept `.xlsx` and `.xls` as well as the existing CSV/TSV formats.
-They use the same multipart `file` parameter and endpoints:
+They use the same multipart `file` parameter and standard endpoints:
 
 - `POST /api/projects/{projectId}/samples/samplesheet`
 - `POST /api/projects/{projectId}/assays/{assayId}/experiments`
+
+To explicitly overwrite existing populated values, submit the same sheet to the corresponding overwrite endpoint:
+
+- `POST /api/projects/{projectId}/samples/samplesheet/overwrite`
+- `POST /api/projects/{projectId}/assays/{assayId}/experiments/overwrite`
+
+Standard imports continue to accept new values for empty fields, but reject attempts to replace populated values.
+Overwrite imports preserve blank cells, process rows independently, and run the same parsing and vocabulary validation;
+they do not bypass sample/assay ownership or file upload lifecycle checks. Row errors include a `code` of
+`OVERWRITE_CONFLICT` when an existing value can be replaced through an overwrite import, or `VALIDATION_ERROR` for
+other validation failures. Clients can use the conflict code to ask the user whether to retry with the overwrite route.
 
 The server detects Excel files from their contents. Downloadable XLSX templates and the worksheet format
 are described in [Excel template version 1](docs/excel-template-v1.md).
