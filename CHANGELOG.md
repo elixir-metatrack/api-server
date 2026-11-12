@@ -1,5 +1,52 @@
 # Changelog
 
+## [1.0.0](https://github.com/elixir-metatrack/api-server/compare/0.9.0...1.0.0) (2026-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sample:** Sample requests and responses no longer expose MLST. The database migration permanently drops existing sample MLST values and obsolete MLST vocabularies.
+
+### Features
+
+* **admin:** add project recovery, dashboard and audit history ([881fdec](https://github.com/elixir-metatrack/api-server/commit/881fdecc35110c448afd9e4f150c23e02f4d7410))
+* **assay:** add overwrite mode for experiment imports ([de29e30](https://github.com/elixir-metatrack/api-server/commit/de29e3090da4e96ca95721097195df86fd154c18))
+* **assay:** report newly linked sample counts in experiment imports ([8c218da](https://github.com/elixir-metatrack/api-server/commit/8c218dad6e46539d36e06ff4d93946ea250daf3b))
+* **auth:** grant system admins owner-level project access ([ace8bf8](https://github.com/elixir-metatrack/api-server/commit/ace8bf871032a084cff10219d2b6581e4862f823))
+* **file:** allow overwriting pending import metadata ([640fa40](https://github.com/elixir-metatrack/api-server/commit/640fa40a640d54511f8fbf1986565365cc4cce3f))
+* **sample:** add overwrite mode for sample sheet imports ([be397cf](https://github.com/elixir-metatrack/api-server/commit/be397cf468da4cfee61f0fe67a8792c8738656d4))
+* **sample:** allow Unicode custom metadata keys ([60f942c](https://github.com/elixir-metatrack/api-server/commit/60f942ccfe71ec0e667a4327d62381fe0dd83e98))
+* **sample:** remove built-in MLST field ([f5b9565](https://github.com/elixir-metatrack/api-server/commit/f5b9565863f6a75b59e7c279fffb7323140cb3b5))
+* **sample:** report accepted import rows and detect no-op updates ([ea798b8](https://github.com/elixir-metatrack/api-server/commit/ea798b83efe3989a720bbe339b3b93dae5bac2a7))
+
+
+### Bug Fixes
+
+* **deps:** update aws-java-sdk-v2 monorepo to v2.57.13 ([#137](https://github.com/elixir-metatrack/api-server/issues/137)) ([e14f477](https://github.com/elixir-metatrack/api-server/commit/e14f47734f9cc72afd56ccde395106657514f18e))
+* **deps:** update dependency software.amazon.awssdk:s3 to v2.58.0 ([566d902](https://github.com/elixir-metatrack/api-server/commit/566d90237b441ae01e2de5f7a4f8a3c23b1edeeb))
+
+
+### Documentation
+
+* **admin:** document system administration API and configuration ([740e311](https://github.com/elixir-metatrack/api-server/commit/740e3114c7260d7465c1638e9f7050e91fdfdd8d))
+* **import:** document overwrite import endpoints ([338c800](https://github.com/elixir-metatrack/api-server/commit/338c800c82558c3b3046b53964538b9cb507adb5))
+* **upload:** document upload batch response bodies ([d629261](https://github.com/elixir-metatrack/api-server/commit/d629261e272c171ea40a923a40932500b3b30ec7))
+
+
+### Tests
+
+* **import:** cover accepted counts and scoped partial imports ([ffe169e](https://github.com/elixir-metatrack/api-server/commit/ffe169e5f7c85f2f73c1ab8657f34049c6c70f1d))
+* **import:** cover overwrite conflict handling ([2d0537e](https://github.com/elixir-metatrack/api-server/commit/2d0537ea231882c80769b6c62212906d946a3bab))
+* **sample:** cover MLST as custom metadata ([fb689ef](https://github.com/elixir-metatrack/api-server/commit/fb689efa026ef62a8f2eab0c8092da84ddae8449))
+
+
+### Miscellaneous Chores
+
+* **assay:** remove unused OpenAPI schema import ([1c46a02](https://github.com/elixir-metatrack/api-server/commit/1c46a02568ba0e76ca6af6c7aa0a77b680d0a811))
+* **deps:** update registry.access.redhat.com/ubi9/ubi-minimal docker tag to v9.9-1793829856 ([7ef9af8](https://github.com/elixir-metatrack/api-server/commit/7ef9af89b184220bd358bcc5eec30b9400a8a385))
+* **dev:** bootstrap Keycloak database idempotently ([aa8fab8](https://github.com/elixir-metatrack/api-server/commit/aa8fab8dd21bbae0238bf6175963ae4144f544d5))
+* **main:** release 0.9.1-SNAPSHOT ([ff9af1f](https://github.com/elixir-metatrack/api-server/commit/ff9af1fbb533c4695c3518efbd26788b9fb8ff27))
+
 ## [0.9.0](https://github.com/elixir-metatrack/api-server/compare/0.8.0...0.9.0) (2026-11-10)
 
 
