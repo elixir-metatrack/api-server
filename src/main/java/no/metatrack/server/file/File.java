@@ -174,14 +174,30 @@ public class File extends PanacheEntity {
     public static Optional<String> validateImportPending(
             Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
             String unencryptedMd5, ReadRole readRole) {
+        return validateImportPending(projectId, assayId, sample, assay, fileName, md5, unencryptedMd5, readRole, false);
+    }
+
+    public static Optional<String> validateImportPending(
+            Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
+            String unencryptedMd5, ReadRole readRole, boolean overwrite) {
         String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
         Optional<File> existing = findByVirtualPathOptional(virtualPath);
         if (existing.isPresent()) {
             File file = existing.get();
-            if (file.status != UploadStatus.PENDING || file.sample != sample || file.assay != assay
-                    || !java.util.Objects.equals(file.md5, md5)
-                    || !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5)
-                    || (file.readRole != null && file.readRole != readRole)) {
+            if (file.status != UploadStatus.PENDING || file.sample != sample || file.assay != assay) {
+                return Optional.of("File is not pending for this sample and assay");
+            }
+            boolean metadataConflict = overwrite
+                    ? (md5 != null && !java.util.Objects.equals(file.md5, md5))
+                            || (unencryptedMd5 != null && !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5))
+                            || (file.readRole != null && file.readRole != readRole)
+                    : !java.util.Objects.equals(file.md5, md5)
+                            || !java.util.Objects.equals(file.unencryptedMd5, unencryptedMd5)
+                            || (file.readRole != null && file.readRole != readRole);
+            if (metadataConflict && overwrite && (file.uploadBatchEntry != null || file.uploadedBy != null)) {
+                return Optional.of("File metadata cannot be replaced while an upload is active");
+            }
+            if (metadataConflict && !overwrite) {
                 return Optional.of("Conflicting file metadata for '" + fileName + "'");
             }
         }
@@ -191,14 +207,27 @@ public class File extends PanacheEntity {
     public static Optional<String> importPending(
             Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
             String unencryptedMd5, ReadRole readRole) {
+        return importPending(projectId, assayId, sample, assay, fileName, md5, unencryptedMd5, readRole, false);
+    }
+
+    public static Optional<String> importPending(
+            Long projectId, UUID assayId, Sample sample, Assay assay, String fileName, String md5,
+            String unencryptedMd5, ReadRole readRole, boolean overwrite) {
         Optional<String> validationError = validateImportPending(
-                projectId, assayId, sample, assay, fileName, md5, unencryptedMd5, readRole);
+                projectId, assayId, sample, assay, fileName, md5, unencryptedMd5, readRole, overwrite);
         if (validationError.isPresent()) return validationError;
 
         String virtualPath = PresignUrlService.virtualPath(projectId, assayId, sample.name, fileName);
         Optional<File> existing = findByVirtualPathOptional(virtualPath);
         if (existing.isPresent()) {
-            if (existing.get().readRole == null) existing.get().readRole = readRole;
+            File file = existing.get();
+            if (overwrite) {
+                if (md5 != null) file.md5 = md5;
+                if (unencryptedMd5 != null) file.unencryptedMd5 = unencryptedMd5;
+                file.readRole = readRole;
+            } else if (file.readRole == null) {
+                file.readRole = readRole;
+            }
             return Optional.empty();
         }
 
