@@ -69,6 +69,11 @@ class CSVExperimentImportServiceTest {
 
     private ExperimentImportResult importResult(Map<String, Set<String>> terms, Path path,
             Optional<Sample> projectSample) throws Exception {
+        return importResult(terms, path, projectSample, false);
+    }
+
+    private ExperimentImportResult importResult(Map<String, Set<String>> terms, Path path,
+            Optional<Sample> projectSample, boolean overwrite) throws Exception {
         if (assay.id == null) assay.id = UUID.randomUUID();
         assay.name = "assay";
         assay.project = new Project();
@@ -91,7 +96,7 @@ class CSVExperimentImportServiceTest {
              MockedStatic<Sample> scopedSamples = mockStatic(Sample.class)) {
             scopedAssays.when(() -> Assay.findByIdInProjectScope(1L, assay.id)).thenReturn(Optional.of(assay));
             scopedSamples.when(() -> Sample.findBySampleNameInProject("sample", 1L)).thenReturn(projectSample);
-            return service.importIntoAssay(1L, assay.id, path.toFile());
+            return service.importIntoAssay(1L, assay.id, path.toFile(), overwrite);
         }
     }
 
@@ -193,7 +198,41 @@ class CSVExperimentImportServiceTest {
         var errors = importFile(Map.of(), path);
         assertEquals(1, errors.size());
         assertEquals("Study Accession", errors.getFirst().field());
+        assertEquals("OVERWRITE_CONFLICT", errors.getFirst().code());
         assertEquals("existing", assay.studyAccession);
+    }
+
+    @Test
+    void laterRowsCheckAssayMetadataWrittenByEarlierRows() throws Exception {
+        Path path = Files.writeString(directory.resolve("sequential-assay-metadata.csv"),
+                "Sample Name,Study Accession\nsample,first-study\nsample,second-study\n");
+
+        ExperimentImportResult result = importResult(Map.of(), path);
+
+        assertEquals(1, result.acceptedCount());
+        assertEquals(1, result.errors().size());
+        assertEquals("Row 2", result.errors().getFirst().row());
+        assertEquals("OVERWRITE_CONFLICT", result.errors().getFirst().code());
+        assertEquals("first-study", assay.studyAccession);
+    }
+
+    @Test
+    void overwriteImportReplacesAssayMetadataButRetainsVocabularyValidation() throws Exception {
+        assay.studyAccession = "existing-study";
+        Path valid = Files.writeString(directory.resolve("overwrite-valid.csv"),
+                "Sample Name,Study Accession\nsample,new-study\n");
+        assertTrue(importResult(Map.of(), valid, Optional.of(sample), true).errors().isEmpty());
+        assertEquals("new-study", assay.studyAccession);
+
+        assay.instrumentModel = "existing instrument";
+        Path invalid = Files.writeString(directory.resolve("overwrite-invalid.csv"),
+                "Sample Name,Sequencing instrument\nsample,not-allowed\n");
+        ExperimentImportResult result = importResult(
+                Map.of("instrument_model", Set.of("allowed")), invalid, Optional.of(sample), true);
+
+        assertEquals(1, result.errors().size());
+        assertEquals("VALIDATION_ERROR", result.errors().getFirst().code());
+        assertEquals("existing instrument", assay.instrumentModel);
     }
 
     private FileResponse exportFile(Assay source, String name, ReadRole role) {
@@ -597,10 +636,28 @@ class CSVExperimentImportServiceTest {
             assertEquals(1, errors.size());
             assertEquals("File Name", errors.getFirst().field());
             assertEquals("Conflicting file metadata", errors.getFirst().message());
+            assertEquals("OVERWRITE_CONFLICT", errors.getFirst().code());
             assertEquals("instrument", assay.instrumentModel);
             assertEquals(Instant.EPOCH, assay.modifiedOn);
             verify(assay, never()).addSample(any());
             files.verify(() -> File.importPending(anyLong(), any(), any(), any(), any(), any(), any(), any()), never());
+        }
+    }
+
+    @Test
+    void fileOwnershipAndUploadStateFailuresRemainValidationErrors() throws Exception {
+        assay.id = UUID.randomUUID();
+        try (MockedStatic<File> files = mockStatic(File.class)) {
+            files.when(() -> File.validateImportPending(1L, assay.id, sample, assay,
+                    "reads.fastq", "md5", null, ReadRole.SINGLE))
+                    .thenReturn(Optional.of("File is not pending for this sample and assay"));
+
+            var errors = importRows(Map.of(), row("platform", "lab", "100"));
+
+            assertEquals(1, errors.size());
+            assertEquals("File Name", errors.getFirst().field());
+            assertEquals("VALIDATION_ERROR", errors.getFirst().code());
+            verify(assay, never()).addSample(any());
         }
     }
 
