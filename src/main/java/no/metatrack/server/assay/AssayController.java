@@ -3,22 +3,19 @@ package no.metatrack.server.assay;
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.MediaType;
-import no.metatrack.server.project.Project;
+import jakarta.ws.rs.core.Response;
 import no.metatrack.server.file.File;
 import no.metatrack.server.file.FileResponse;
 import no.metatrack.server.file.FileService;
+import no.metatrack.server.project.Project;
 import no.metatrack.server.project.ProjectRole;
 import no.metatrack.server.project.ProjectRoleCheck;
 import no.metatrack.server.sample.Sample;
 import no.metatrack.server.sample.SampleResponse;
 import no.metatrack.server.sample.metadata.SampleMetadataService;
 import no.metatrack.server.spreadsheet.TableUploadSupport;
-import org.jboss.resteasy.reactive.RestForm;
-import org.jboss.resteasy.reactive.multipart.FileUpload;
 import org.eclipse.microprofile.openapi.annotations.Operation;
-import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.ExampleObject;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -27,6 +24,8 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.util.List;
 import java.util.Map;
@@ -39,6 +38,7 @@ public class AssayController {
 
     @Inject
     SampleMetadataService metadataService;
+
     @Inject
     AssayService assayService;
 
@@ -80,15 +80,28 @@ public class AssayController {
 
     @POST
     @Authenticated
-    @Operation(summary = "Create an assay", description = "Requires EDITOR membership in the project. Assays are created in the parent project, not in a sub-project; the response is the created assay.")
-    @APIResponse(responseCode = "403", description = "Project EDITOR membership required, or assay creation was attempted in a sub-project")
+    @Operation(
+            summary = "Create an assay",
+            description =
+                    "Requires EDITOR membership in the project. Assays are created in the parent project, not in a"
+                            + " sub-project; the response is the created assay.")
+    @APIResponse(
+            responseCode = "403",
+            description = "Project EDITOR membership required, or assay creation was attempted in a sub-project")
     @APIResponse(responseCode = "404", description = "Project not found")
     public AssayResponse createNewAssay(
             @PathParam("projectId") Long projectId,
-            @RequestBody(description = "Assay fields", content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = CreateAssayRequest.class),
-                    examples = @ExampleObject(value = "{\"name\":\"sequencing-run-01\",\"libraryLayout\":\"PAIRED\",\"insertSize\":350}")))
-            CreateAssayRequest request) {
+            @RequestBody(
+                            description = "Assay fields",
+                            content =
+                                    @Content(
+                                            mediaType = MediaType.APPLICATION_JSON,
+                                            schema = @Schema(implementation = CreateAssayRequest.class),
+                                            examples =
+                                                    @ExampleObject(
+                                                            value =
+                                                                    "{\"name\":\"sequencing-run-01\",\"libraryLayout\":\"PAIRED\",\"insertSize\":350}")))
+                    CreateAssayRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
@@ -115,17 +128,24 @@ public class AssayController {
     @PATCH
     @Authenticated
     @Path("/{assayId}")
-    @Operation(summary = "Update an assay", description = "Requires EDITOR membership. Supplied non-null fields are updated; returns no response body.")
+    @Operation(
+            summary = "Update an assay",
+            description = "Requires EDITOR membership. Supplied non-null fields are updated; returns no response body.")
     @APIResponse(responseCode = "204", description = "Assay updated")
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or project-scoped assay not found")
     public Response updateAssay(
-            @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId,
-            @RequestBody(description = "Partial assay update; only non-null values are applied",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                            schema = @Schema(implementation = PatchAssayRequest.class),
-                            examples = @ExampleObject(value = "{\"instrumentModel\":\"NextSeq 2000\"}")))
-            PatchAssayRequest request) {
+            @PathParam("projectId") Long projectId,
+            @PathParam("assayId") UUID assayId,
+            @RequestBody(
+                            description = "Partial assay update; only non-null values are applied",
+                            content =
+                                    @Content(
+                                            mediaType = MediaType.APPLICATION_JSON,
+                                            schema = @Schema(implementation = PatchAssayRequest.class),
+                                            examples =
+                                                    @ExampleObject(value = "{\"instrumentModel\":\"NextSeq 2000\"}")))
+                    PatchAssayRequest request) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR))
             throw new WebApplicationException(Response.Status.FORBIDDEN);
@@ -154,17 +174,28 @@ public class AssayController {
     @Authenticated
     @Path("/{assayId}/experiments")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Operation(summary = "Import experiments into an assay", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field `file`. Rows are processed independently, so successful rows may be committed even when the response is 400 with row-level errors. The response includes acceptedCount and errors; upload-level 400 responses use the framework's bad-request body.")
-    @APIResponse(responseCode = "200", description = "Import result with newly linked sample row count and no row errors",
+    @Operation(
+            summary = "Import experiments into an assay",
+            description =
+                    "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field"
+                        + " `file`. Rows are processed independently, so successful rows may be committed even when"
+                        + " the response is 400 with row-level errors. The response includes acceptedCount and errors;"
+                        + " upload-level 400 responses use the framework's bad-request body.")
+    @APIResponse(
+            responseCode = "200",
+            description = "Import result with newly linked sample row count and no row errors",
             content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
-    @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
+    @APIResponse(
+            responseCode = "400",
+            description = "Upload or spreadsheet invalid, or one or more rows were rejected",
             content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or assay not found")
     public Response importExperiments(
             @PathParam("projectId") Long projectId,
             @PathParam("assayId") UUID assayId,
-            @Parameter(description = "CSV, TSV, XLS, or XLSX experiment sheet", required = true) @RestForm("file") FileUpload file) {
+            @Parameter(description = "CSV, TSV, XLS, or XLSX experiment sheet", required = true) @RestForm("file")
+                    FileUpload file) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
         if (file == null) throw new BadRequestException("No file uploaded");
@@ -182,17 +213,28 @@ public class AssayController {
     @Authenticated
     @Path("/{assayId}/experiments/overwrite")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Operation(summary = "Import experiments and overwrite populated fields", description = "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field `file`. Existing assay metadata provided by the sheet is replaced; blank cells are unchanged. Parsing, vocabulary, sample, and file upload validation still apply, and rows are processed independently.")
-    @APIResponse(responseCode = "200", description = "Import result with newly linked sample row count and no row errors",
+    @Operation(
+            summary = "Import experiments and overwrite populated fields",
+            description =
+                    "Requires EDITOR membership. Upload a CSV, TSV, XLS, or XLSX experiment sheet in multipart field"
+                        + " `file`. Existing assay metadata provided by the sheet is replaced; blank cells are"
+                        + " unchanged. Parsing, vocabulary, sample, and file upload validation still apply, and rows"
+                        + " are processed independently.")
+    @APIResponse(
+            responseCode = "200",
+            description = "Import result with newly linked sample row count and no row errors",
             content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
-    @APIResponse(responseCode = "400", description = "Upload or spreadsheet invalid, or one or more rows were rejected",
+    @APIResponse(
+            responseCode = "400",
+            description = "Upload or spreadsheet invalid, or one or more rows were rejected",
             content = @Content(schema = @Schema(implementation = ExperimentImportResult.class)))
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or assay not found")
     public Response importExperimentsOverwrite(
             @PathParam("projectId") Long projectId,
             @PathParam("assayId") UUID assayId,
-            @Parameter(description = "CSV, TSV, XLS, or XLSX experiment sheet", required = true) @RestForm("file") FileUpload file) {
+            @Parameter(description = "CSV, TSV, XLS, or XLSX experiment sheet", required = true) @RestForm("file")
+                    FileUpload file) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
         if (!projectRoleCheck.isAtLeast(projectId, ProjectRole.EDITOR)) throw new ForbiddenException();
         if (file == null) throw new BadRequestException("No file uploaded");
@@ -209,9 +251,13 @@ public class AssayController {
     @DELETE
     @Authenticated
     @Path("/{assayId}")
-    @Operation(summary = "Delete an assay", description = "Requires EDITOR membership in the assay's owning project. Returns no response body.")
+    @Operation(
+            summary = "Delete an assay",
+            description = "Requires EDITOR membership in the assay's owning project. Returns no response body.")
     @APIResponse(responseCode = "204", description = "Assay deleted")
-    @APIResponse(responseCode = "403", description = "Project EDITOR membership required, or assay belongs to a parent project")
+    @APIResponse(
+            responseCode = "403",
+            description = "Project EDITOR membership required, or assay belongs to a parent project")
     @APIResponse(responseCode = "404", description = "Project or project-scoped assay not found")
     public Response deleteAssay(@PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
@@ -225,7 +271,12 @@ public class AssayController {
     @PUT
     @Authenticated
     @Path("/{assayId}/samples")
-    @Operation(summary = "Add samples to an assay", description = "Requires EDITOR membership. Sample names are resolved in the project; successful associations are applied even if other names are missing. Returns an array of error messages, empty when all names were processed successfully.")
+    @Operation(
+            summary = "Add samples to an assay",
+            description =
+                    "Requires EDITOR membership. Sample names are resolved in the project; successful associations are"
+                            + " applied even if other names are missing. Returns an array of error messages, empty when"
+                            + " all names were processed successfully.")
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or assay not found")
     public List<String> addSamplesToAssay(
@@ -242,7 +293,11 @@ public class AssayController {
     @DELETE
     @Authenticated
     @Path("/{assayId}/samples")
-    @Operation(summary = "Remove samples from an assay", description = "Requires EDITOR membership. Sample names are resolved in the project; removals are applied for existing names and missing names are returned as error messages.")
+    @Operation(
+            summary = "Remove samples from an assay",
+            description =
+                    "Requires EDITOR membership. Sample names are resolved in the project; removals are applied for"
+                            + " existing names and missing names are returned as error messages.")
     @APIResponse(responseCode = "403", description = "Project EDITOR membership required")
     @APIResponse(responseCode = "404", description = "Project or assay not found")
     public List<String> removeSamplesFromAssay(
@@ -259,7 +314,9 @@ public class AssayController {
     @GET
     @Authenticated
     @Path("/{assayId}/samples")
-    @Operation(summary = "List samples in an assay", description = "Requires VIEWER membership. Includes active custom metadata for returned samples.")
+    @Operation(
+            summary = "List samples in an assay",
+            description = "Requires VIEWER membership. Includes active custom metadata for returned samples.")
     public List<SampleResponse> getSamplesInAssay(
             @PathParam("projectId") Long projectId, @PathParam("assayId") UUID assayId) {
         if (!Project.projectExists(projectId)) throw new NotFoundException("Project not found");
@@ -289,7 +346,9 @@ public class AssayController {
     @GET
     @Authenticated
     @Path("/{assayId}/samples/{sampleId}/files")
-    @Operation(summary = "List files for a sample in an assay", description = "Requires VIEWER membership in the project.")
+    @Operation(
+            summary = "List files for a sample in an assay",
+            description = "Requires VIEWER membership in the project.")
     public List<FileResponse> getFilesInSampleAndAssay(
             @PathParam("projectId") Long projectId,
             @PathParam("assayId") UUID assayId,
